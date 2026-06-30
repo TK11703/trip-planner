@@ -1,0 +1,45 @@
+@page "/faq"
+
+<PageTitle>Trip Planner — FAQ</PageTitle>
+
+<h1 class="mb-3">Frequently asked questions</h1>
+<p class="lead">Public help content. This page does not load or display personal trip data.</p>
+
+@if (_entries is { Count: > 0 })
+{
+    <div class="accordion" id="faqAccordion">
+        @for (var i = 0; i < _entries.Count; i++)
+        {
+            var entry = _entries[i];
+            var headerId = $"faqHeader{i}";
+            var collapseId = $"faqCollapse{i}";
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="@headerId">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId">
+                        @entry.Question
+                    </button>
+                </h2>
+                <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">@entry.Answer</div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <PublicContentFallback Title="FAQ content is unavailable right now." />
+}
+
+@code {
+    private record FaqEntry(string Question, string Answer);
+
+    private readonly IReadOnlyList<FaqEntry> _entries = new List<FaqEntry>
+    {
+        new("How do I sign in?", "Sign in with your Azure Entra account. The planner uses Microsoft Identity Web to keep your session secure."),
+        new("Can other people see my trips?", "No. Every trip query is filtered by your immutable Azure Entra identifier, and cross-user lookups return a generic not-found response."),
+        new("How are dates validated?", "Trips require an end date on or after the start date. Tracked items must fall within their parent trip's date range."),
+        new("What does the timeline show?", "The timeline uses fullcalendar.io to plot every trip leg and tracked item across the trip date range, including empty days."),
+        new("How do I delete a trip?", "Trip deletion is a planned enhancement. For now you can update trip details or remove tracked items individually."),
+    };
+}

@@ -1,0 +1,23 @@
+@if (State == TripAccessStateKind.NotFoundOrDenied)
+{
+    <div class="alert alert-warning">
+        <strong>This trip isn't available.</strong>
+        <div class="small">If you expected to see a trip here, double check the link or return to your <a href="/">recent trips</a>.</div>
+    </div>
+}
+else if (State == TripAccessStateKind.ReauthRequired)
+{
+    <div class="alert alert-info">
+        Your session has expired. <a href="MicrosoftIdentity/Account/SignIn">Sign in again</a> to view your trip.
+    </div>
+}
+else if (State == TripAccessStateKind.Loading)
+{
+    <div class="text-secondary">Loading trip…</div>
+}
+
+@code {
+    public enum TripAccessStateKind { None, Loading, NotFoundOrDenied, ReauthRequired }
+
+    [Parameter] public TripAccessStateKind State { get; set; } = TripAccessStateKind.None;
+}

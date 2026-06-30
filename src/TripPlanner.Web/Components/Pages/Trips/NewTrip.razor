@@ -1,0 +1,27 @@
+@page "/trips/new"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ITripApiClient TripApi
+@inject NavigationManager Nav
+
+<PageTitle>Create trip</PageTitle>
+
+<h1 class="mb-3">Create trip</h1>
+
+<TripForm Model="_model" CancelHref="/" OnSubmit="HandleSubmitAsync" />
+
+@code {
+    private TripPlanner.Web.Components.Trips.TripForm.TripFormModel _model = new();
+
+    private async Task HandleSubmitAsync(TripPlanner.Web.Components.Trips.TripForm.TripFormModel model)
+    {
+        var request = new CreateTripRequest(
+            model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Destination) ? null : model.Destination.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            DateOnly.FromDateTime(model.StartDate),
+            DateOnly.FromDateTime(model.EndDate));
+        var created = await TripApi.CreateAsync(request);
+        Nav.NavigateTo($"/trips/{created.TripId}");
+    }
+}

@@ -1,0 +1,154 @@
+@page "/trips/{TripId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ITripApiClient TripApi
+
+<PageTitle>Trip details</PageTitle>
+
+@if (_loading)
+{
+    <TripAccessState State="TripAccessState.TripAccessStateKind.Loading" />
+}
+else if (_trip is null)
+{
+    <TripAccessState State="TripAccessState.TripAccessStateKind.NotFoundOrDenied" />
+}
+else
+{
+    <header class="mb-4">
+        <h1 class="mb-1">@_trip.Name</h1>
+        @if (!string.IsNullOrWhiteSpace(_trip.Destination))
+        {
+            <p class="text-secondary mb-1">@_trip.Destination</p>
+        }
+        <p class="text-secondary mb-0">@_trip.StartDate.ToLongDateString() – @_trip.EndDate.ToLongDateString()</p>
+    </header>
+
+    <div class="row g-3">
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header">Overview</div>
+                <div class="card-body">
+                    @if (!string.IsNullOrWhiteSpace(_trip.Description))
+                    {
+                        <p class="mb-2">@_trip.Description</p>
+                    }
+                    else
+                    {
+                        <p class="text-secondary mb-2">No description yet.</p>
+                    }
+                    <div class="small text-secondary">Created @_trip.CreatedAtUtc.ToString("yyyy-MM-dd")</div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">Add trip leg</div>
+                <div class="card-body">
+                    <TripLegForm TripId="@TripId" OnSaved="ReloadAsync" />
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">Add tracked item</div>
+                <div class="card-body">
+                    <TrackedItemForm TripId="@TripId" OnSaved="ReloadAsync" />
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Timeline</span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ReloadAsync">Refresh</button>
+                </div>
+                <div class="card-body">
+                    <TripTimeline @ref="_timeline" TripId="@TripId" />
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">Legs (@_trip.Legs.Count)</div>
+                <ul class="list-group list-group-flush">
+                    @if (_trip.Legs.Count == 0)
+                    {
+                        <li class="list-group-item text-secondary">No legs yet.</li>
+                    }
+                    @foreach (var leg in _trip.Legs)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <div>
+                                <div class="fw-semibold">@leg.Title</div>
+                                <div class="small text-secondary">@leg.StartAt.ToString("g") @(leg.EndAt is { } e ? "→ " + e.ToString("g") : null)</div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteLegAsync(leg.TripLegId)">Remove</button>
+                        </li>
+                    }
+                </ul>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Tracked items (@_trip.TrackedItems.Count)</div>
+                <ul class="list-group list-group-flush">
+                    @if (_trip.TrackedItems.Count == 0)
+                    {
+                        <li class="list-group-item text-secondary">No tracked items yet.</li>
+                    }
+                    @foreach (var item in _trip.TrackedItems)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <div>
+                                <div class="fw-semibold">@item.Title <span class="badge bg-secondary ms-1">@item.ItemType</span></div>
+                                <div class="small text-secondary">@item.StartsAt.ToString("g") @(item.EndsAt is { } e ? "→ " + e.ToString("g") : null)</div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteItemAsync(item.TrackedItemId)">Remove</button>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid TripId { get; set; }
+
+    private bool _loading = true;
+    private TripDetail? _trip;
+    private TripTimeline? _timeline;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _trip = await TripApi.GetDetailAsync(TripId);
+        }
+        catch
+        {
+            _trip = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+        if (_timeline is not null)
+        {
+            await _timeline.RefreshAsync();
+        }
+        StateHasChanged();
+    }
+
+    private async Task DeleteLegAsync(Guid tripLegId)
+    {
+        await TripApi.DeleteLegAsync(TripId, tripLegId);
+        await ReloadAsync();
+    }
+
+    private async Task DeleteItemAsync(Guid trackedItemId)
+    {
+        await TripApi.DeleteItemAsync(TripId, trackedItemId);
+        await ReloadAsync();
+    }
+}

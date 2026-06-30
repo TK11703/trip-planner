@@ -1,0 +1,19 @@
+@if (string.IsNullOrWhiteSpace(Title))
+{
+    <div class="alert alert-secondary">Content is temporarily unavailable. Please try again later.</div>
+}
+else
+{
+    <div class="alert alert-secondary">
+        <strong>@Title</strong>
+        @if (!string.IsNullOrWhiteSpace(Detail))
+        {
+            <div class="small mt-1">@Detail</div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Detail { get; set; }
+}

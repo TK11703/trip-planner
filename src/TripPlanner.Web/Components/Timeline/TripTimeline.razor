@@ -1,0 +1,53 @@
+@inject IJSRuntime JS
+@inject ITripApiClient TripApi
+@implements IAsyncDisposable
+
+<div @ref="_container" class="trip-timeline" style="min-height: 28rem"></div>
+
+@code {
+    [Parameter] public Guid TripId { get; set; }
+
+    private ElementReference _container;
+    private IJSObjectReference? _instance;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefreshAsync();
+        }
+    }
+
+    public async Task RefreshAsync()
+    {
+        var timeline = await TripApi.GetTimelineAsync(TripId);
+        if (timeline is null) return;
+        var events = timeline.Events.Select(e => new
+        {
+            id = e.Id,
+            title = e.Title,
+            start = e.Start.ToString("o"),
+            end = e.End?.ToString("o"),
+            allDay = e.AllDay,
+            extendedProps = new { sourceType = e.SourceType, displayOrder = e.DisplayOrder }
+        });
+        if (_instance is null)
+        {
+            _instance = await JS.InvokeAsync<IJSObjectReference>("tripTimeline.create", _container,
+                timeline.StartDate.ToString("yyyy-MM-dd"), timeline.EndDate.ToString("yyyy-MM-dd"), events);
+        }
+        else
+        {
+            await _instance.InvokeVoidAsync("refresh", timeline.StartDate.ToString("yyyy-MM-dd"), timeline.EndDate.ToString("yyyy-MM-dd"), events);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_instance is not null)
+        {
+            try { await _instance.InvokeVoidAsync("dispose"); } catch { }
+            await _instance.DisposeAsync();
+        }
+    }
+}
