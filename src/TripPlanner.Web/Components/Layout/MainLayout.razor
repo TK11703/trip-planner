@@ -1,0 +1,25 @@
+@inherits LayoutComponentBase
+
+<div class="page d-flex flex-column min-vh-100">
+    <NavMenu />
+    <main class="flex-grow-1">
+        <div class="container py-4">
+            @Body
+        </div>
+    </main>
+    <footer class="border-top bg-body-tertiary py-3 mt-auto">
+        <div class="container small text-secondary d-flex justify-content-between flex-wrap gap-2">
+            <span>&copy; @DateTime.UtcNow.Year Trip Planner</span>
+            <nav class="d-flex gap-3">
+                <a class="link-secondary" href="/about">About</a>
+                <a class="link-secondary" href="/faq">FAQ</a>
+            </nav>
+        </div>
+    </footer>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

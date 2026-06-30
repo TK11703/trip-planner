@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TripPlanner.Api/TripPlanner.Api.csproj" />
+    <Project Path="src/TripPlanner.AppHost/TripPlanner.AppHost.csproj" />
+    <Project Path="src/TripPlanner.Contracts/TripPlanner.Contracts.csproj" />
+    <Project Path="src/TripPlanner.Database/TripPlanner.Database.csproj" />
+    <Project Path="src/TripPlanner.ServiceDefaults/TripPlanner.ServiceDefaults.csproj" />
+    <Project Path="src/TripPlanner.Web/TripPlanner.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TripPlanner.Api.Tests/TripPlanner.Api.Tests.csproj" />
+    <Project Path="tests/TripPlanner.Database.Tests/TripPlanner.Database.Tests.csproj" />
+    <Project Path="tests/TripPlanner.E2E.Tests/TripPlanner.E2E.Tests.csproj" />
+    <Project Path="tests/TripPlanner.Web.Tests/TripPlanner.Web.Tests.csproj" />
+  </Folder>
+</Solution>

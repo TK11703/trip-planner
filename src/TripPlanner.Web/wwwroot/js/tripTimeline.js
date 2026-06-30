@@ -1,0 +1,40 @@
+// Vanilla JavaScript fullcalendar.io interop for the Blazor TripTimeline component.
+// No jQuery dependency — uses the fullcalendar global bundle loaded in App.razor.
+(function () {
+    const tripTimeline = {
+        create: function (element, startDate, endDate, events) {
+            if (!window.FullCalendar) {
+                console.warn('FullCalendar global not loaded yet.');
+                return null;
+            }
+            const calendar = new window.FullCalendar.Calendar(element, {
+                initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
+                initialDate: startDate,
+                validRange: { start: startDate, end: addOneDay(endDate) },
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listWeek' },
+                height: 'auto',
+                events: events,
+                eventOrder: 'extendedProps.displayOrder,start'
+            });
+            calendar.render();
+            const instance = {
+                refresh: function (newStart, newEnd, newEvents) {
+                    calendar.removeAllEvents();
+                    calendar.setOption('validRange', { start: newStart, end: addOneDay(newEnd) });
+                    calendar.gotoDate(newStart);
+                    newEvents.forEach(function (e) { calendar.addEvent(e); });
+                },
+                dispose: function () { calendar.destroy(); }
+            };
+            return instance;
+        }
+    };
+
+    function addOneDay(dateString) {
+        const d = new Date(dateString + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + 1);
+        return d.toISOString().substring(0, 10);
+    }
+
+    window.tripTimeline = tripTimeline;
+})();

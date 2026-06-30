@@ -1,0 +1,66 @@
+@inject ITripApiClient TripApi
+
+<section class="mb-4">
+    <div class="d-flex justify-content-between align-items-end mb-2">
+        <h2 class="h4 mb-0">Recent trips</h2>
+        <a class="btn btn-outline-primary btn-sm" href="/trips/new">New trip</a>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-secondary">Loading recent trips…</div>
+    }
+    else if (_error is not null)
+    {
+        <PublicContentFallback Title="We couldn't load your trips right now." Detail="@_error" />
+    }
+    else if (_trips.Count == 0)
+    {
+        <NoTripsEmptyState />
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var trip in _trips)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <a class="card h-100 text-decoration-none text-reset shadow-sm" href="@($"/trips/{trip.TripId}")">
+                        <div class="card-body">
+                            <h3 class="h5 mb-1">@trip.Name</h3>
+                            @if (!string.IsNullOrWhiteSpace(trip.Destination))
+                            {
+                                <div class="text-secondary small mb-2">@trip.Destination</div>
+                            }
+                            <div class="small">
+                                <span class="badge bg-secondary me-2">@trip.StartDate.ToShortDateString() – @trip.EndDate.ToShortDateString()</span>
+                                <span class="text-secondary">@trip.ItemCount items</span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private string? _error;
+    private IReadOnlyList<TripSummary> _trips = Array.Empty<TripSummary>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _trips = await TripApi.GetRecentAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

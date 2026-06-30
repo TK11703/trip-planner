@@ -1,0 +1,47 @@
+@page "/"
+@rendermode InteractiveServer
+
+<PageTitle>Trip Planner</PageTitle>
+
+<section class="bg-primary text-white rounded-4 p-4 p-md-5 mb-4 shadow-sm">
+    <div class="row align-items-center g-4">
+        <div class="col-md-8">
+            <h1 class="display-5 fw-bold mb-2">Plan trips that come together.</h1>
+            <p class="lead mb-3">A modern, private trip planner for travelers. Sign in to track flights, hotels, activities, and reservations on a single timeline.</p>
+            <AuthorizeView>
+                <Authorized>
+                    <a class="btn btn-light btn-lg" href="/trips/new">Start a new trip</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-light btn-lg" href="MicrosoftIdentity/Account/SignIn">Sign in to begin</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</section>
+
+<AuthorizeView>
+    <Authorized>
+        <RecentTripsList />
+    </Authorized>
+    <NotAuthorized>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5">Your data stays yours</h2>
+                        <p class="mb-0">Only you can see your trips. Owner-scoped storage keeps trips isolated by Azure Entra identity.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5">Visualize your itinerary</h2>
+                        <p class="mb-0">A calendar timeline shows every leg, activity, and reservation across your trip date range.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>

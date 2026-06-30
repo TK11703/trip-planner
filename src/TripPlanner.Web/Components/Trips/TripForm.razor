@@ -1,0 +1,84 @@
+@using System.ComponentModel.DataAnnotations
+
+<EditForm Model="Model" OnValidSubmit="SubmitAsync" FormName="trip-form">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label class="form-label" for="name">Name</label>
+        <InputText id="name" class="form-control" @bind-Value="Model.Name" />
+        <ValidationMessage For="@(() => Model.Name)" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="destination">Destination</label>
+        <InputText id="destination" class="form-control" @bind-Value="Model.Destination" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="description">Description</label>
+        <InputTextArea id="description" rows="3" class="form-control" @bind-Value="Model.Description" />
+    </div>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label" for="startDate">Start date</label>
+            <InputDate id="startDate" class="form-control" @bind-Value="Model.StartDate" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label" for="endDate">End date</label>
+            <InputDate id="endDate" class="form-control" @bind-Value="Model.EndDate" />
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
+    }
+
+    <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">@(IsEdit ? "Save trip" : "Create trip")</button>
+        @if (!string.IsNullOrWhiteSpace(CancelHref))
+        {
+            <a class="btn btn-outline-secondary" href="@CancelHref">Cancel</a>
+        }
+    </div>
+</EditForm>
+
+@code {
+    public sealed class TripFormModel
+    {
+        [Required(ErrorMessage = "Trip name is required.")]
+        public string Name { get; set; } = string.Empty;
+        public string? Destination { get; set; }
+        public string? Description { get; set; }
+        public DateTime StartDate { get; set; } = DateTime.Today;
+        public DateTime EndDate { get; set; } = DateTime.Today.AddDays(1);
+    }
+
+    [Parameter] public TripFormModel Model { get; set; } = new();
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public string? CancelHref { get; set; }
+    [Parameter] public EventCallback<TripFormModel> OnSubmit { get; set; }
+
+    private bool _isSubmitting;
+    private string? _errorMessage;
+
+    private async Task SubmitAsync()
+    {
+        _errorMessage = null;
+        if (DateOnly.FromDateTime(Model.EndDate) < DateOnly.FromDateTime(Model.StartDate))
+        {
+            _errorMessage = "The trip end date must be on or after the start date.";
+            return;
+        }
+        try
+        {
+            _isSubmitting = true;
+            await OnSubmit.InvokeAsync(Model);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}
