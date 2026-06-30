@@ -1,50 +1,65 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+Version change: template -> 1.0.0
+Modified principles: template placeholders -> initial project principles
+Added sections: Technology Constraints; Development Workflow
+Removed sections: none
+Templates requiring updates: none; reviewed .specify/templates/plan-template.md,
+.specify/templates/spec-template.md, and .specify/templates/tasks-template.md
+Follow-up TODOs: none
+-->
+
+# Trip Planner Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Trip Planning Domain
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+The product MUST help people plan trips by managing itineraries, dated trip legs,
+and events, reservations, or activities that occur during the trip.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. .NET Application Stack
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+Backend and API code MUST use C# on the latest .NET 10. The web application MUST
+use Blazor, and the solution MUST use Aspire for local orchestration and
+container-ready composition.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Minimal API Vertical Slices
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+The API MUST use Minimal APIs, not MVC. Features MUST be organized as vertical
+slices with requests, DTOs, and handlers colocated by feature. Program.cs files
+MUST keep middleware and endpoint setup concise through extension methods.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. PostgreSQL with Dapper
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+PostgreSQL is the database. Data access MUST use Dapper instead of Entity
+Framework. Database abstractions and SQL files MUST live in a dedicated database
+project.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. Container App Readiness
+
+Application components MUST remain deployable as containers suitable for Azure
+Container Apps. Configuration MUST be environment-driven and avoid local-only
+assumptions.
+
+## Technology Constraints
+
+The system consists of a Blazor front end, a C# Minimal API middle tier, and a
+PostgreSQL database backend. Shared contracts and database access patterns MUST
+support the trip planning domain without introducing unused infrastructure.
+
+## Development Workflow
+
+Plans and tasks MUST preserve the chosen stack and architecture. Each feature
+MUST be deliverable as a small vertical slice that can be tested independently
+before broader integration.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution guides specs, plans, and implementation decisions. Changes
+require updating this file, documenting the version change, and reviewing
+affected templates or guidance. Versioning follows semantic versioning: MAJOR for
+incompatible principle changes, MINOR for new or expanded principles, and PATCH
+for clarifications.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-06-30 | **Last Amended**: 2026-06-30
