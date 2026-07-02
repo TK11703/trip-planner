@@ -19,17 +19,12 @@ namespace TripPlanner.Api.Extensions;
 
 public static class WebApplicationBuilderExtensions
 {
-    public const string AuthenticatedUserPolicy = "AuthenticatedUser";
+    public const string AuthenticatedUserPolicy = AuthenticationExtensions.AuthenticatedUserPolicy;
 
     public static WebApplicationBuilder AddTripPlannerApi(this WebApplicationBuilder builder)
     {
         builder.AddServiceDefaults();
         builder.AddTripPlannerAuthentication();
-        builder.Services.AddAuthorization(options =>
-        {
-            options.AddPolicy(AuthenticatedUserPolicy, policy => policy.RequireAuthenticatedUser());
-            options.DefaultPolicy = options.GetPolicy(AuthenticatedUserPolicy)!;
-        });
 
         builder.Services.AddOpenApi();
         builder.Services.AddHttpContextAccessor();

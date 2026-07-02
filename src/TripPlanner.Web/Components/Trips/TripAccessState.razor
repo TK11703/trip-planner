@@ -1,4 +1,12 @@
-@if (State == TripAccessStateKind.NotFoundOrDenied)
+@if (State == TripAccessStateKind.SignInRequired)
+{
+    <div class="alert alert-info">
+        <strong>Sign in required.</strong>
+        <div class="small">Sign in with your Azure Entra account before loading personal trip data.</div>
+        <a class="btn btn-primary btn-sm mt-2" href="MicrosoftIdentity/Account/SignIn">Sign in</a>
+    </div>
+}
+else if (State == TripAccessStateKind.NotFoundOrDenied)
 {
     <div class="alert alert-warning">
         <strong>This trip isn't available.</strong>
@@ -17,7 +25,7 @@ else if (State == TripAccessStateKind.Loading)
 }
 
 @code {
-    public enum TripAccessStateKind { None, Loading, NotFoundOrDenied, ReauthRequired }
+    public enum TripAccessStateKind { None, Loading, SignInRequired, NotFoundOrDenied, ReauthRequired }
 
     [Parameter] public TripAccessStateKind State { get; set; } = TripAccessStateKind.None;
 }

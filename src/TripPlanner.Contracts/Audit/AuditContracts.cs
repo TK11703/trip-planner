@@ -20,6 +20,7 @@ public static class AuditResults
 {
     public const string Success = "success";
     public const string Denied = "denied";
+    public const string Unauthenticated = "unauthenticated";
     public const string ValidationFailed = "validation-failed";
     public const string Error = "error";
 }

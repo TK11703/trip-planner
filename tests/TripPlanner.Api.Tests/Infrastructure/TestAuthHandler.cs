@@ -11,6 +11,7 @@ public sealed class TestAuthHandler : AuthenticationHandler<TestAuthHandlerOptio
     public const string SchemeName = "Test";
     public const string TestUserHeader = "X-Test-User";
     public const string TestNameHeader = "X-Test-Name";
+    public const string TestScopeHeader = "X-Test-Scope";
 
     public TestAuthHandler(IOptionsMonitor<TestAuthHandlerOptions> options, ILoggerFactory logger, UrlEncoder encoder)
         : base(options, logger, encoder)
@@ -29,6 +30,7 @@ public sealed class TestAuthHandler : AuthenticationHandler<TestAuthHandlerOptio
         {
             new("http://schemas.microsoft.com/identity/claims/objectidentifier", userId),
             new(ClaimTypes.NameIdentifier, userId),
+            new("scp", Request.Headers[TestScopeHeader].FirstOrDefault() ?? "access_as_user api://trip-planner-api/access_as_user"),
         };
         if (!string.IsNullOrWhiteSpace(displayName))
         {

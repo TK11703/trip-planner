@@ -1,4 +1,5 @@
 @inject ITripApiClient TripApi
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <section class="mb-4">
     <div class="d-flex justify-content-between align-items-end mb-2">
@@ -50,6 +51,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated != true)
+        {
+            _isLoading = false;
+            _error = "Sign in is required to access your trips.";
+            return;
+        }
+
         try
         {
             _trips = await TripApi.GetRecentAsync();

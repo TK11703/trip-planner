@@ -19,12 +19,15 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddCascadingAuthenticationState();
         builder.Services.AddAuthorization();
+        builder.Services.AddScoped<ITripPlannerApiTokenProvider, MicrosoftIdentityTripPlannerApiTokenProvider>();
+        builder.Services.AddTransient<AuthenticatedApiTokenHandler>();
 
         // HTTP client to the authenticated Minimal API resolved via Aspire service discovery.
         builder.Services.AddHttpClient<ITripApiClient, TripApiClient>(client =>
         {
             client.BaseAddress = new Uri("https+http://api");
-        });
+        })
+        .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
 
         return builder;
     }

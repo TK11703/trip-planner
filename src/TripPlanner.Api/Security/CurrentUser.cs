@@ -28,8 +28,8 @@ public sealed class CurrentUser : ICurrentUser
         if (p?.Identity?.IsAuthenticated != true) return null;
         var value = p.FindFirst(EntraObjectIdClaim)?.Value
             ?? p.FindFirst(OidClaim)?.Value
-            ?? p.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? p.FindFirst("sub")?.Value;
+            ?? p.FindFirst("sub")?.Value
+            ?? p.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }

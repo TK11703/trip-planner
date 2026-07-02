@@ -9,8 +9,15 @@ public static class AuthenticationExtensions
 {
     public static WebApplicationBuilder AddTripPlannerAuthentication(this WebApplicationBuilder builder)
     {
+        var apiScopes = builder.Configuration
+            .GetSection("AzureEntra:ApiScopes")
+            .Get<string[]>()
+            ?? [];
+
         builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
-            .AddMicrosoftIdentityWebApp(builder.Configuration, configSectionName: "AzureEntra");
+            .AddMicrosoftIdentityWebApp(builder.Configuration, configSectionName: "AzureEntra")
+            .EnableTokenAcquisitionToCallDownstreamApi(apiScopes)
+            .AddInMemoryTokenCaches();
 
         builder.Services.AddControllersWithViews()
             .AddMicrosoftIdentityUI();
