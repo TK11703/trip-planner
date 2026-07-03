@@ -18,9 +18,26 @@ public static class AuthenticationExtensions
 
         builder.Services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
         {
+            options.IncludeErrorDetails = true;
+            options.MapInboundClaims = false;
+            options.TokenValidationParameters.NameClaimType = "name";
+            options.TokenValidationParameters.RoleClaimType = "roles";
             options.Events ??= new JwtBearerEvents();
+            options.Events.OnAuthenticationFailed = context =>
+            {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("TripPlanner.Api.JwtBearer");
+                logger.LogWarning(context.Exception, "JWT authentication failed: {Message}", context.Exception?.Message);
+                return Task.CompletedTask;
+            };
             options.Events.OnChallenge = async context =>
             {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("TripPlanner.Api.JwtBearer");
+                logger.LogWarning("JWT challenge: error={Error}, description={Description}, failure={Failure}",
+                    context.Error, context.ErrorDescription, context.AuthenticateFailure?.Message);
                 context.HandleResponse();
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 context.Response.ContentType = "application/json";
@@ -28,6 +45,12 @@ public static class AuthenticationExtensions
             };
             options.Events.OnForbidden = async context =>
             {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("TripPlanner.Api.JwtBearer");
+                logger.LogWarning("JWT forbidden for {Path}. Token had scopes: {Scopes}",
+                    context.HttpContext.Request.Path,
+                    string.Join(" ", context.Principal?.FindAll("scp").Concat(context.Principal.FindAll("scope")).Select(c => c.Value) ?? Array.Empty<string>()));
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 context.Response.ContentType = "application/json";
                 await context.Response.WriteAsJsonAsync(ApiError.ReauthenticationRequired(), context.HttpContext.RequestAborted);
