@@ -3,7 +3,6 @@
 SELECT
     t.trip_id        AS "TripId",
     t.name           AS "Name",
-    t.destination    AS "Destination",
     t.start_date     AS "StartDate",
     t.end_date       AS "EndDate",
     t.updated_at_utc AS "UpdatedAtUtc",

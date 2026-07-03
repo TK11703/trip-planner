@@ -42,7 +42,7 @@ public class RecentTripsComponentTests : TestContext
     [Fact]
     public void SignedInUser_WithTrips_RendersCards()
     {
-        var trip = new TripSummary(Guid.NewGuid(), "Paris planning", "Paris", new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, 0);
+        var trip = new TripSummary(Guid.NewGuid(), "Paris planning", new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, 0);
         var client = new RecordingTripApiClient(new[] { trip });
         Services.AddSingleton<ITripApiClient>(client);
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
@@ -60,11 +60,18 @@ public class RecentTripsComponentTests : TestContext
         var handler = new RecordingHttpHandler();
         var api = new TripApiClient(new HttpClient(handler) { BaseAddress = new Uri("https://api.example.test") });
 
+        await api.GetTripsAsync(2, 5);
         await api.GetDetailAsync(tripId);
-        await api.CreateAsync(new CreateTripRequest("Owner trip", "Paris", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6)));
-        await api.UpdateAsync(tripId, new UpdateTripRequest("Owner trip", "Paris", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6)));
+        await api.CreateAsync(new CreateTripRequest("Owner trip", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6)));
+        await api.UpdateAsync(tripId, new UpdateTripRequest("Owner trip", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6)));
 
         Assert.Collection(handler.Requests,
+            request =>
+            {
+                Assert.Equal(HttpMethod.Get, request.Method);
+                Assert.Equal("/api/trips", request.RequestUri!.AbsolutePath);
+                Assert.Equal("?page=2&pageSize=5", request.RequestUri.Query);
+            },
             request =>
             {
                 Assert.Equal(HttpMethod.Get, request.Method);
@@ -88,6 +95,9 @@ public class RecentTripsComponentTests : TestContext
         public int RecentCallCount { get; private set; }
 
         public RecordingTripApiClient(IReadOnlyList<TripSummary> trips) => _trips = trips;
+
+        public Task<TripListResponse> GetTripsAsync(int page = 1, int pageSize = 12, CancellationToken ct = default)
+            => Task.FromResult(new TripListResponse(_trips, page, pageSize, _trips.Count));
 
         public Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default)
         {
@@ -114,9 +124,11 @@ public class RecentTripsComponentTests : TestContext
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Requests.Add(request);
-            var responseJson = request.Method == HttpMethod.Get
-                ? """{"tripId":"00000000-0000-0000-0000-000000000001","name":"Owner trip","destination":"Paris","description":null,"startDate":"2026-09-01","endDate":"2026-09-06","createdAtUtc":"2026-01-01T00:00:00+00:00","updatedAtUtc":"2026-01-01T00:00:00+00:00","legs":[],"trackedItems":[]}"""
-                : """{"tripId":"00000000-0000-0000-0000-000000000001","name":"Owner trip","destination":"Paris","description":null,"startDate":"2026-09-01","endDate":"2026-09-06"}""";
+            var responseJson = request.Method == HttpMethod.Get && request.RequestUri!.AbsolutePath == "/api/trips"
+                ? """{"trips":[],"page":2,"pageSize":5,"totalCount":0}"""
+                : request.Method == HttpMethod.Get
+                ? """{"tripId":"00000000-0000-0000-0000-000000000001","name":"Owner trip","description":null,"startDate":"2026-09-01","endDate":"2026-09-06","createdAtUtc":"2026-01-01T00:00:00+00:00","updatedAtUtc":"2026-01-01T00:00:00+00:00","legs":[],"trackedItems":[]}"""
+                : """{"tripId":"00000000-0000-0000-0000-000000000001","name":"Owner trip","description":null,"startDate":"2026-09-01","endDate":"2026-09-06"}""";
 
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {

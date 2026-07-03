@@ -28,12 +28,8 @@
                     <a class="card h-100 text-decoration-none text-reset shadow-sm" href="@($"/trips/{trip.TripId}")">
                         <div class="card-body">
                             <h3 class="h5 mb-1">@trip.Name</h3>
-                            @if (!string.IsNullOrWhiteSpace(trip.Destination))
-                            {
-                                <div class="text-secondary small mb-2">@trip.Destination</div>
-                            }
                             <div class="small">
-                                <span class="badge bg-secondary me-2">@trip.StartDate.ToShortDateString() – @trip.EndDate.ToShortDateString()</span>
+                                <span class="badge bg-secondary me-2">@trip.StartDate.ToShortDateString() - @trip.EndDate.ToShortDateString()</span>
                                 <span class="text-secondary">@trip.ItemCount items</span>
                             </div>
                         </div>

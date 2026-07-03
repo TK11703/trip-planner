@@ -5,16 +5,20 @@ public sealed record UserAccount(string UserId, string? DisplayName, string? Ema
 public sealed record TripSummary(
     Guid TripId,
     string Name,
-    string? Destination,
     DateOnly StartDate,
     DateOnly EndDate,
     DateTimeOffset UpdatedAtUtc,
     int ItemCount);
 
+public sealed record TripListResponse(
+    IReadOnlyList<TripSummary> Trips,
+    int Page,
+    int PageSize,
+    int TotalCount);
+
 public sealed record TripDetail(
     Guid TripId,
     string Name,
-    string? Destination,
     string? Description,
     DateOnly StartDate,
     DateOnly EndDate,

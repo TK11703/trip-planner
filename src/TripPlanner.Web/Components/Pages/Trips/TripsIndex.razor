@@ -1,0 +1,89 @@
+@page "/trips"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ITripApiClient TripApi
+
+<PageTitle>Trips</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
+    <div>
+        <h1 class="mb-1">Trips</h1>
+        <p class="text-secondary mb-0">All trips you have created.</p>
+    </div>
+    <a class="btn btn-primary" href="/trips/new">New trip</a>
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-secondary">Loading trips...</div>
+}
+else if (_error is not null)
+{
+    <PublicContentFallback Title="We couldn't load your trips right now." Detail="@_error" />
+}
+else if (_response.TotalCount == 0)
+{
+    <NoTripsEmptyState />
+}
+else
+{
+    <div class="row g-3 mb-3">
+        @foreach (var trip in _response.Trips)
+        {
+            <div class="col-md-6 col-xl-4">
+                <a class="card h-100 text-decoration-none text-reset shadow-sm" href="@($"/trips/{trip.TripId}")">
+                    <div class="card-body">
+                        <h2 class="h5 mb-2">@trip.Name</h2>
+                        <div class="small mb-2">
+                            <span class="badge bg-secondary">@trip.StartDate.ToShortDateString() - @trip.EndDate.ToShortDateString()</span>
+                        </div>
+                        <div class="small text-secondary">@trip.ItemCount itinerary items</div>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+
+    <nav aria-label="Trips pages" class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="text-secondary small">
+            Page @_response.Page of @TotalPages (@_response.TotalCount trips)
+        </div>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary" disabled="@(_response.Page <= 1)" @onclick="PreviousPageAsync">Previous</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@(_response.Page >= TotalPages)" @onclick="NextPageAsync">Next</button>
+        </div>
+    </nav>
+}
+
+@code {
+    private const int PageSize = 12;
+    private bool _isLoading = true;
+    private string? _error;
+    private TripListResponse _response = new(Array.Empty<TripSummary>(), 1, PageSize, 0);
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_response.TotalCount / (double)_response.PageSize));
+
+    protected override async Task OnInitializedAsync() => await LoadPageAsync(1);
+
+    private async Task PreviousPageAsync() => await LoadPageAsync(_response.Page - 1);
+
+    private async Task NextPageAsync() => await LoadPageAsync(_response.Page + 1);
+
+    private async Task LoadPageAsync(int page)
+    {
+        _isLoading = true;
+        _error = null;
+        try
+        {
+            _response = await TripApi.GetTripsAsync(page, PageSize);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

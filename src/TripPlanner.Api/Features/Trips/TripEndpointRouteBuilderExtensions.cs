@@ -4,6 +4,7 @@ using TripPlanner.Api.Extensions;
 using TripPlanner.Api.Features.Trips.CreateTrip;
 using TripPlanner.Api.Features.Trips.GetRecentTrips;
 using TripPlanner.Api.Features.Trips.GetTripDetail;
+using TripPlanner.Api.Features.Trips.GetTrips;
 using TripPlanner.Api.Features.Trips.UpdateTrip;
 
 namespace TripPlanner.Api.Features.Trips;
@@ -16,6 +17,7 @@ public static class TripEndpointRouteBuilderExtensions
             .RequireAuthorization(WebApplicationBuilderExtensions.AuthenticatedUserPolicy)
             .WithTags("Trips");
 
+        group.MapGetTrips();
         group.MapGetRecentTrips();
         group.MapGetTripDetail();
         group.MapCreateTrip();

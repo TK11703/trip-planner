@@ -2,19 +2,24 @@
 // No jQuery dependency — uses the fullcalendar global bundle loaded in App.razor.
 (function () {
     const tripTimeline = {
-        create: function (element, startDate, endDate, events) {
+        create: function (element, startDate, endDate, events, dotNetRef) {
             if (!window.FullCalendar) {
                 console.warn('FullCalendar global not loaded yet.');
                 return null;
             }
             const calendar = new window.FullCalendar.Calendar(element, {
-                initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
+                initialView: 'timeGridWeek',
                 initialDate: startDate,
                 validRange: { start: startDate, end: addOneDay(endDate) },
-                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listWeek' },
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek,dayGridMonth' },
                 height: 'auto',
                 events: events,
-                eventOrder: 'extendedProps.displayOrder,start'
+                eventOrder: 'extendedProps.displayOrder,start',
+                eventClick: function (info) {
+                    if (dotNetRef) {
+                        dotNetRef.invokeMethodAsync('SelectItemAsync', info.event.extendedProps.sourceType, info.event.id);
+                    }
+                }
             });
             calendar.render();
             const instance = {

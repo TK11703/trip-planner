@@ -8,10 +8,6 @@
         <ValidationMessage For="@(() => Model.Name)" />
     </div>
     <div class="mb-3">
-        <label class="form-label" for="destination">Destination</label>
-        <InputText id="destination" class="form-control" @bind-Value="Model.Destination" />
-    </div>
-    <div class="mb-3">
         <label class="form-label" for="description">Description</label>
         <InputTextArea id="description" rows="3" class="form-control" @bind-Value="Model.Description" />
     </div>
@@ -45,7 +41,6 @@
     {
         [Required(ErrorMessage = "Trip name is required.")]
         public string Name { get; set; } = string.Empty;
-        public string? Destination { get; set; }
         public string? Description { get; set; }
         public DateTime StartDate { get; set; } = DateTime.Today;
         public DateTime EndDate { get; set; } = DateTime.Today.AddDays(1);

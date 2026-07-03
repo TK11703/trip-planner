@@ -48,10 +48,24 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
     }
 
     [Fact]
+    public async Task ValidScopedToken_CanGetPaginatedTripsForCurrentUser()
+    {
+        var client = CreateAuthenticatedClient();
+
+        var trips = await client.GetFromJsonAsync<TripListResponse>("/api/trips?page=2&pageSize=5");
+
+        Assert.NotNull(trips);
+        Assert.Equal(2, trips!.Page);
+        Assert.Equal(5, trips.PageSize);
+        Assert.Single(trips.Trips);
+        Assert.Equal(TestUsers.UserA, _factory.Services.GetRequiredService<FakeTripStore>().LastReadOwnerUserId);
+    }
+
+    [Fact]
     public async Task ValidScopedToken_CanCreateTripForCurrentUser()
     {
         var client = CreateAuthenticatedClient();
-        var request = new CreateTripRequest("Owner trip", "Paris", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6));
+        var request = new CreateTripRequest("Owner trip", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6));
 
         var response = await client.PostAsJsonAsync("/api/trips", request);
 
@@ -64,7 +78,7 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
     {
         var client = CreateAuthenticatedClient();
         var tripId = _factory.Services.GetRequiredService<FakeTripStore>().SeedTripId;
-        var request = new UpdateTripRequest("Updated owner trip", "Rome", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6));
+        var request = new UpdateTripRequest("Updated owner trip", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6));
 
         var response = await client.PutAsJsonAsync($"/api/trips/{tripId}", request);
 
@@ -97,12 +111,22 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
         public string? LastReadOwnerUserId { get; private set; }
         public string? LastWriteOwnerUserId { get; private set; }
 
+        public Task<TripListResponse> GetPageAsync(string ownerUserId, int page, int pageSize, CancellationToken cancellationToken)
+        {
+            LastReadOwnerUserId = ownerUserId;
+            IReadOnlyList<TripSummary> result = new[]
+            {
+                new TripSummary(SeedTripId, "Owner trip", new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, 0)
+            };
+            return Task.FromResult(new TripListResponse(result, page, pageSize, result.Count));
+        }
+
         public Task<IReadOnlyList<TripSummary>> GetRecentAsync(string ownerUserId, int limit, CancellationToken cancellationToken)
         {
             LastReadOwnerUserId = ownerUserId;
             IReadOnlyList<TripSummary> result = new[]
             {
-                new TripSummary(SeedTripId, "Owner trip", "Paris", new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, 0)
+                new TripSummary(SeedTripId, "Owner trip", new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, 0)
             };
             return Task.FromResult(result);
         }
@@ -111,7 +135,7 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
         {
             LastReadOwnerUserId = ownerUserId;
             TripDetail? result = tripId == SeedTripId
-                ? new TripDetail(SeedTripId, "Owner trip", "Paris", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, Array.Empty<TripLegDto>(), Array.Empty<TrackedItemDto>())
+                ? new TripDetail(SeedTripId, "Owner trip", null, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, Array.Empty<TripLegDto>(), Array.Empty<TrackedItemDto>())
                 : null;
             return Task.FromResult(result);
         }

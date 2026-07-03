@@ -2,7 +2,7 @@
 -- distinguish "no such trip / not owned" (0) from a successful update (1).
 UPDATE trips
 SET name = @Name,
-    destination = @Destination,
+    destination = NULL,
     description = @Description,
     start_date = @StartDate,
     end_date = @EndDate

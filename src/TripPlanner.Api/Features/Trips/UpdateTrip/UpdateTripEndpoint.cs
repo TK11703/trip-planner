@@ -43,6 +43,6 @@ public static class UpdateTripEndpoint
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(ownerId, AuditOperations.TripUpdate, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
-        return TypedResults.Ok(new CreateTripResponse(tripId, request.Name, request.Destination, request.Description, request.StartDate, request.EndDate));
+        return TypedResults.Ok(new CreateTripResponse(tripId, request.Name, request.Description, request.StartDate, request.EndDate));
     }
 }

@@ -1,14 +1,18 @@
 @inject IJSRuntime JS
 @inject ITripApiClient TripApi
 @implements IAsyncDisposable
+@using Microsoft.JSInterop
 
-<div @ref="_container" class="trip-timeline" style="min-height: 28rem"></div>
+<div @ref="_container" class="trip-timeline" style="min-height: 34rem"></div>
 
 @code {
     [Parameter] public Guid TripId { get; set; }
+    [Parameter] public EventCallback<CalendarItemSelection> OnItemSelected { get; set; }
 
     private ElementReference _container;
     private IJSObjectReference? _instance;
+    private DotNetObjectReference<TripTimeline>? _dotNetRef;
+    private bool _disposed;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -20,8 +24,13 @@
 
     public async Task RefreshAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var timeline = await TripApi.GetTimelineAsync(TripId);
-        if (timeline is null) return;
+        if (timeline is null || _disposed) return;
         var events = timeline.Events.Select(e => new
         {
             id = e.Id,
@@ -30,24 +39,63 @@
             end = e.End?.ToString("o"),
             allDay = e.AllDay,
             extendedProps = new { sourceType = e.SourceType, displayOrder = e.DisplayOrder }
-        });
+        }).ToArray();
         if (_instance is null)
         {
-            _instance = await JS.InvokeAsync<IJSObjectReference>("tripTimeline.create", _container,
-                timeline.StartDate.ToString("yyyy-MM-dd"), timeline.EndDate.ToString("yyyy-MM-dd"), events);
+            await CreateCalendarAsync(timeline.StartDate, timeline.EndDate, events);
         }
         else
         {
-            await _instance.InvokeVoidAsync("refresh", timeline.StartDate.ToString("yyyy-MM-dd"), timeline.EndDate.ToString("yyyy-MM-dd"), events);
+            try
+            {
+                await _instance.InvokeVoidAsync("refresh", timeline.StartDate.ToString("yyyy-MM-dd"), timeline.EndDate.ToString("yyyy-MM-dd"), events);
+            }
+            catch (JSDisconnectedException) { }
+            catch (TaskCanceledException) { }
+            catch (ObjectDisposedException) when (!_disposed)
+            {
+                _instance = null;
+                await CreateCalendarAsync(timeline.StartDate, timeline.EndDate, events);
+            }
         }
     }
 
+    private async Task CreateCalendarAsync(DateOnly startDate, DateOnly endDate, object[] events)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _dotNetRef ??= DotNetObjectReference.Create(this);
+        _instance = await JS.InvokeAsync<IJSObjectReference>("tripTimeline.create", _container,
+            startDate.ToString("yyyy-MM-dd"), endDate.ToString("yyyy-MM-dd"), events, _dotNetRef);
+    }
+
+    [JSInvokable]
+    public async Task SelectItemAsync(string sourceType, string id)
+        => await OnItemSelected.InvokeAsync(new CalendarItemSelection(sourceType, id));
+
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         if (_instance is not null)
         {
-            try { await _instance.InvokeVoidAsync("dispose"); } catch { }
-            await _instance.DisposeAsync();
+            try { await _instance.InvokeVoidAsync("dispose"); }
+            catch (JSDisconnectedException) { }
+            catch (TaskCanceledException) { }
+            catch (ObjectDisposedException) { }
+            catch { }
+
+            try { await _instance.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+            catch (TaskCanceledException) { }
+            catch (ObjectDisposedException) { }
+
+            _instance = null;
         }
+        _dotNetRef?.Dispose();
     }
+
+    public sealed record CalendarItemSelection(string SourceType, string Id);
 }

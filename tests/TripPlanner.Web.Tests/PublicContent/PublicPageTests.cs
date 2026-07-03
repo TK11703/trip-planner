@@ -46,6 +46,7 @@ public class PublicPageTests : TestContext
     private sealed class ThrowingTripApiClient : ITripApiClient
     {
         public bool WasCalled { get; private set; }
+        public Task<TripListResponse> GetTripsAsync(int page = 1, int pageSize = 12, CancellationToken ct = default) { WasCalled = true; throw new InvalidOperationException("Public pages must not load protected trip data."); }
         public Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default) { WasCalled = true; throw new InvalidOperationException("Public pages must not load protected trip data."); }
         public Task<TripDetail?> GetDetailAsync(Guid tripId, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }
         public Task<CreateTripResponse> CreateAsync(CreateTripRequest request, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }

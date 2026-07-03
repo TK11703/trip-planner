@@ -10,7 +10,7 @@ public class TrackedItemEndpointTests
     [Fact]
     public void Validator_RejectsUnsupportedItemType()
     {
-        var trip = new TripDetail(Guid.NewGuid(), "Trip", null, null,
+        var trip = new TripDetail(Guid.NewGuid(), "Trip", null,
             new DateOnly(2026, 7, 10), new DateOnly(2026, 7, 18), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
             Array.Empty<TripLegDto>(), Array.Empty<TrackedItemDto>());
         var v = new TrackedItemValidator();
@@ -23,7 +23,7 @@ public class TrackedItemEndpointTests
     [Fact]
     public void Validator_RejectsOutOfRangeDate()
     {
-        var trip = new TripDetail(Guid.NewGuid(), "Trip", null, null,
+        var trip = new TripDetail(Guid.NewGuid(), "Trip", null,
             new DateOnly(2026, 7, 10), new DateOnly(2026, 7, 18), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
             Array.Empty<TripLegDto>(), Array.Empty<TrackedItemDto>());
         var v = new TrackedItemValidator();

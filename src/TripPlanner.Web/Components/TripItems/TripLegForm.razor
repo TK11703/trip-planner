@@ -1,7 +1,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject ITripApiClient TripApi
 
-<EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="trip-leg-form">
+<EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName">
     <DataAnnotationsValidator />
     <div class="mb-2">
         <label class="form-label" for="leg-title">Title</label>
@@ -36,7 +36,7 @@
     {
         <div class="alert alert-danger py-2 small">@_error</div>
     }
-    <button type="submit" class="btn btn-primary btn-sm" disabled="@_submitting">Add leg</button>
+    <button type="submit" class="btn btn-primary" disabled="@_submitting">@(IsEdit ? "Save leg" : "Add leg")</button>
 </EditForm>
 
 @code {
@@ -51,11 +51,45 @@
     }
 
     [Parameter] public Guid TripId { get; set; }
+    [Parameter] public TripLegDto? Leg { get; set; }
     [Parameter] public EventCallback OnSaved { get; set; }
 
     private LegModel _model = new();
     private string? _error;
     private bool _submitting;
+    private Guid? _loadedLegId;
+
+    private bool IsEdit => Leg is not null;
+    private string FormName => IsEdit ? $"trip-leg-edit-{Leg!.TripLegId}" : "trip-leg-create";
+
+    protected override void OnParametersSet()
+    {
+        if (Leg is null)
+        {
+            if (_loadedLegId is not null)
+            {
+                _model = new LegModel();
+                _loadedLegId = null;
+            }
+            return;
+        }
+
+        if (_loadedLegId == Leg.TripLegId)
+        {
+            return;
+        }
+
+        _model = new LegModel
+        {
+            Title = Leg.Title,
+            Origin = Leg.Origin,
+            Destination = Leg.Destination,
+            StartAt = Leg.StartAt.LocalDateTime,
+            EndAt = (Leg.EndAt ?? Leg.StartAt).LocalDateTime,
+            Notes = Leg.Notes
+        };
+        _loadedLegId = Leg.TripLegId;
+    }
 
     private async Task SubmitAsync()
     {
@@ -69,8 +103,21 @@
                 new DateTimeOffset(_model.StartAt.ToUniversalTime(), TimeSpan.Zero),
                 new DateTimeOffset(_model.EndAt.ToUniversalTime(), TimeSpan.Zero),
                 _model.Notes);
-            await TripApi.CreateLegAsync(TripId, request);
-            _model = new LegModel();
+            if (Leg is null)
+            {
+                await TripApi.CreateLegAsync(TripId, request);
+                _model = new LegModel();
+            }
+            else
+            {
+                await TripApi.UpdateLegAsync(TripId, Leg.TripLegId, new UpdateTripLegRequest(
+                    request.Title,
+                    request.Origin,
+                    request.Destination,
+                    request.StartAt,
+                    request.EndAt,
+                    request.Notes));
+            }
             await OnSaved.InvokeAsync();
         }
         catch (Exception ex)

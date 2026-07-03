@@ -1,7 +1,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject ITripApiClient TripApi
 
-<EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="tracked-item-form">
+<EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName">
     <DataAnnotationsValidator />
     <div class="row g-2 mb-2">
         <div class="col-5">
@@ -41,7 +41,7 @@
     {
         <div class="alert alert-danger py-2 small">@_error</div>
     }
-    <button type="submit" class="btn btn-primary btn-sm" disabled="@_submitting">Add item</button>
+    <button type="submit" class="btn btn-primary" disabled="@_submitting">@(IsEdit ? "Save item" : "Add item")</button>
 </EditForm>
 
 @code {
@@ -57,11 +57,46 @@
     }
 
     [Parameter] public Guid TripId { get; set; }
+    [Parameter] public TrackedItemDto? Item { get; set; }
     [Parameter] public EventCallback OnSaved { get; set; }
 
     private ItemModel _model = new();
     private string? _error;
     private bool _submitting;
+    private Guid? _loadedItemId;
+
+    private bool IsEdit => Item is not null;
+    private string FormName => IsEdit ? $"tracked-item-edit-{Item!.TrackedItemId}" : "tracked-item-create";
+
+    protected override void OnParametersSet()
+    {
+        if (Item is null)
+        {
+            if (_loadedItemId is not null)
+            {
+                _model = new ItemModel();
+                _loadedItemId = null;
+            }
+            return;
+        }
+
+        if (_loadedItemId == Item.TrackedItemId)
+        {
+            return;
+        }
+
+        _model = new ItemModel
+        {
+            ItemType = Item.ItemType,
+            Title = Item.Title,
+            Location = Item.Location,
+            StartsAt = Item.StartsAt.LocalDateTime,
+            EndsAt = (Item.EndsAt ?? Item.StartsAt).LocalDateTime,
+            ConfirmationCode = Item.ConfirmationCode,
+            Notes = Item.Notes
+        };
+        _loadedItemId = Item.TrackedItemId;
+    }
 
     private async Task SubmitAsync()
     {
@@ -76,8 +111,22 @@
                 new DateTimeOffset(_model.EndsAt.ToUniversalTime(), TimeSpan.Zero),
                 _model.ConfirmationCode,
                 _model.Notes);
-            await TripApi.CreateItemAsync(TripId, request);
-            _model = new ItemModel();
+            if (Item is null)
+            {
+                await TripApi.CreateItemAsync(TripId, request);
+                _model = new ItemModel();
+            }
+            else
+            {
+                await TripApi.UpdateItemAsync(TripId, Item.TrackedItemId, new UpdateTrackedItemRequest(
+                    request.ItemType,
+                    request.Title,
+                    request.Location,
+                    request.StartsAt,
+                    request.EndsAt,
+                    request.ConfirmationCode,
+                    request.Notes));
+            }
             await OnSaved.InvokeAsync();
         }
         catch (Exception ex)

@@ -7,6 +7,7 @@ namespace TripPlanner.Web.Features.Trips;
 
 public interface ITripApiClient
 {
+    Task<TripListResponse> GetTripsAsync(int page = 1, int pageSize = 12, CancellationToken ct = default);
     Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default);
     Task<TripDetail?> GetDetailAsync(Guid tripId, CancellationToken ct = default);
     Task<CreateTripResponse> CreateAsync(CreateTripRequest request, CancellationToken ct = default);
@@ -27,6 +28,12 @@ public sealed class TripApiClient : ITripApiClient
 {
     private readonly HttpClient _http;
     public TripApiClient(HttpClient http) => _http = http;
+
+    public async Task<TripListResponse> GetTripsAsync(int page = 1, int pageSize = 12, CancellationToken ct = default)
+    {
+        var result = await _http.GetFromJsonAsync<TripListResponse>($"/api/trips?page={page}&pageSize={pageSize}", ct);
+        return result ?? new TripListResponse(Array.Empty<TripSummary>(), page, pageSize, 0);
+    }
 
     public async Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default)
     {

@@ -37,7 +37,7 @@ public static class CreateTripEndpoint
         }
         var tripId = await commands.InsertAsync(ownerId, request, clock.UtcNow, cancellationToken);
         await audit.RecordAsync(ownerId, AuditOperations.TripCreate, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
-        var response = new CreateTripResponse(tripId, request.Name, request.Destination, request.Description, request.StartDate, request.EndDate);
+        var response = new CreateTripResponse(tripId, request.Name, request.Description, request.StartDate, request.EndDate);
         return TypedResults.Created($"/api/trips/{tripId}", response);
     }
 }

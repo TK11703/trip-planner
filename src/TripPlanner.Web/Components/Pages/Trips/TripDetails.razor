@@ -15,17 +15,37 @@ else if (_trip is null)
 }
 else
 {
-    <header class="mb-4">
-        <h1 class="mb-1">@_trip.Name</h1>
-        @if (!string.IsNullOrWhiteSpace(_trip.Destination))
-        {
-            <p class="text-secondary mb-1">@_trip.Destination</p>
-        }
-        <p class="text-secondary mb-0">@_trip.StartDate.ToLongDateString() – @_trip.EndDate.ToLongDateString()</p>
+    <header class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <h1 class="mb-1">@_trip.Name</h1>
+            <p class="text-secondary mb-0">@_trip.StartDate.ToLongDateString() - @_trip.EndDate.ToLongDateString()</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="/trips">All trips</a>
+            <button class="btn btn-primary" @onclick="OpenTripEditModal">Edit trip</button>
+        </div>
     </header>
 
     <div class="row g-3">
-        <div class="col-lg-4">
+        <div class="col-xl-9">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Trip calendar</div>
+                        <div class="small text-secondary">Week view is the default. Use the calendar controls for day, week, month, and date navigation.</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="OpenCreateLegModal">Add leg</button>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="OpenCreateItemModal">Add event</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <TripTimeline @ref="_timeline" TripId="@TripId" OnItemSelected="SelectCalendarItemAsync" />
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3">
             <div class="card mb-3">
                 <div class="card-header">Overview</div>
                 <div class="card-body">
@@ -42,71 +62,109 @@ else
             </div>
 
             <div class="card mb-3">
-                <div class="card-header">Add trip leg</div>
+                <div class="card-header">Selected item</div>
                 <div class="card-body">
-                    <TripLegForm TripId="@TripId" OnSaved="ReloadAsync" />
+                    @if (SelectedLeg is { } leg)
+                    {
+                        <h2 class="h6">@leg.Title</h2>
+                        <dl class="small mb-3">
+                            <dt>Type</dt>
+                            <dd>Leg</dd>
+                            <dt>When</dt>
+                            <dd>@leg.StartAt.ToString("g") @(leg.EndAt is { } end ? "- " + end.ToString("g") : null)</dd>
+                            @if (!string.IsNullOrWhiteSpace(leg.Origin) || !string.IsNullOrWhiteSpace(leg.Destination))
+                            {
+                                <dt>Route</dt>
+                                <dd>@leg.Origin @(!string.IsNullOrWhiteSpace(leg.Origin) && !string.IsNullOrWhiteSpace(leg.Destination) ? "to" : null) @leg.Destination</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(leg.Notes))
+                            {
+                                <dt>Notes</dt>
+                                <dd>@leg.Notes</dd>
+                            }
+                        </dl>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditLegModal(leg)">Edit leg</button>
+                    }
+                    else if (SelectedItem is { } item)
+                    {
+                        <h2 class="h6">@item.Title</h2>
+                        <dl class="small mb-3">
+                            <dt>Type</dt>
+                            <dd>@item.ItemType</dd>
+                            <dt>When</dt>
+                            <dd>@item.StartsAt.ToString("g") @(item.EndsAt is { } end ? "- " + end.ToString("g") : null)</dd>
+                            @if (!string.IsNullOrWhiteSpace(item.Location))
+                            {
+                                <dt>Location</dt>
+                                <dd>@item.Location</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(item.ConfirmationCode))
+                            {
+                                <dt>Confirmation</dt>
+                                <dd>@item.ConfirmationCode</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(item.Notes))
+                            {
+                                <dt>Notes</dt>
+                                <dd>@item.Notes</dd>
+                            }
+                        </dl>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditItemModal(item)">Edit event</button>
+                    }
+                    else
+                    {
+                        <p class="text-secondary mb-0">Select a calendar leg or event to see its details here.</p>
+                    }
                 </div>
             </div>
+
             <div class="card">
-                <div class="card-header">Add tracked item</div>
-                <div class="card-body">
-                    <TrackedItemForm TripId="@TripId" OnSaved="ReloadAsync" />
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-8">
-            <div class="card mb-3">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>Timeline</span>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="ReloadAsync">Refresh</button>
-                </div>
-                <div class="card-body">
-                    <TripTimeline @ref="_timeline" TripId="@TripId" />
-                </div>
-            </div>
-
-            <div class="card mb-3">
-                <div class="card-header">Legs (@_trip.Legs.Count)</div>
-                <ul class="list-group list-group-flush">
-                    @if (_trip.Legs.Count == 0)
-                    {
-                        <li class="list-group-item text-secondary">No legs yet.</li>
-                    }
-                    @foreach (var leg in _trip.Legs)
-                    {
-                        <li class="list-group-item d-flex justify-content-between">
-                            <div>
-                                <div class="fw-semibold">@leg.Title</div>
-                                <div class="small text-secondary">@leg.StartAt.ToString("g") @(leg.EndAt is { } e ? "→ " + e.ToString("g") : null)</div>
-                            </div>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteLegAsync(leg.TripLegId)">Remove</button>
-                        </li>
-                    }
-                </ul>
-            </div>
-
-            <div class="card">
-                <div class="card-header">Tracked items (@_trip.TrackedItems.Count)</div>
-                <ul class="list-group list-group-flush">
-                    @if (_trip.TrackedItems.Count == 0)
-                    {
-                        <li class="list-group-item text-secondary">No tracked items yet.</li>
-                    }
-                    @foreach (var item in _trip.TrackedItems)
-                    {
-                        <li class="list-group-item d-flex justify-content-between">
-                            <div>
-                                <div class="fw-semibold">@item.Title <span class="badge bg-secondary ms-1">@item.ItemType</span></div>
-                                <div class="small text-secondary">@item.StartsAt.ToString("g") @(item.EndsAt is { } e ? "→ " + e.ToString("g") : null)</div>
-                            </div>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteItemAsync(item.TrackedItemId)">Remove</button>
-                        </li>
-                    }
+                <div class="card-header">Itinerary summary</div>
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item d-flex justify-content-between"><span>Legs</span><span>@_trip.Legs.Count</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Events</span><span>@_trip.TrackedItems.Count</span></li>
                 </ul>
             </div>
         </div>
     </div>
+
+    @if (_activeModal is not ActiveModal.None)
+    {
+        <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5">@ModalTitle</h2>
+                        <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        @switch (_activeModal)
+                        {
+                            case ActiveModal.EditTrip:
+                                <div class="alert alert-warning small" role="alert">
+                                    Changing trip dates can leave existing legs or events outside the trip range. Review the calendar after saving.
+                                </div>
+                                <TripForm Model="_tripEditModel" IsEdit="true" OnSubmit="HandleTripEditAsync" />
+                                break;
+                            case ActiveModal.CreateLeg:
+                                <TripLegForm TripId="@TripId" OnSaved="HandleModalSavedAsync" />
+                                break;
+                            case ActiveModal.EditLeg:
+                                <TripLegForm TripId="@TripId" Leg="_editingLeg" OnSaved="HandleModalSavedAsync" />
+                                break;
+                            case ActiveModal.CreateItem:
+                                <TrackedItemForm TripId="@TripId" OnSaved="HandleModalSavedAsync" />
+                                break;
+                            case ActiveModal.EditItem:
+                                <TrackedItemForm TripId="@TripId" Item="_editingItem" OnSaved="HandleModalSavedAsync" />
+                                break;
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop show"></div>
+    }
 }
 
 @code {
@@ -115,15 +173,58 @@ else
     private bool _loading = true;
     private TripDetail? _trip;
     private TripTimeline? _timeline;
+    private ActiveModal _activeModal = ActiveModal.None;
+    private TripPlanner.Web.Components.Trips.TripForm.TripFormModel _tripEditModel = new();
+    private TripLegDto? _editingLeg;
+    private TrackedItemDto? _editingItem;
+    private string? _selectedSourceType;
+    private Guid? _selectedItemId;
+
+    private enum ActiveModal
+    {
+        None,
+        EditTrip,
+        CreateLeg,
+        EditLeg,
+        CreateItem,
+        EditItem
+    }
+
+    private string ModalTitle => _activeModal switch
+    {
+        ActiveModal.EditTrip => "Edit trip",
+        ActiveModal.CreateLeg => "Add leg",
+        ActiveModal.EditLeg => "Edit leg",
+        ActiveModal.CreateItem => "Add event",
+        ActiveModal.EditItem => "Edit event",
+        _ => string.Empty
+    };
+
+    private TripLegDto? SelectedLeg
+        => _selectedSourceType == "trip-leg" && _selectedItemId is { } id
+            ? _trip?.Legs.FirstOrDefault(l => l.TripLegId == id)
+            : null;
+
+    private TrackedItemDto? SelectedItem
+        => _selectedSourceType == "tracked-item" && _selectedItemId is { } id
+            ? _trip?.TrackedItems.FirstOrDefault(i => i.TrackedItemId == id)
+            : null;
 
     protected override async Task OnInitializedAsync() => await ReloadAsync();
 
     private async Task ReloadAsync()
     {
-        _loading = true;
+        if (_trip is null)
+        {
+            _loading = true;
+        }
         try
         {
             _trip = await TripApi.GetDetailAsync(TripId);
+            if (_trip is not null && _activeModal != ActiveModal.EditTrip)
+            {
+                PopulateTripEditModel();
+            }
         }
         catch
         {
@@ -140,15 +241,85 @@ else
         StateHasChanged();
     }
 
-    private async Task DeleteLegAsync(Guid tripLegId)
+    private void PopulateTripEditModel()
     {
-        await TripApi.DeleteLegAsync(TripId, tripLegId);
+        if (_trip is null) return;
+        _tripEditModel = new TripPlanner.Web.Components.Trips.TripForm.TripFormModel
+        {
+            Name = _trip.Name,
+            Description = _trip.Description,
+            StartDate = _trip.StartDate.ToDateTime(TimeOnly.MinValue),
+            EndDate = _trip.EndDate.ToDateTime(TimeOnly.MinValue)
+        };
+    }
+
+    private void OpenTripEditModal()
+    {
+        PopulateTripEditModel();
+        _activeModal = ActiveModal.EditTrip;
+    }
+
+    private void OpenCreateLegModal()
+    {
+        _editingLeg = null;
+        _activeModal = ActiveModal.CreateLeg;
+    }
+
+    private void OpenEditLegModal(TripLegDto leg)
+    {
+        _editingLeg = leg;
+        _activeModal = ActiveModal.EditLeg;
+    }
+
+    private void OpenCreateItemModal()
+    {
+        _editingItem = null;
+        _activeModal = ActiveModal.CreateItem;
+    }
+
+    private void OpenEditItemModal(TrackedItemDto item)
+    {
+        _editingItem = item;
+        _activeModal = ActiveModal.EditItem;
+    }
+
+    private void CloseModal()
+    {
+        _activeModal = ActiveModal.None;
+        _editingLeg = null;
+        _editingItem = null;
+    }
+
+    private async Task HandleTripEditAsync(TripPlanner.Web.Components.Trips.TripForm.TripFormModel model)
+    {
+        var request = new UpdateTripRequest(
+            model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            DateOnly.FromDateTime(model.StartDate),
+            DateOnly.FromDateTime(model.EndDate));
+        await TripApi.UpdateAsync(TripId, request);
+        CloseModal();
         await ReloadAsync();
     }
 
-    private async Task DeleteItemAsync(Guid trackedItemId)
+    private async Task HandleModalSavedAsync()
     {
-        await TripApi.DeleteItemAsync(TripId, trackedItemId);
+        CloseModal();
         await ReloadAsync();
+    }
+
+    private Task SelectCalendarItemAsync(TripTimeline.CalendarItemSelection selection)
+    {
+        _selectedSourceType = selection.SourceType;
+        _selectedItemId = ParseCalendarItemId(selection.Id);
+        return Task.CompletedTask;
+    }
+
+    private static Guid? ParseCalendarItemId(string calendarId)
+    {
+        var idPart = calendarId.Contains(':', StringComparison.Ordinal)
+            ? calendarId[(calendarId.IndexOf(':', StringComparison.Ordinal) + 1)..]
+            : calendarId;
+        return Guid.TryParse(idPart, out var id) ? id : null;
     }
 }

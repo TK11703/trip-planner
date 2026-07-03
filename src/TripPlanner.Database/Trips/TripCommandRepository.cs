@@ -28,7 +28,6 @@ public sealed class TripCommandRepository : ITripCommandRepository
             TripId = tripId,
             OwnerUserId = ownerUserId,
             request.Name,
-            request.Destination,
             request.Description,
             request.StartDate,
             request.EndDate,
@@ -46,7 +45,6 @@ public sealed class TripCommandRepository : ITripCommandRepository
             TripId = tripId,
             OwnerUserId = ownerUserId,
             request.Name,
-            request.Destination,
             request.Description,
             request.StartDate,
             request.EndDate

@@ -17,7 +17,6 @@
     {
         var request = new CreateTripRequest(
             model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Destination) ? null : model.Destination.Trim(),
             string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
             DateOnly.FromDateTime(model.StartDate),
             DateOnly.FromDateTime(model.EndDate));
