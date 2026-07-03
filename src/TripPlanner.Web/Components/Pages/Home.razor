@@ -3,19 +3,38 @@
 
 <PageTitle>Trip Planner</PageTitle>
 
-<section class="bg-primary text-white rounded-4 p-4 p-md-5 mb-4 shadow-sm">
+<section class="hero-adventure rounded-4 p-4 p-md-5 mb-4 shadow-sm">
     <div class="row align-items-center g-4">
-        <div class="col-md-8">
-            <h1 class="display-5 fw-bold mb-2">Plan trips that come together.</h1>
-            <p class="lead mb-3">A modern, private trip planner for travelers. Sign in to track flights, hotels, activities, and reservations on a single timeline.</p>
+        <div class="col-lg-7">
+            <p class="brand-eyebrow text-white-50">Adventurous explorer trip planning</p>
+            <h1 class="display-5 fw-bold mb-3">Scout your next great trip before you pack.</h1>
+            <p class="lead mb-4">Bring flights, stays, activities, reservations, and day-by-day plans into one private expedition map built for calm, confident travel.</p>
             <AuthorizeView>
                 <Authorized>
-                    <a class="btn btn-light btn-lg" href="/trips/new">Start a new trip</a>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-light btn-lg fw-semibold" href="/trips/new">Plot a new trip</a>
+                        <a class="btn btn-outline-light btn-lg" href="/trips">Review your journeys</a>
+                    </div>
                 </Authorized>
                 <NotAuthorized>
-                    <a class="btn btn-light btn-lg" href="MicrosoftIdentity/Account/SignIn">Sign in to begin</a>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-light btn-lg fw-semibold" href="MicrosoftIdentity/Account/SignIn">Sign in to begin</a>
+                        <a class="btn btn-outline-light btn-lg" href="/about">See how it works</a>
+                    </div>
                 </NotAuthorized>
             </AuthorizeView>
+        </div>
+        <div class="col-lg-5">
+            <div class="hero-map-card" aria-label="Trip Planner adventure compass illustration">
+                <div class="explorer-compass">
+                    <div class="explorer-compass-inner">
+                        <div>
+                            <div class="display-6">✦</div>
+                            <div>Plan<br />Explore<br />Remember</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </section>
@@ -26,19 +45,30 @@
     </Authorized>
     <NotAuthorized>
         <div class="row g-3">
-            <div class="col-md-6">
-                <div class="card h-100">
+            <div class="col-md-4">
+                <div class="card h-100 modern-card">
                     <div class="card-body">
+                        <p class="brand-eyebrow">Private</p>
                         <h2 class="h5">Your data stays yours</h2>
-                        <p class="mb-0">Only you can see your trips. Owner-scoped storage keeps trips isolated by Azure Entra identity.</p>
+                        <p class="mb-0 text-secondary">Owner-scoped storage keeps each itinerary isolated by your Azure Entra identity.</p>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card h-100">
+            <div class="col-md-4">
+                <div class="card h-100 modern-card">
                     <div class="card-body">
-                        <h2 class="h5">Visualize your itinerary</h2>
-                        <p class="mb-0">A calendar timeline shows every leg, activity, and reservation across your trip date range.</p>
+                        <p class="brand-eyebrow">Organized</p>
+                        <h2 class="h5">Visualize the whole route</h2>
+                        <p class="mb-0 text-secondary">A calendar timeline connects every leg, activity, and reservation across your date range.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 modern-card">
+                    <div class="card-body">
+                        <p class="brand-eyebrow">Responsive</p>
+                        <h2 class="h5">Plan from any trailhead</h2>
+                        <p class="mb-0 text-secondary">Use a modern light or dark experience that adapts from desktop to phone.</p>
                     </div>
                 </div>
             </div>

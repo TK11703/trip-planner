@@ -1,8 +1,8 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
-<nav class="navbar navbar-expand-md navbar-light bg-white border-bottom sticky-top">
+<nav class="navbar navbar-expand-md navbar-modern border-bottom sticky-top" aria-label="Primary navigation">
     <div class="container">
-        <a class="navbar-brand fw-semibold text-primary" href="/">Trip Planner</a>
+        <BrandMark />
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
                 aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
@@ -19,11 +19,12 @@
                     </Authorized>
                 </AuthorizeView>
             </ul>
-            <ul class="navbar-nav">
+            <ul class="navbar-nav align-items-md-center gap-2">
                 <AuthorizeView>
                     <Authorized>
-                        <li class="nav-item d-flex align-items-center me-2 text-secondary small">
-                            Signed in as @context.User.Identity?.Name
+                        <li class="nav-item"><ThemeSelector /></li>
+                        <li class="nav-item d-flex align-items-center text-secondary small">
+                            <span class="visually-hidden">Signed in as </span>@context.User.Identity?.Name
                         </li>
                         <li class="nav-item"><a class="nav-link" href="MicrosoftIdentity/Account/SignOut">Sign out</a></li>
                     </Authorized>

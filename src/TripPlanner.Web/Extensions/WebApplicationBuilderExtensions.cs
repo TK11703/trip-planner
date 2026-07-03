@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
 using TripPlanner.Web.Features.Trips;
+using TripPlanner.Web.Features.Theme;
 
 namespace TripPlanner.Web.Extensions;
 
@@ -19,11 +20,19 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddCascadingAuthenticationState();
         builder.Services.AddAuthorization();
+        builder.Services.AddScoped<ThemeStateService>();
+        builder.Services.AddScoped<AccountThemeInitializer>();
         builder.Services.AddScoped<ITripPlannerApiTokenProvider, MicrosoftIdentityTripPlannerApiTokenProvider>();
         builder.Services.AddTransient<AuthenticatedApiTokenHandler>();
 
         // HTTP client to the authenticated Minimal API resolved via Aspire service discovery.
         builder.Services.AddHttpClient<ITripApiClient, TripApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https+http://api");
+        })
+        .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
+
+        builder.Services.AddHttpClient<IThemePreferenceApiClient, ThemePreferenceApiClient>(client =>
         {
             client.BaseAddress = new Uri("https+http://api");
         })

@@ -1,0 +1,24 @@
+<div class="state-message state-message-@Tone @Class" role="@Role" aria-live="polite">
+    <div class="state-message-icon" aria-hidden="true">@Icon</div>
+    <div>
+        <h3 class="h5 mb-1">@Title</h3>
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <p class="mb-0">@Message</p>
+        }
+        @if (ChildContent is not null)
+        {
+            <div class="mt-3">@ChildContent</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string Tone { get; set; } = "info";
+    [Parameter] public string Role { get; set; } = "status";
+    [Parameter] public string? Icon { get; set; } = "✦";
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

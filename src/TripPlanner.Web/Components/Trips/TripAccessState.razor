@@ -1,27 +1,24 @@
 @if (State == TripAccessStateKind.SignInRequired)
 {
-    <div class="alert alert-info">
-        <strong>Sign in required.</strong>
-        <div class="small">Sign in with your Azure Entra account before loading personal trip data.</div>
-        <a class="btn btn-primary btn-sm mt-2" href="MicrosoftIdentity/Account/SignIn">Sign in</a>
-    </div>
+    <StateMessage Title="Sign in required" Message="Sign in with your Azure Entra account before loading personal trip data." Tone="info" Icon="🔐">
+        <a class="btn btn-primary btn-sm" href="MicrosoftIdentity/Account/SignIn">Sign in</a>
+    </StateMessage>
 }
 else if (State == TripAccessStateKind.NotFoundOrDenied)
 {
-    <div class="alert alert-warning">
-        <strong>This trip isn't available.</strong>
-        <div class="small">If you expected to see a trip here, double check the link or return to your <a href="/">recent trips</a>.</div>
-    </div>
+    <StateMessage Title="This trip isn't available" Message="If you expected to see a trip here, double check the link or return to your recent trips." Tone="warning" Icon="⚠">
+        <a class="btn btn-outline-primary btn-sm" href="/">Recent trips</a>
+    </StateMessage>
 }
 else if (State == TripAccessStateKind.ReauthRequired)
 {
-    <div class="alert alert-info">
-        Your session has expired. <a href="MicrosoftIdentity/Account/SignIn">Sign in again</a> to view your trip.
-    </div>
+    <StateMessage Title="Your session has expired" Message="Sign in again to view your private trip details." Tone="info" Icon="↻">
+        <a class="btn btn-primary btn-sm" href="MicrosoftIdentity/Account/SignIn">Sign in again</a>
+    </StateMessage>
 }
 else if (State == TripAccessStateKind.Loading)
 {
-    <div class="text-secondary">Loading trip…</div>
+    <StateMessage Title="Loading trip…" Message="We are checking your private route notes." Tone="info" Icon="⌛" />
 }
 
 @code {

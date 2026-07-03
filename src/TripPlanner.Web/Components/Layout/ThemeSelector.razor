@@ -1,0 +1,30 @@
+@implements IDisposable
+@inject ThemeStateService ThemeState
+@inject IThemePreferenceApiClient ThemePreferenceApi
+
+<div class="theme-selector" role="group" aria-label="Theme preference">
+    <button type="button" class="btn btn-sm @(ThemeState.CurrentMode == TripPlanner.Web.Features.Theme.ThemeMode.Light ? "active" : null)" @onclick="() => SetThemeAsync(TripPlanner.Contracts.Theme.ThemeMode.Light)" aria-pressed="@(ThemeState.CurrentMode == TripPlanner.Web.Features.Theme.ThemeMode.Light)">Light</button>
+    <button type="button" class="btn btn-sm @(ThemeState.CurrentMode == TripPlanner.Web.Features.Theme.ThemeMode.Dark ? "active" : null)" @onclick="() => SetThemeAsync(TripPlanner.Contracts.Theme.ThemeMode.Dark)" aria-pressed="@(ThemeState.CurrentMode == TripPlanner.Web.Features.Theme.ThemeMode.Dark)">Dark</button>
+</div>
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <span class="visually-hidden" aria-live="polite">@_message</span>
+}
+
+@code {
+    private string? _message;
+
+    protected override void OnInitialized()
+    {
+        ThemeState.Changed += StateHasChanged;
+    }
+
+    private async Task SetThemeAsync(TripPlanner.Contracts.Theme.ThemeMode mode)
+    {
+        var response = await ThemePreferenceApi.SaveAsync(mode);
+        await ThemeState.ApplyAccountPreferenceAsync(response.ThemeMode);
+        _message = $"{response.ThemeMode} theme saved to your account.";
+    }
+
+    public void Dispose() => ThemeState.Changed -= StateHasChanged;
+}

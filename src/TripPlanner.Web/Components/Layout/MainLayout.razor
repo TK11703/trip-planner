@@ -1,16 +1,17 @@
 @inherits LayoutComponentBase
+@inject AccountThemeInitializer AccountThemeInitializer
 
 <div class="page d-flex flex-column min-vh-100">
     <NavMenu />
     <main class="flex-grow-1">
-        <div class="container py-4">
+        <div class="container py-4 py-lg-5">
             @Body
         </div>
     </main>
-    <footer class="border-top bg-body-tertiary py-3 mt-auto">
-        <div class="container small text-secondary d-flex justify-content-between flex-wrap gap-2">
-            <span>&copy; @DateTime.UtcNow.Year Trip Planner</span>
-            <nav class="d-flex gap-3">
+    <footer class="border-top bg-body-tertiary py-4 mt-auto">
+        <div class="container small text-secondary d-flex justify-content-between flex-wrap gap-3 align-items-center">
+            <span class="d-inline-flex align-items-center gap-2"><span aria-hidden="true">✦</span> &copy; @DateTime.UtcNow.Year Trip Planner</span>
+            <nav class="d-flex gap-3" aria-label="Footer">
                 <a class="link-secondary" href="/about">About</a>
                 <a class="link-secondary" href="/faq">FAQ</a>
             </nav>
@@ -23,3 +24,13 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AccountThemeInitializer.InitializeAsync();
+        }
+    }
+}

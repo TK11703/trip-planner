@@ -14,6 +14,8 @@ using TripPlanner.Contracts.Common;
 using TripPlanner.Api.Features.Trips.CreateTrip;
 using TripPlanner.Api.Features.Trips.UpdateTrip;
 using TripPlanner.Api.Features.TripItems;
+using TripPlanner.Database.ThemePreferences;
+using TripPlanner.Api.Features.ThemePreferences;
 
 namespace TripPlanner.Api.Extensions;
 
@@ -38,11 +40,13 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<ITripItemRepository, TripItemRepository>();
         builder.Services.AddScoped<ITimelineRepository, TimelineRepository>();
         builder.Services.AddScoped<IAuditRepository, AuditRepository>();
+        builder.Services.AddScoped<IThemePreferenceRepository, ThemePreferenceRepository>();
 
         builder.Services.AddSingleton<CreateTripValidator>();
         builder.Services.AddSingleton<UpdateTripValidator>();
         builder.Services.AddSingleton<TripLegValidator>();
         builder.Services.AddSingleton<TrackedItemValidator>();
+        builder.Services.AddSingleton<ThemePreferenceValidator>();
 
         builder.Services.AddSingleton<DatabaseInitializer>();
 

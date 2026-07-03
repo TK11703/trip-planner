@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Trip Planner explorer mark</title>
+  <desc id="desc">A compass star over a winding route.</desc>
+  <defs>
+    <linearGradient id="g" x1="18" x2="110" y1="18" y2="110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2f6b4f"/>
+      <stop offset=".55" stop-color="#c96f34"/>
+      <stop offset="1" stop-color="#e7b85d"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="58" fill="url(#g)"/>
+  <path fill="#fffaf0" d="M68.8 15.7 78 52.2l34.4 11.8-34.4 11.8-9.2 36.5-14.1-34.2-39.1-14.1 39.1-14.1 14.1-34.2Z"/>
+  <path fill="none" stroke="#173527" stroke-linecap="round" stroke-width="7" d="M28 91c15-18 30-9 42-26 7-10 12-20 30-24"/>
+</svg>

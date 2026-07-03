@@ -1,0 +1,22 @@
+<section class="brand-surface @Class" aria-labelledby="@TitleId">
+    @if (!string.IsNullOrWhiteSpace(Eyebrow))
+    {
+        <p class="brand-eyebrow">@Eyebrow</p>
+    }
+    @if (!string.IsNullOrWhiteSpace(Title))
+    {
+        <h2 id="@TitleId" class="brand-surface-title">@Title</h2>
+    }
+    <div class="brand-surface-body">
+        @ChildContent
+    </div>
+</section>
+
+@code {
+    private string TitleId { get; } = $"brand-surface-{Guid.NewGuid():N}";
+
+    [Parameter] public string? Eyebrow { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

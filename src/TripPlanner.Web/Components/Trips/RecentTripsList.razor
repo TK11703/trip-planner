@@ -2,14 +2,18 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <section class="mb-4">
-    <div class="d-flex justify-content-between align-items-end mb-2">
-        <h2 class="h4 mb-0">Recent trips</h2>
-        <a class="btn btn-outline-primary btn-sm" href="/trips/new">New trip</a>
+    <div class="d-flex justify-content-between align-items-end mb-3 flex-wrap gap-2">
+        <div>
+            <p class="brand-eyebrow mb-1">Base camp</p>
+            <h2 class="h3 mb-0">Recent trips</h2>
+            <p class="text-secondary mb-0">Jump back into the journeys you have been charting.</p>
+        </div>
+        <a class="btn btn-outline-primary" href="/trips/new">New trip</a>
     </div>
 
     @if (_isLoading)
     {
-        <div class="text-secondary">Loading recent trips…</div>
+        <StateMessage Title="Loading your route notes…" Message="We are gathering your recent trips." Tone="info" Icon="⌛" />
     }
     else if (_error is not null)
     {
@@ -25,12 +29,16 @@
             @foreach (var trip in _trips)
             {
                 <div class="col-md-6 col-lg-4">
-                    <a class="card h-100 text-decoration-none text-reset shadow-sm" href="@($"/trips/{trip.TripId}")">
-                        <div class="card-body">
-                            <h3 class="h5 mb-1">@trip.Name</h3>
-                            <div class="small">
-                                <span class="badge bg-secondary me-2">@trip.StartDate.ToShortDateString() - @trip.EndDate.ToShortDateString()</span>
-                                <span class="text-secondary">@trip.ItemCount items</span>
+                    <a class="card trip-card h-100 text-decoration-none text-reset shadow-sm" href="@($"/trips/{trip.TripId}")">
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div>
+                                <p class="brand-eyebrow mb-1">Journey</p>
+                                <h3 class="h5 mb-1">@trip.Name</h3>
+                                <p class="small text-secondary mb-0">@trip.StartDate.ToString("MMM d") – @trip.EndDate.ToString("MMM d, yyyy")</p>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between mt-auto">
+                                <span class="badge rounded-pill text-bg-primary">@trip.ItemCount itinerary items</span>
+                                <span aria-hidden="true">→</span>
                             </div>
                         </div>
                     </a>

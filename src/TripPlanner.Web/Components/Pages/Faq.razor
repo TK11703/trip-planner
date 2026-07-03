@@ -2,12 +2,13 @@
 
 <PageTitle>Trip Planner — FAQ</PageTitle>
 
-<h1 class="mb-3">Frequently asked questions</h1>
-<p class="lead">Public help content. This page does not load or display personal trip data.</p>
+<BrandSurface Eyebrow="Field guide" Title="Frequently asked questions" Class="mb-4">
+    <p class="lead mb-0">Public help content for charting trips confidently. This page does not load or display personal trip data.</p>
+</BrandSurface>
 
 @if (_entries is { Count: > 0 })
 {
-    <div class="accordion" id="faqAccordion">
+    <div class="accordion modern-card rounded-4 overflow-hidden" id="faqAccordion">
         @for (var i = 0; i < _entries.Count; i++)
         {
             var entry = _entries[i];
@@ -15,12 +16,12 @@
             var collapseId = $"faqCollapse{i}";
             <div class="accordion-item">
                 <h2 class="accordion-header" id="@headerId">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId">
-                        @entry.Question
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-controls="@collapseId">
+                        <span class="me-2" aria-hidden="true">✦</span>@entry.Question
                     </button>
                 </h2>
-                <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                    <div class="accordion-body">@entry.Answer</div>
+                <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#faqAccordion" aria-labelledby="@headerId">
+                    <div class="accordion-body text-secondary">@entry.Answer</div>
                 </div>
             </div>
         }
@@ -39,7 +40,7 @@ else
         new("How do I sign in?", "Sign in with your Azure Entra account. The planner uses Microsoft Identity Web to keep your session secure."),
         new("Can other people see my trips?", "No. Every trip query is filtered by your immutable Azure Entra identifier, and cross-user lookups return a generic not-found response."),
         new("How are dates validated?", "Trips require an end date on or after the start date. Tracked items must fall within their parent trip's date range."),
-        new("What does the timeline show?", "The timeline uses fullcalendar.io to plot every trip leg and tracked item across the trip date range, including empty days."),
+        new("What does the timeline show?", "The timeline plots every trip leg and tracked item across the trip date range, including empty days."),
         new("How do I delete a trip?", "Trip deletion is a planned enhancement. For now you can update trip details or remove tracked items individually."),
     };
 }

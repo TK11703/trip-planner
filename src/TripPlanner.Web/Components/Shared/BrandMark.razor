@@ -1,0 +1,12 @@
+<a class="brand-mark text-decoration-none @Class" href="/" aria-label="Trip Planner home">
+    <span class="brand-mark-icon" aria-hidden="true">✦</span>
+    @if (!Compact)
+    {
+        <span>Trip Planner</span>
+    }
+</a>
+
+@code {
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public string? Class { get; set; }
+}
