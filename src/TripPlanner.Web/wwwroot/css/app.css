@@ -103,9 +103,123 @@ body {
 }
 
 .navbar-modern {
+    --bs-navbar-color: var(--tp-text);
+    --bs-navbar-hover-color: var(--tp-brand-strong);
+    --bs-navbar-active-color: var(--tp-brand-strong);
     background: color-mix(in srgb, var(--tp-surface-raised) 92%, transparent) !important;
-    border-color: var(--tp-border) !important;
+    border-bottom: 1px solid color-mix(in srgb, var(--tp-brand) 22%, var(--tp-border)) !important;
+    box-shadow: 0 .35rem 1.35rem color-mix(in srgb, var(--tp-brand-strong) 12%, transparent);
     backdrop-filter: blur(16px);
+    padding-block: .65rem;
+}
+
+/* Three-column navbar: brand left, centered nav, account right. */
+.navbar-3col {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .75rem 1rem;
+    width: 100%;
+}
+
+.navbar-3col-start,
+.navbar-3col-end {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.navbar-3col-end {
+    justify-content: flex-end;
+}
+
+.navbar-3col-center {
+    flex: 0 1 auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: .15rem;
+    margin: 0;
+    padding: 0;
+}
+
+@media (max-width: 767.98px) {
+    .navbar-3col {
+        justify-content: center;
+        text-align: center;
+    }
+
+    .navbar-3col-start,
+    .navbar-3col-center,
+    .navbar-3col-end {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+}
+
+.navbar-modern .nav-link {
+    font-size: .975rem;
+    font-weight: 600;
+    color: var(--tp-text);
+    padding: .5rem .9rem;
+    border-radius: .6rem;
+    line-height: 1.2;
+    transition: color 120ms ease, background-color 120ms ease;
+}
+
+.navbar-modern .nav-link:hover,
+.navbar-modern .nav-link:focus-visible {
+    color: var(--tp-brand-strong);
+    background: color-mix(in srgb, var(--tp-brand) 18%, var(--tp-surface-raised));
+}
+
+.navbar-modern .nav-link.active {
+    color: var(--tp-brand-strong);
+    background: color-mix(in srgb, var(--tp-brand) 24%, var(--tp-surface-raised));
+}
+
+.account-menu-toggle {
+    font-weight: 600;
+}
+
+.account-menu-toggle::after {
+    margin-left: .1rem;
+    vertical-align: middle;
+}
+
+.account-name {
+    max-width: 16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-avatar {
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--tp-brand), var(--tp-secondary));
+    color: #fff;
+    font-weight: 800;
+    font-size: .9rem;
+    line-height: 1;
+    flex: 0 0 auto;
+}
+
+.navbar-modern .dropdown-menu {
+    border-color: var(--tp-border);
+    border-radius: .85rem;
+    box-shadow: 0 1rem 2.5rem rgba(20, 37, 28, .14);
+    padding-block: .35rem;
+}
+
+.navbar-modern .dropdown-item {
+    font-weight: 600;
+    padding: .5rem 1rem;
 }
 
 .brand-mark {

@@ -1,39 +1,59 @@
+@using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
 
-<nav class="navbar navbar-expand-md navbar-modern border-bottom sticky-top" aria-label="Primary navigation">
-    <div class="container">
-        <BrandMark />
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
-                aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="mainNav">
-            <ul class="navbar-nav me-auto mb-2 mb-md-0">
-                <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
-                <li class="nav-item"><a class="nav-link" href="/faq">FAQ</a></li>
-                <li class="nav-item"><a class="nav-link" href="/about">About</a></li>
-                <AuthorizeView>
-                    <Authorized>
-                        <li class="nav-item"><a class="nav-link" href="/trips">Trips</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/trips/new">New trip</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/profile">Profile</a></li>
-                    </Authorized>
-                </AuthorizeView>
-            </ul>
-            <ul class="navbar-nav align-items-md-center gap-2">
-                <AuthorizeView>
-                    <Authorized>
-                        <li class="nav-item"><ThemeSelector /></li>
-                        <li class="nav-item d-flex align-items-center text-secondary small">
-                            <span class="visually-hidden">Signed in as </span>@context.User.Identity?.Name
-                        </li>
-                        <li class="nav-item"><a class="nav-link" href="MicrosoftIdentity/Account/SignOut">Sign out</a></li>
-                    </Authorized>
-                    <NotAuthorized>
-                        <li class="nav-item"><a class="btn btn-primary" href="MicrosoftIdentity/Account/SignIn">Sign in</a></li>
-                    </NotAuthorized>
-                </AuthorizeView>
-            </ul>
+<nav class="navbar navbar-modern border-bottom sticky-top" aria-label="Primary navigation">
+    <div class="container navbar-3col">
+        <div class="navbar-3col-start">
+            <BrandMark />
+        </div>
+        <ul class="navbar-nav navbar-3col-center flex-row">
+            <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+            <AuthorizeView>
+                <Authorized>
+                    <li class="nav-item"><a class="nav-link" href="/trips">Trips</a></li>
+                </Authorized>
+            </AuthorizeView>
+            <li class="nav-item"><a class="nav-link" href="/faq">FAQ</a></li>
+            <li class="nav-item"><a class="nav-link" href="/about">About</a></li>
+        </ul>
+        <div class="navbar-3col-end">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle account-menu-toggle d-flex align-items-center gap-2"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="account-avatar" aria-hidden="true">@AvatarInitial(context.User)</span>
+                            <span class="account-name">@DisplayLabel(context.User)</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/profile">Profile</a></li>
+                            <li><hr class="dropdown-divider" /></li>
+                            <li><a class="dropdown-item" href="MicrosoftIdentity/Account/SignOut">Sign out</a></li>
+                        </ul>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-primary" href="MicrosoftIdentity/Account/SignIn">Sign in</a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
     </div>
 </nav>
+
+@code {
+    private static string DisplayLabel(ClaimsPrincipal user)
+        => FirstNonEmpty(
+            user.FindFirst("name")?.Value,
+            user.FindFirst("preferred_username")?.Value,
+            user.FindFirst(ClaimTypes.Email)?.Value,
+            user.Identity?.Name) ?? "Account";
+
+    private static string AvatarInitial(ClaimsPrincipal user)
+    {
+        var label = DisplayLabel(user).TrimStart();
+        return string.IsNullOrEmpty(label) ? "?" : char.ToUpperInvariant(label[0]).ToString();
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+        => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim();
+}
