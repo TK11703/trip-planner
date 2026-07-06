@@ -19,6 +19,10 @@ body {
     transition: transform 120ms ease-in-out;
 }
 
+.card.tp-static:hover {
+    transform: none;
+}
+
 .border-dashed {
     border-style: dashed !important;
     border-width: 1px;
@@ -27,6 +31,198 @@ body {
 
 .trip-timeline .fc {
     --fc-border-color: rgba(0,0,0,.08);
+}
+
+/* 007: First-party trip resource timeline */
+.ttl {
+    --ttl-slot-w: 26px;
+    --ttl-label-w: 220px;
+    --ttl-day-h: 2rem;
+    --ttl-hour-h: 1.6rem;
+    --ttl-row-h: 3.75rem;
+    --ttl-line: var(--tp-border, rgba(0,0,0,.12));
+}
+
+.ttl-scroll {
+    overflow: auto;
+    max-height: 34rem;
+    border: 1px solid var(--ttl-line);
+    border-radius: .5rem;
+    background: var(--tp-surface-raised, #fff);
+}
+
+.ttl-grid {
+    display: grid;
+    position: relative;
+    width: max-content;
+}
+
+.ttl-corner,
+.ttl-leg-label {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--tp-surface-raised, #fff);
+    border-right: 2px solid var(--ttl-line);
+    border-bottom: 1px solid var(--ttl-line);
+    padding: .35rem .6rem;
+}
+
+.ttl-corner {
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    font-size: .85rem;
+}
+
+.ttl-corner-day {
+    top: 0;
+    height: var(--ttl-day-h);
+}
+
+.ttl-corner-hour {
+    top: var(--ttl-day-h);
+    height: var(--ttl-hour-h);
+}
+
+.ttl-days,
+.ttl-hours {
+    position: sticky;
+    z-index: 2;
+    display: flex;
+    background: var(--tp-surface, #faf7f0);
+    border-bottom: 1px solid var(--ttl-line);
+}
+
+.ttl-days { top: 0; height: var(--ttl-day-h); }
+.ttl-hours { top: var(--ttl-day-h); height: var(--ttl-hour-h); }
+
+.ttl-day {
+    position: relative;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    font-weight: 600;
+    font-size: .8rem;
+    border-right: 2px solid var(--ttl-line);
+    box-sizing: border-box;
+}
+
+.ttl-day-label {
+    position: sticky;
+    left: 0;
+    white-space: nowrap;
+}
+
+.ttl-hour {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding-left: 2px;
+    font-size: .68rem;
+    color: var(--tp-muted, #62717c);
+    border-right: 1px solid var(--ttl-line);
+    box-sizing: border-box;
+}
+
+.ttl-leg-label {
+    min-height: var(--ttl-row-h);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.ttl-leg-label:hover { background: var(--tp-brand-soft, #eef4ee); }
+.ttl-leg-label-muted { cursor: default; background: rgba(0,0,0,.02); }
+
+.ttl-lane {
+    position: relative;
+    min-height: var(--ttl-row-h);
+    border-bottom: 1px solid var(--ttl-line);
+}
+
+.ttl-lane-clickable {
+    cursor: copy;
+}
+
+.ttl-lane-grid {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.ttl-lane-hour {
+    flex: 0 0 auto;
+    border-right: 1px solid var(--ttl-line);
+    box-sizing: border-box;
+}
+
+.ttl-lane-hour-dayend {
+    border-right-width: 2px;
+}
+
+.ttl-leg-band {
+    position: absolute;
+    top: .25rem;
+    bottom: .25rem;
+    border-radius: .35rem;
+    background: var(--tp-brand-soft, #d9eadb);
+    opacity: .5;
+    pointer-events: none;
+}
+
+.ttl-item {
+    position: absolute;
+    top: .4rem;
+    height: calc(var(--ttl-row-h) - .8rem);
+    border: none;
+    border-left: 4px solid rgba(0,0,0,.25);
+    border-radius: .35rem;
+    background: var(--tp-item, #64748b);
+    color: #fff;
+    padding: .15rem .4rem;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,.2);
+    z-index: 1;
+    cursor: pointer;
+}
+
+.ttl-item:hover { filter: brightness(1.05); z-index: 2; }
+.ttl-item.is-outside { outline: 2px dashed var(--tp-warning, #b7791f); outline-offset: -2px; }
+
+.ttl-item-title {
+    font-size: .72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tp-color-swatch {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    border: 2px solid rgba(0,0,0,.15);
+    background: var(--tp-swatch, #64748b);
+    cursor: pointer;
+    padding: 0;
+}
+
+.tp-color-swatch.is-selected {
+    border-color: var(--tp-text, #1f2933);
+    box-shadow: 0 0 0 2px var(--tp-focus, #f1a941);
+}
+
+@media (max-width: 576px) {
+    .ttl-scroll { max-height: 26rem; }
+    .ttl { --ttl-label-w: 150px; }
 }
 
 @media (max-width: 576px) {

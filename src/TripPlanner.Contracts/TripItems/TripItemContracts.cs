@@ -16,5 +16,20 @@ public static class TrackedItemTypes
     { Event, Reservation, Activity, Reminder };
 }
 
-public sealed record CreateTrackedItemRequest(string ItemType, string Title, string? Location, DateTimeOffset StartsAt, DateTimeOffset? EndsAt, string? ConfirmationCode, string? Notes);
-public sealed record UpdateTrackedItemRequest(string ItemType, string Title, string? Location, DateTimeOffset StartsAt, DateTimeOffset? EndsAt, string? ConfirmationCode, string? Notes);
+public static class TrackedItemColors
+{
+    public const string Default = "slate";
+
+    public static readonly IReadOnlyList<string> All = new[]
+    { "slate", "teal", "blue", "green", "gold", "orange", "red", "purple" };
+
+    private static readonly IReadOnlySet<string> Allowed =
+        new HashSet<string>(All, StringComparer.OrdinalIgnoreCase);
+
+    public static bool IsValid(string? color) => !string.IsNullOrWhiteSpace(color) && Allowed.Contains(color);
+
+    public static string Normalize(string? color) => IsValid(color) ? color!.Trim().ToLowerInvariant() : Default;
+}
+
+public sealed record CreateTrackedItemRequest(Guid TripLegId, string ItemType, string Title, string? Location, DateTimeOffset StartsAt, DateTimeOffset? EndsAt, string DisplayColor, string? ConfirmationCode, string? Notes);
+public sealed record UpdateTrackedItemRequest(Guid TripLegId, string ItemType, string Title, string? Location, DateTimeOffset StartsAt, DateTimeOffset? EndsAt, string DisplayColor, string? ConfirmationCode, string? Notes);

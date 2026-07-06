@@ -22,7 +22,7 @@ public interface ITripApiClient
     Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default);
     Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default);
 
-    Task<TimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default);
+    Task<TripTimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default);
 }
 
 public sealed class TripApiClient : ITripApiClient
@@ -89,10 +89,10 @@ public sealed class TripApiClient : ITripApiClient
     public async Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default)
         => (await _http.DeleteAsync($"/api/trips/{tripId}/items/{trackedItemId}", ct)).EnsureSuccessStatusCode();
 
-    public async Task<TimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default)
+    public async Task<TripTimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default)
     {
         var resp = await _http.GetAsync($"/api/trips/{tripId}/timeline", ct);
         if (!resp.IsSuccessStatusCode) return null;
-        return await resp.Content.ReadFromJsonAsync<TimelineResponse>(cancellationToken: ct);
+        return await resp.Content.ReadFromJsonAsync<TripTimelineResponse>(cancellationToken: ct);
     }
 }

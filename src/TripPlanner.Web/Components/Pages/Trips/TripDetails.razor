@@ -27,12 +27,12 @@ else
     </header>
 
     <div class="row g-3">
-        <div class="col-xl-9">
-            <div class="card shadow-sm mb-3">
+        <div class="col-12">
+            <div class="card shadow-sm mb-3 tp-static">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div>
-                        <div class="fw-semibold">Trip calendar</div>
-                        <div class="small text-secondary">Week view is the default. Use the calendar controls for day, week, month, and date navigation.</div>
+                        <div class="fw-semibold">Trip timeline</div>
+                        <div class="small text-secondary">Trip legs are listed on the left. Scroll the grid to see each day, hour, and the events on each leg. Select a leg or event to edit it.</div>
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-sm btn-outline-primary" @onclick="OpenCreateLegModal">Add leg</button>
@@ -40,12 +40,12 @@ else
                     </div>
                 </div>
                 <div class="card-body">
-                    <TripTimeline @ref="_timeline" TripId="@TripId" OnItemSelected="SelectCalendarItemAsync" />
+                    <TripTimeline @ref="_timeline" TripId="@TripId" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" />
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-3">
+        <div class="col-md-6 col-xl-4">
             <div class="card mb-3">
                 <div class="card-header">Overview</div>
                 <div class="card-body">
@@ -60,67 +60,10 @@ else
                     <div class="small text-secondary">Created @_trip.CreatedAtUtc.ToString("yyyy-MM-dd")</div>
                 </div>
             </div>
+        </div>
 
+        <div class="col-md-6 col-xl-4">
             <div class="card mb-3">
-                <div class="card-header">Selected item</div>
-                <div class="card-body">
-                    @if (SelectedLeg is { } leg)
-                    {
-                        <h2 class="h6">@leg.Title</h2>
-                        <dl class="small mb-3">
-                            <dt>Type</dt>
-                            <dd>Leg</dd>
-                            <dt>When</dt>
-                            <dd>@leg.StartLocal.ToString("g") - @leg.EndLocal.ToString("g")</dd>
-                            <dt>Timezones</dt>
-                            <dd>@FormatTimeZone(leg.StartTimeZoneLabel, leg.StartTimeZoneId) - @FormatTimeZone(leg.EndTimeZoneLabel, leg.EndTimeZoneId)</dd>
-                            @if (!string.IsNullOrWhiteSpace(leg.Origin) || !string.IsNullOrWhiteSpace(leg.Destination))
-                            {
-                                <dt>Route</dt>
-                                <dd>@leg.Origin @(!string.IsNullOrWhiteSpace(leg.Origin) && !string.IsNullOrWhiteSpace(leg.Destination) ? "to" : null) @leg.Destination</dd>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(leg.Notes))
-                            {
-                                <dt>Notes</dt>
-                                <dd>@leg.Notes</dd>
-                            }
-                        </dl>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditLegModal(leg)">Edit leg</button>
-                    }
-                    else if (SelectedItem is { } item)
-                    {
-                        <h2 class="h6">@item.Title</h2>
-                        <dl class="small mb-3">
-                            <dt>Type</dt>
-                            <dd>@item.ItemType</dd>
-                            <dt>When</dt>
-                            <dd>@item.StartsAt.ToString("g") @(item.EndsAt is { } end ? "- " + end.ToString("g") : null)</dd>
-                            @if (!string.IsNullOrWhiteSpace(item.Location))
-                            {
-                                <dt>Location</dt>
-                                <dd>@item.Location</dd>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(item.ConfirmationCode))
-                            {
-                                <dt>Confirmation</dt>
-                                <dd>@item.ConfirmationCode</dd>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(item.Notes))
-                            {
-                                <dt>Notes</dt>
-                                <dd>@item.Notes</dd>
-                            }
-                        </dl>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditItemModal(item)">Edit event</button>
-                    }
-                    else
-                    {
-                        <p class="text-secondary mb-0">Select a calendar leg or event to see its details here.</p>
-                    }
-                </div>
-            </div>
-
-            <div class="card">
                 <div class="card-header">Itinerary summary</div>
                 <ul class="list-group list-group-flush small">
                     <li class="list-group-item d-flex justify-content-between"><span>Legs</span><span>@_trip.Legs.Count</span></li>
@@ -155,10 +98,10 @@ else
                                 <TripLegForm TripId="@TripId" Leg="_editingLeg" OnSaved="HandleModalSavedAsync" />
                                 break;
                             case ActiveModal.CreateItem:
-                                <TrackedItemForm TripId="@TripId" OnSaved="HandleModalSavedAsync" />
+                                <TrackedItemForm TripId="@TripId" Legs="_trip.Legs" InitialTripLegId="_initialItemLegId" InitialStartsAt="_initialItemStart" OnSaved="HandleModalSavedAsync" />
                                 break;
                             case ActiveModal.EditItem:
-                                <TrackedItemForm TripId="@TripId" Item="_editingItem" OnSaved="HandleModalSavedAsync" />
+                                <TrackedItemForm TripId="@TripId" Item="_editingItem" Legs="_trip.Legs" OnSaved="HandleModalSavedAsync" />
                                 break;
                         }
                     </div>
@@ -179,8 +122,8 @@ else
     private TripPlanner.Web.Components.Trips.TripForm.TripFormModel _tripEditModel = new();
     private TripLegDto? _editingLeg;
     private TrackedItemDto? _editingItem;
-    private string? _selectedSourceType;
-    private Guid? _selectedItemId;
+    private Guid? _initialItemLegId;
+    private DateTime? _initialItemStart;
 
     private enum ActiveModal
     {
@@ -201,16 +144,6 @@ else
         ActiveModal.EditItem => "Edit event",
         _ => string.Empty
     };
-
-    private TripLegDto? SelectedLeg
-        => _selectedSourceType == "trip-leg" && _selectedItemId is { } id
-            ? _trip?.Legs.FirstOrDefault(l => l.TripLegId == id)
-            : null;
-
-    private TrackedItemDto? SelectedItem
-        => _selectedSourceType == "tracked-item" && _selectedItemId is { } id
-            ? _trip?.TrackedItems.FirstOrDefault(i => i.TrackedItemId == id)
-            : null;
 
     protected override async Task OnInitializedAsync() => await ReloadAsync();
 
@@ -276,6 +209,8 @@ else
     private void OpenCreateItemModal()
     {
         _editingItem = null;
+        _initialItemLegId = null;
+        _initialItemStart = null;
         _activeModal = ActiveModal.CreateItem;
     }
 
@@ -310,23 +245,29 @@ else
         await ReloadAsync();
     }
 
-    private Task SelectCalendarItemAsync(TripTimeline.CalendarItemSelection selection)
+    private void OnTimelineLegSelected(Guid tripLegId)
     {
-        _selectedSourceType = selection.SourceType;
-        _selectedItemId = ParseCalendarItemId(selection.Id);
-        return Task.CompletedTask;
+        var leg = _trip?.Legs.FirstOrDefault(l => l.TripLegId == tripLegId);
+        if (leg is not null)
+        {
+            OpenEditLegModal(leg);
+        }
     }
 
-    private static Guid? ParseCalendarItemId(string calendarId)
+    private void OnTimelineItemSelected(Guid trackedItemId)
     {
-        var idPart = calendarId.Contains(':', StringComparison.Ordinal)
-            ? calendarId[(calendarId.IndexOf(':', StringComparison.Ordinal) + 1)..]
-            : calendarId;
-        return Guid.TryParse(idPart, out var id) ? id : null;
+        var item = _trip?.TrackedItems.FirstOrDefault(i => i.TrackedItemId == trackedItemId);
+        if (item is not null)
+        {
+            OpenEditItemModal(item);
+        }
     }
 
-    private static string FormatTimeZone(string? label, string timeZoneId)
-        => string.IsNullOrWhiteSpace(label) || string.Equals(label, timeZoneId, StringComparison.Ordinal)
-            ? timeZoneId
-            : $"{label} ({timeZoneId})";
+    private void OnTimelineLegSlotSelected(TripTimeline.TimelineSlotSelection selection)
+    {
+        _editingItem = null;
+        _initialItemLegId = selection.TripLegId;
+        _initialItemStart = selection.StartLocal;
+        _activeModal = ActiveModal.CreateItem;
+    }
 }

@@ -20,6 +20,7 @@ public interface ITripItemRepository
     Task<Guid?> CreateTrackedItemAsync(string ownerUserId, Guid tripId, CreateTrackedItemRequest request, DateTimeOffset nowUtc, CancellationToken ct);
     Task<int> UpdateTrackedItemAsync(string ownerUserId, Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct);
     Task<int> DeleteTrackedItemAsync(string ownerUserId, Guid tripId, Guid trackedItemId, CancellationToken ct);
+    Task<int> CountItemsForLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, CancellationToken ct);
 }
 
 public sealed class TripItemRepository : ITripItemRepository
@@ -96,9 +97,11 @@ public sealed class TripItemRepository : ITripItemRepository
         var id = Guid.NewGuid();
         var rows = await conn.ExecuteAsync(new CommandDefinition(ItemSql("Insert"), new
         {
-            TrackedItemId = id, TripId = tripId, OwnerUserId = ownerUserId,
+            TrackedItemId = id, TripId = tripId, TripLegId = request.TripLegId, OwnerUserId = ownerUserId,
             request.ItemType, request.Title, request.Location,
-            request.StartsAt, request.EndsAt, request.ConfirmationCode, request.Notes,
+            request.StartsAt, request.EndsAt,
+            DisplayColor = TrackedItemColors.Normalize(request.DisplayColor),
+            request.ConfirmationCode, request.Notes,
             SortOrder = 0, NowUtc = nowUtc
         }, cancellationToken: ct));
         return rows == 0 ? null : id;
@@ -109,9 +112,11 @@ public sealed class TripItemRepository : ITripItemRepository
         await using var conn = await _factory.CreateOpenConnectionAsync(ct);
         return await conn.ExecuteAsync(new CommandDefinition(ItemSql("Update"), new
         {
-            TrackedItemId = trackedItemId, TripId = tripId, OwnerUserId = ownerUserId,
+            TrackedItemId = trackedItemId, TripId = tripId, TripLegId = request.TripLegId, OwnerUserId = ownerUserId,
             request.ItemType, request.Title, request.Location,
-            request.StartsAt, request.EndsAt, request.ConfirmationCode, request.Notes,
+            request.StartsAt, request.EndsAt,
+            DisplayColor = TrackedItemColors.Normalize(request.DisplayColor),
+            request.ConfirmationCode, request.Notes,
             SortOrder = 0
         }, cancellationToken: ct));
     }
@@ -120,6 +125,12 @@ public sealed class TripItemRepository : ITripItemRepository
     {
         await using var conn = await _factory.CreateOpenConnectionAsync(ct);
         return await conn.ExecuteAsync(new CommandDefinition(ItemSql("Delete"), new { TrackedItemId = trackedItemId, TripId = tripId, OwnerUserId = ownerUserId }, cancellationToken: ct));
+    }
+
+    public async Task<int> CountItemsForLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, CancellationToken ct)
+    {
+        await using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(ItemSql("CountByLeg"), new { OwnerUserId = ownerUserId, TripId = tripId, TripLegId = tripLegId }, cancellationToken: ct));
     }
 
     private static DateTimeOffset ToInstant(DateTime local, string timeZoneId)

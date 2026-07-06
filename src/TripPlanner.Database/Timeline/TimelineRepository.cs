@@ -1,13 +1,18 @@
 using Dapper;
 using TripPlanner.Contracts.Timeline;
+using TripPlanner.Contracts.TripItems;
 using TripPlanner.Database.Connections;
 using TripPlanner.Database.Sql;
 
 namespace TripPlanner.Database.Timeline;
 
+public sealed record TimelineProjection(
+    IReadOnlyList<TimelineLeg> Legs,
+    IReadOnlyList<TimelineItem> UnassignedItems);
+
 public interface ITimelineRepository
 {
-    Task<IReadOnlyList<TimelineEvent>> GetTimelineAsync(string ownerUserId, Guid tripId, CancellationToken ct);
+    Task<TimelineProjection> GetTimelineAsync(string ownerUserId, Guid tripId, CancellationToken ct);
 }
 
 public sealed class TimelineRepository : ITimelineRepository
@@ -16,56 +21,108 @@ public sealed class TimelineRepository : ITimelineRepository
     private readonly ISqlFileProvider _sql;
     public TimelineRepository(IPostgresConnectionFactory factory, ISqlFileProvider sql) { _factory = factory; _sql = sql; }
 
-    public async Task<IReadOnlyList<TimelineEvent>> GetTimelineAsync(string ownerUserId, Guid tripId, CancellationToken ct)
+    public async Task<TimelineProjection> GetTimelineAsync(string ownerUserId, Guid tripId, CancellationToken ct)
     {
         await using var conn = await _factory.CreateOpenConnectionAsync(ct);
         var query = _sql.Get("Queries/Timeline/GetTripTimeline.sql");
-        var rows = await conn.QueryAsync<TimelineRow>(new CommandDefinition(query, new { OwnerUserId = ownerUserId, TripId = tripId }, cancellationToken: ct));
-        return rows.Select(r => new TimelineEvent(
-            r.Id,
-            r.SourceType,
-            r.Title,
-            r.Start,
-            r.End,
-            r.CalendarStart,
-            r.CalendarEnd,
-            r.StartTimeZoneId,
-            r.StartTimeZoneLabel,
-            r.EndTimeZoneId,
-            r.EndTimeZoneLabel,
-            r.AllDay,
-            r.DisplayOrder,
-            BuildMetadata(r))).ToArray();
-    }
+        await using var grid = await conn.QueryMultipleAsync(new CommandDefinition(query, new { OwnerUserId = ownerUserId, TripId = tripId }, cancellationToken: ct));
 
-    private static Dictionary<string, string?>? BuildMetadata(TimelineRow row)
-    {
-        if (row.SourceType != "trip-leg")
+        var legRows = (await grid.ReadAsync<LegRow>()).ToList();
+        var itemRows = (await grid.ReadAsync<ItemRow>()).ToList();
+
+        var itemsByLeg = itemRows
+            .Where(i => i.TripLegId is not null)
+            .GroupBy(i => i.TripLegId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var legs = new List<TimelineLeg>(legRows.Count);
+        foreach (var leg in legRows)
         {
-            return null;
+            var legItems = itemsByLeg.TryGetValue(leg.TripLegId, out var found)
+                ? found
+                    .OrderBy(i => i.StartsAt)
+                    .ThenBy(i => i.SortOrder)
+                    .ThenBy(i => i.Title, StringComparer.Ordinal)
+                    .ThenBy(i => i.TrackedItemId)
+                    .Select(i => MapItem(i, leg))
+                    .ToArray()
+                : Array.Empty<TimelineItem>();
+
+            legs.Add(new TimelineLeg(
+                leg.TripLegId,
+                leg.Title,
+                leg.Origin,
+                leg.Destination,
+                leg.StartLocal,
+                leg.StartTimeZoneId,
+                leg.StartTimeZoneId,
+                leg.EndLocal,
+                leg.EndTimeZoneId,
+                leg.EndTimeZoneId,
+                leg.SortOrder,
+                legItems));
         }
 
-        return new Dictionary<string, string?>
-        {
-            ["startTimeZoneId"] = row.StartTimeZoneId,
-            ["startTimeZoneLabel"] = row.StartTimeZoneLabel,
-            ["endTimeZoneId"] = row.EndTimeZoneId,
-            ["endTimeZoneLabel"] = row.EndTimeZoneLabel
-        };
+        var unassigned = itemRows
+            .Where(i => i.TripLegId is null)
+            .OrderBy(i => i.StartsAt)
+            .ThenBy(i => i.SortOrder)
+            .ThenBy(i => i.Title, StringComparer.Ordinal)
+            .ThenBy(i => i.TrackedItemId)
+            .Select(i => MapItem(i, null))
+            .ToArray();
+
+        return new TimelineProjection(legs, unassigned);
     }
 
-    private sealed record TimelineRow(
-        string Id,
-        string SourceType,
+    private static TimelineItem MapItem(ItemRow item, LegRow? leg)
+    {
+        var startsOutside = false;
+        var endsOutside = false;
+        if (leg is not null)
+        {
+            startsOutside = item.StartsAt < leg.StartAt || item.StartsAt > leg.EndAt;
+            if (item.EndsAt is { } end)
+            {
+                endsOutside = end < leg.StartAt || end > leg.EndAt;
+            }
+        }
+
+        return new TimelineItem(
+            item.TrackedItemId,
+            item.TripLegId,
+            item.ItemType,
+            item.Title,
+            item.Location,
+            item.StartsAt,
+            item.EndsAt,
+            TrackedItemColors.Normalize(item.DisplayColor),
+            startsOutside,
+            endsOutside,
+            item.SortOrder);
+    }
+
+    private sealed record LegRow(
+        Guid TripLegId,
         string Title,
-        DateTimeOffset Start,
-        DateTimeOffset? End,
-        string CalendarStart,
-        string? CalendarEnd,
-        string? StartTimeZoneId,
-        string? StartTimeZoneLabel,
-        string? EndTimeZoneId,
-        string? EndTimeZoneLabel,
-        bool AllDay,
-        int DisplayOrder);
+        string? Origin,
+        string? Destination,
+        DateTime StartLocal,
+        string StartTimeZoneId,
+        DateTime EndLocal,
+        string EndTimeZoneId,
+        DateTimeOffset StartAt,
+        DateTimeOffset EndAt,
+        int SortOrder);
+
+    private sealed record ItemRow(
+        Guid TrackedItemId,
+        Guid? TripLegId,
+        string ItemType,
+        string Title,
+        string? Location,
+        DateTimeOffset StartsAt,
+        DateTimeOffset? EndsAt,
+        string? DisplayColor,
+        int SortOrder);
 }

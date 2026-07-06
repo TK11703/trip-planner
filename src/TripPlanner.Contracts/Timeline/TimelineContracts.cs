@@ -1,19 +1,36 @@
 namespace TripPlanner.Contracts.Timeline;
 
-public sealed record TimelineResponse(Guid TripId, DateOnly StartDate, DateOnly EndDate, IReadOnlyList<TimelineEvent> Events);
+public sealed record TripTimelineResponse(
+    Guid TripId,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    int SlotMinutes,
+    IReadOnlyList<TimelineLeg> Legs,
+    IReadOnlyList<TimelineItem> UnassignedItems);
 
-public sealed record TimelineEvent(
-    string Id,
-    string SourceType,
+public sealed record TimelineLeg(
+    Guid TripLegId,
     string Title,
-    DateTimeOffset Start,
-    DateTimeOffset? End,
-    string CalendarStart,
-    string? CalendarEnd,
-    string? StartTimeZoneId,
+    string? Origin,
+    string? Destination,
+    DateTime StartLocal,
+    string StartTimeZoneId,
     string? StartTimeZoneLabel,
-    string? EndTimeZoneId,
+    DateTime EndLocal,
+    string EndTimeZoneId,
     string? EndTimeZoneLabel,
-    bool AllDay,
-    int DisplayOrder,
-    IReadOnlyDictionary<string, string?>? Metadata = null);
+    int SortOrder,
+    IReadOnlyList<TimelineItem> Items);
+
+public sealed record TimelineItem(
+    Guid TrackedItemId,
+    Guid? TripLegId,
+    string ItemType,
+    string Title,
+    string? Location,
+    DateTimeOffset StartsAt,
+    DateTimeOffset? EndsAt,
+    string DisplayColor,
+    bool StartsOutsideLeg,
+    bool EndsOutsideLeg,
+    int SortOrder);

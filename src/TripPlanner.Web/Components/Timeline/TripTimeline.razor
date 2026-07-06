@@ -1,109 +1,249 @@
-@inject IJSRuntime JS
 @inject ITripApiClient TripApi
+@inject IJSRuntime JS
 @implements IAsyncDisposable
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
+@using TripPlanner.Contracts.Common
+@using TripPlanner.Contracts.Timeline
+@using TripPlanner.Contracts.TripItems
 
-<div @ref="_container" class="trip-timeline" style="min-height: 34rem"></div>
+@if (_timeline is null)
+{
+    <div class="text-secondary small py-4">Loading trip timeline…</div>
+}
+else if (_timeline.Legs.Count == 0 && _timeline.UnassignedItems.Count == 0)
+{
+    <div class="border-dashed rounded p-4 text-center text-secondary">
+        No trip legs yet. Add a trip leg to start building your timeline, then relate events to it.
+    </div>
+}
+else
+{
+    @if (_timeline.UnassignedItems.Count > 0)
+    {
+        <div class="alert alert-warning py-2 small mb-2">
+            @_timeline.UnassignedItems.Count event(s) are not related to a trip leg. Select one below to assign it to a leg.
+        </div>
+    }
+    <div class="ttl" style="--ttl-slot-w:@(SlotWidthPx)px; --ttl-label-w:@(LabelWidthPx)px;">
+        <div class="ttl-scroll" @ref="_scrollEl">
+            <div class="ttl-grid" style="grid-template-columns: var(--ttl-label-w) @(TrackWidthPx)px;">
+                <div class="ttl-corner ttl-corner-day">Trip legs</div>
+                <div class="ttl-days">
+                    @for (var d = 0; d < _days; d++)
+                    {
+                        var date = _start.AddDays(d);
+                        <div class="ttl-day" style="width:@(SlotsPerDay * SlotWidthPx)px"><span class="ttl-day-label">@date.ToString("ddd M/d")</span></div>
+                    }
+                </div>
+
+                <div class="ttl-corner ttl-corner-hour"></div>
+                <div class="ttl-hours">
+                    @for (var d = 0; d < _days; d++)
+                    {
+                        @for (var h = 0; h < 24; h++)
+                        {
+                            <div class="ttl-hour" style="width:@(2 * SlotWidthPx)px">@FormatHour(h)</div>
+                        }
+                    }
+                </div>
+
+                @{
+                    RenderFragment laneGrid =
+                        @<div class="ttl-lane-grid">
+                            @for (var gd = 0; gd < _days; gd++)
+                            {
+                                @for (var gh = 0; gh < 24; gh++)
+                                {
+                                    <div class="ttl-lane-hour @(gh == 23 ? "ttl-lane-hour-dayend" : null)" style="width:@(2 * SlotWidthPx)px"></div>
+                                }
+                            }
+                        </div>;
+                }
+
+                @foreach (var leg in _timeline.Legs)
+                {
+                    <div class="ttl-leg-label" @onclick="() => SelectLegAsync(leg.TripLegId)" role="button" tabindex="0">
+                        <div class="fw-semibold">@leg.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(leg.Origin) || !string.IsNullOrWhiteSpace(leg.Destination))
+                        {
+                            <div class="small text-secondary">@leg.Origin @(string.IsNullOrWhiteSpace(leg.Origin) || string.IsNullOrWhiteSpace(leg.Destination) ? null : "→") @leg.Destination</div>
+                        }
+                        @if (leg.Items.Count == 0)
+                        {
+                            <div class="small text-secondary fst-italic">No events yet</div>
+                        }
+                    </div>
+                    <div class="ttl-lane ttl-lane-clickable" style="width:@(TrackWidthPx)px" @onclick="args => OnLaneClickAsync(leg, args)">
+                        @laneGrid
+                        @{
+                            var band = ComputeSpan(leg.StartLocal, leg.EndLocal);
+                        }
+                        <div class="ttl-leg-band" style="left:@(band.Left)px; width:@(band.Width)px"></div>
+                        @foreach (var item in leg.Items)
+                        {
+                            var tz = TimezoneOptions.FindTimeZone(leg.StartTimeZoneId) ?? TimeZoneInfo.Utc;
+                            var localStart = TimeZoneInfo.ConvertTime(item.StartsAt, tz).DateTime;
+                            DateTime? localEnd = item.EndsAt is { } e ? TimeZoneInfo.ConvertTime(e, tz).DateTime : null;
+                            var span = ComputeSpan(localStart, localEnd);
+                            var outside = item.StartsOutsideLeg || item.EndsOutsideLeg;
+                            <button type="button"
+                                    class="ttl-item @(outside ? "is-outside" : null)"
+                                    style="left:@(span.Left)px; width:@(span.Width)px; --tp-item:@SwatchColor(item.DisplayColor)"
+                                    title="@ItemTooltip(item, localStart, localEnd, outside)"
+                                    @onclick="() => SelectItemAsync(item.TrackedItemId)"
+                                    @onclick:stopPropagation="true">
+                                <span class="ttl-item-title text-truncate">@item.Title</span>
+                            </button>
+                        }
+                    </div>
+                }
+
+                @if (_timeline.UnassignedItems.Count > 0)
+                {
+                    <div class="ttl-leg-label ttl-leg-label-muted">
+                        <div class="fw-semibold text-truncate">Unassigned</div>
+                        <div class="small text-secondary fst-italic">Needs a trip leg</div>
+                    </div>
+                    <div class="ttl-lane" style="width:@(TrackWidthPx)px">
+                        @laneGrid
+                        @foreach (var item in _timeline.UnassignedItems)
+                        {
+                            var localStart = item.StartsAt.UtcDateTime;
+                            DateTime? localEnd = item.EndsAt?.UtcDateTime;
+                            var span = ComputeSpan(localStart, localEnd);
+                            <button type="button"
+                                    class="ttl-item is-outside"
+                                    style="left:@(span.Left)px; width:@(span.Width)px; --tp-item:@SwatchColor(item.DisplayColor)"
+                                    title="Unassigned event — select to relate it to a trip leg"
+                                    @onclick="() => SelectItemAsync(item.TrackedItemId)">
+                                <span class="ttl-item-title text-truncate">@item.Title</span>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter] public Guid TripId { get; set; }
-    [Parameter] public EventCallback<CalendarItemSelection> OnItemSelected { get; set; }
+    [Parameter] public EventCallback<Guid> OnLegSelected { get; set; }
+    [Parameter] public EventCallback<Guid> OnItemSelected { get; set; }
+    [Parameter] public EventCallback<TimelineSlotSelection> OnLegSlotSelected { get; set; }
 
-    private ElementReference _container;
-    private IJSObjectReference? _instance;
-    private DotNetObjectReference<TripTimeline>? _dotNetRef;
+    public sealed record TimelineSlotSelection(Guid TripLegId, DateTime StartLocal);
+
+    private const int SlotWidthPx = 26;
+    private const int LabelWidthPx = 220;
+    private const int SlotMinutes = 30;
+    private const int SlotsPerDay = 24 * 60 / SlotMinutes;
+
+    private TripTimelineResponse? _timeline;
+    private DateOnly _start;
+    private DateOnly _end;
+    private int _days;
+    private ElementReference _scrollEl;
     private bool _disposed;
+
+    private bool HasGrid => _timeline is not null && (_timeline.Legs.Count > 0 || _timeline.UnassignedItems.Count > 0);
+
+    private int TrackWidthPx => _days * SlotsPerDay * SlotWidthPx;
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (_disposed || !HasGrid)
         {
-            await RefreshAsync();
+            return;
         }
+        try
+        {
+            await JS.InvokeVoidAsync("tripTimeline.init", _scrollEl);
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
     }
 
     public async Task RefreshAsync()
     {
-        if (_disposed)
+        _timeline = await TripApi.GetTimelineAsync(TripId);
+        if (_timeline is not null)
         {
-            return;
+            _start = _timeline.StartDate;
+            _end = _timeline.EndDate;
+            _days = Math.Max(1, _end.DayNumber - _start.DayNumber + 1);
         }
-
-        var timeline = await TripApi.GetTimelineAsync(TripId);
-        if (timeline is null || _disposed) return;
-        var events = timeline.Events.Select(e => new
-        {
-            id = e.Id,
-            title = e.Title,
-            start = e.CalendarStart,
-            end = e.CalendarEnd,
-            allDay = e.AllDay,
-            extendedProps = new
-            {
-                sourceType = e.SourceType,
-                displayOrder = e.DisplayOrder,
-                startTimeZoneId = e.StartTimeZoneId,
-                startTimeZoneLabel = e.StartTimeZoneLabel,
-                endTimeZoneId = e.EndTimeZoneId,
-                endTimeZoneLabel = e.EndTimeZoneLabel
-            }
-        }).ToArray();
-        if (_instance is null)
-        {
-            await CreateCalendarAsync(timeline.StartDate, timeline.EndDate, events);
-        }
-        else
-        {
-            try
-            {
-                await _instance.InvokeVoidAsync("refresh", timeline.StartDate.ToString("yyyy-MM-dd"), timeline.EndDate.ToString("yyyy-MM-dd"), events);
-            }
-            catch (JSDisconnectedException) { }
-            catch (TaskCanceledException) { }
-            catch (ObjectDisposedException) when (!_disposed)
-            {
-                _instance = null;
-                await CreateCalendarAsync(timeline.StartDate, timeline.EndDate, events);
-            }
-        }
+        StateHasChanged();
     }
 
-    private async Task CreateCalendarAsync(DateOnly startDate, DateOnly endDate, object[] events)
+    private (int Left, int Width) ComputeSpan(DateTime localStart, DateTime? localEnd)
     {
-        if (_disposed)
-        {
-            return;
-        }
+        var origin = _start.ToDateTime(TimeOnly.MinValue);
+        var totalSlots = _days * SlotsPerDay;
+        var startMinutes = (localStart - origin).TotalMinutes;
+        var startSlot = Math.Clamp((int)Math.Floor(startMinutes / SlotMinutes), 0, totalSlots - 1);
 
-        _dotNetRef ??= DotNetObjectReference.Create(this);
-        _instance = await JS.InvokeAsync<IJSObjectReference>("tripTimeline.create", _container,
-            startDate.ToString("yyyy-MM-dd"), endDate.ToString("yyyy-MM-dd"), events, _dotNetRef);
+        double durationMinutes = 60;
+        if (localEnd is { } end)
+        {
+            durationMinutes = Math.Max(SlotMinutes, (end - localStart).TotalMinutes);
+        }
+        var spanSlots = Math.Clamp((int)Math.Ceiling(durationMinutes / SlotMinutes), 1, totalSlots - startSlot);
+        return (startSlot * SlotWidthPx, Math.Max(SlotWidthPx, spanSlots * SlotWidthPx));
     }
 
-    [JSInvokable]
-    public async Task SelectItemAsync(string sourceType, string id)
-        => await OnItemSelected.InvokeAsync(new CalendarItemSelection(sourceType, id));
+    private async Task SelectLegAsync(Guid tripLegId) => await OnLegSelected.InvokeAsync(tripLegId);
+
+    private async Task SelectItemAsync(Guid trackedItemId) => await OnItemSelected.InvokeAsync(trackedItemId);
+
+    private async Task OnLaneClickAsync(TimelineLeg leg, MouseEventArgs args)
+    {
+        var totalSlots = _days * SlotsPerDay;
+        var slotIndex = Math.Clamp((int)Math.Floor(args.OffsetX / SlotWidthPx), 0, totalSlots - 1);
+        var startLocal = _start.ToDateTime(TimeOnly.MinValue).AddMinutes(slotIndex * SlotMinutes);
+        await OnLegSlotSelected.InvokeAsync(new TimelineSlotSelection(leg.TripLegId, startLocal));
+    }
 
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
-        if (_instance is not null)
+        try
         {
-            try { await _instance.InvokeVoidAsync("dispose"); }
-            catch (JSDisconnectedException) { }
-            catch (TaskCanceledException) { }
-            catch (ObjectDisposedException) { }
-            catch { }
-
-            try { await _instance.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-            catch (TaskCanceledException) { }
-            catch (ObjectDisposedException) { }
-
-            _instance = null;
+            await JS.InvokeVoidAsync("tripTimeline.dispose", _scrollEl);
         }
-        _dotNetRef?.Dispose();
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+        catch (InvalidOperationException) { }
     }
 
-    public sealed record CalendarItemSelection(string SourceType, string Id);
+    private static string FormatHour(int hour) => hour switch
+    {
+        0 => "12a",
+        12 => "12p",
+        < 12 => $"{hour}a",
+        _ => $"{hour - 12}p"
+    };
+
+    private static string ItemTooltip(TimelineItem item, DateTime localStart, DateTime? localEnd, bool outside)
+    {
+        var when = localEnd is { } e ? $"{localStart:g} – {e:g}" : localStart.ToString("g");
+        var suffix = outside ? " (outside leg range)" : string.Empty;
+        return $"{item.Title} · {when}{suffix}";
+    }
+
+    private static string SwatchColor(string color) => color.ToLowerInvariant() switch
+    {
+        "slate" => "#64748b",
+        "teal" => "#0d9488",
+        "blue" => "#2563eb",
+        "green" => "#2f7d57",
+        "gold" => "#e7b85d",
+        "orange" => "#c96f34",
+        "red" => "#b42318",
+        "purple" => "#7c3aed",
+        _ => "#64748b"
+    };
 }

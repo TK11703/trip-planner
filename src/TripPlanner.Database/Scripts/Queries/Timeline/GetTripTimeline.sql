@@ -1,39 +1,37 @@
--- US4: timeline projection. Legs and tracked items are merged into a single ordered
--- list for the trip and only returned for the authenticated owner.
+-- 007: resource timeline projection. Returns two result sets scoped to the owner:
+--   (1) trip legs ordered chronologically, acting as timeline resource rows.
+--   (2) tracked items with their leg assignment and display color.
+-- The repository groups items under their leg, flags out-of-leg-range items, and
+-- collects unassigned (legacy) items.
+
+-- Legs
 SELECT
-    'leg:' || trip_leg_id::text AS "Id",
-    'trip-leg'                  AS "SourceType",
-    title                       AS "Title",
-    start_at                    AS "Start",
-    end_at                      AS "End",
-    to_char(start_local, 'YYYY-MM-DD"T"HH24:MI:SS') AS "CalendarStart",
-    to_char(end_local, 'YYYY-MM-DD"T"HH24:MI:SS')   AS "CalendarEnd",
-    start_time_zone_id          AS "StartTimeZoneId",
-    start_time_zone_id          AS "StartTimeZoneLabel",
-    end_time_zone_id            AS "EndTimeZoneId",
-    end_time_zone_id            AS "EndTimeZoneLabel",
-    false                       AS "AllDay",
-    sort_order                  AS "DisplayOrder"
+    trip_leg_id                                     AS "TripLegId",
+    title                                           AS "Title",
+    origin                                          AS "Origin",
+    destination                                     AS "Destination",
+    start_local                                     AS "StartLocal",
+    start_time_zone_id                              AS "StartTimeZoneId",
+    end_local                                       AS "EndLocal",
+    end_time_zone_id                                AS "EndTimeZoneId",
+    start_at                                        AS "StartAt",
+    COALESCE(end_at, start_at)                      AS "EndAt",
+    sort_order                                      AS "SortOrder"
 FROM trip_legs
 WHERE owner_user_id = @OwnerUserId AND trip_id = @TripId
-UNION ALL
+ORDER BY start_at, sort_order, title, trip_leg_id;
+
+-- Items
 SELECT
-    'item:' || tracked_item_id::text AS "Id",
-    'tracked-item'                   AS "SourceType",
-    title                            AS "Title",
-    starts_at                        AS "Start",
-    ends_at                          AS "End",
-    to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS') AS "CalendarStart",
-    CASE
-        WHEN ends_at IS NULL THEN NULL
-        ELSE to_char(ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS')
-    END                              AS "CalendarEnd",
-    NULL::text                       AS "StartTimeZoneId",
-    NULL::text                       AS "StartTimeZoneLabel",
-    NULL::text                       AS "EndTimeZoneId",
-    NULL::text                       AS "EndTimeZoneLabel",
-    false                            AS "AllDay",
-    sort_order                       AS "DisplayOrder"
+    tracked_item_id                                 AS "TrackedItemId",
+    trip_leg_id                                     AS "TripLegId",
+    item_type                                       AS "ItemType",
+    title                                           AS "Title",
+    location                                        AS "Location",
+    starts_at                                       AS "StartsAt",
+    ends_at                                         AS "EndsAt",
+    display_color                                   AS "DisplayColor",
+    sort_order                                      AS "SortOrder"
 FROM tracked_items
 WHERE owner_user_id = @OwnerUserId AND trip_id = @TripId
-ORDER BY "Start", "DisplayOrder";
+ORDER BY starts_at, sort_order, title, tracked_item_id;

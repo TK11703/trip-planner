@@ -100,12 +100,20 @@ public static class TripLegEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<NoContent, NotFound<ApiError>>> DeleteAsync(
+    private static async Task<Results<NoContent, BadRequest<ApiError>, NotFound<ApiError>>> DeleteAsync(
         Guid tripId, Guid tripLegId,
         ICurrentUser currentUser, ITripItemRepository items,
         IAuditRepository audit, IClock clock, CancellationToken ct)
     {
         var ownerId = currentUser.UserId;
+        var relatedItems = await items.CountItemsForLegAsync(ownerId, tripId, tripLegId, ct);
+        if (relatedItems > 0)
+        {
+            await audit.RecordAsync(ownerId, AuditOperations.TripLegDelete, "trip-leg", tripLegId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
+            return TypedResults.BadRequest(ApiError.ValidationFailed(
+                "This trip leg still has related events. Reassign or remove those events before deleting the leg.",
+                "tripLegId"));
+        }
         var affected = await items.DeleteLegAsync(ownerId, tripId, tripLegId, ct);
         if (affected == 0)
         {

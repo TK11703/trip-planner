@@ -3,6 +3,23 @@
 
 <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName">
     <DataAnnotationsValidator />
+    @if (Legs.Count == 0)
+    {
+        <div class="alert alert-warning py-2 small mb-2">
+            Add a trip leg first. Every event must be related to a trip leg.
+        </div>
+    }
+    <div class="mb-2">
+        <label class="form-label" for="item-leg">Trip leg</label>
+        <InputSelect id="item-leg" class="form-select" @bind-Value="_model.TripLegId">
+            <option value="">Select a trip leg</option>
+            @foreach (var leg in Legs)
+            {
+                <option value="@leg.TripLegId">@leg.Title</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => _model.TripLegId)" />
+    </div>
     <div class="row g-2 mb-2">
         <div class="col-5">
             <label class="form-label">Type</label>
@@ -34,6 +51,22 @@
         </div>
     </div>
     <div class="mb-2">
+        <label class="form-label" for="item-color">Color</label>
+        <div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Event color">
+            @foreach (var color in TrackedItemColors.All)
+            {
+                var isSelected = string.Equals(_model.DisplayColor, color, StringComparison.OrdinalIgnoreCase);
+                <button type="button"
+                        class="tp-color-swatch @(isSelected ? "is-selected" : null)"
+                        style="--tp-swatch: @SwatchColor(color)"
+                        title="@color"
+                        aria-label="@color"
+                        aria-pressed="@(isSelected ? "true" : "false")"
+                        @onclick="() => _model.DisplayColor = color"></button>
+            }
+        </div>
+    </div>
+    <div class="mb-2">
         <label class="form-label">Confirmation code</label>
         <InputText class="form-control" @bind-Value="_model.ConfirmationCode" />
     </div>
@@ -41,32 +74,52 @@
     {
         <div class="alert alert-danger py-2 small">@_error</div>
     }
-    <button type="submit" class="btn btn-primary" disabled="@_submitting">@(IsEdit ? "Save item" : "Add item")</button>
+    <button type="submit" class="btn btn-primary" disabled="@(_submitting || Legs.Count == 0)">@(IsEdit ? "Save item" : "Add item")</button>
 </EditForm>
 
 @code {
     private sealed class ItemModel
     {
+        [Required(ErrorMessage = "Select the trip leg this event belongs to.")]
+        public Guid? TripLegId { get; set; }
         public string ItemType { get; set; } = "activity";
         [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
         public string? Location { get; set; }
         public DateTime StartsAt { get; set; } = DateTime.UtcNow;
         public DateTime EndsAt { get; set; } = DateTime.UtcNow.AddHours(1);
+        public string DisplayColor { get; set; } = TrackedItemColors.Default;
         public string? ConfirmationCode { get; set; }
         public string? Notes { get; set; }
     }
 
     [Parameter] public Guid TripId { get; set; }
     [Parameter] public TrackedItemDto? Item { get; set; }
+    [Parameter] public IReadOnlyList<TripLegDto> Legs { get; set; } = Array.Empty<TripLegDto>();
+    [Parameter] public Guid? InitialTripLegId { get; set; }
+    [Parameter] public DateTime? InitialStartsAt { get; set; }
     [Parameter] public EventCallback OnSaved { get; set; }
 
     private ItemModel _model = new();
     private string? _error;
     private bool _submitting;
     private Guid? _loadedItemId;
+    private bool _appliedInitial;
 
     private bool IsEdit => Item is not null;
     private string FormName => IsEdit ? $"tracked-item-edit-{Item!.TrackedItemId}" : "tracked-item-create";
+
+    private static string SwatchColor(string color) => color.ToLowerInvariant() switch
+    {
+        "slate" => "#64748b",
+        "teal" => "#0d9488",
+        "blue" => "#2563eb",
+        "green" => "#2f7d57",
+        "gold" => "#e7b85d",
+        "orange" => "#c96f34",
+        "red" => "#b42318",
+        "purple" => "#7c3aed",
+        _ => "#64748b"
+    };
 
     protected override void OnParametersSet()
     {
@@ -76,6 +129,26 @@
             {
                 _model = new ItemModel();
                 _loadedItemId = null;
+                _appliedInitial = false;
+            }
+
+            if (!_appliedInitial)
+            {
+                if (InitialTripLegId is { } initialLeg)
+                {
+                    _model.TripLegId = initialLeg;
+                }
+                if (InitialStartsAt is { } initialStart)
+                {
+                    _model.StartsAt = initialStart;
+                    _model.EndsAt = initialStart.AddHours(1);
+                }
+                _appliedInitial = true;
+            }
+
+            if (_model.TripLegId is null && Legs.Count > 0)
+            {
+                _model.TripLegId = Legs[0].TripLegId;
             }
             return;
         }
@@ -87,11 +160,13 @@
 
         _model = new ItemModel
         {
+            TripLegId = Item.TripLegId ?? (Legs.Count > 0 ? Legs[0].TripLegId : null),
             ItemType = Item.ItemType,
             Title = Item.Title,
             Location = Item.Location,
             StartsAt = Item.StartsAt.LocalDateTime,
             EndsAt = (Item.EndsAt ?? Item.StartsAt).LocalDateTime,
+            DisplayColor = TrackedItemColors.Normalize(Item.DisplayColor),
             ConfirmationCode = Item.ConfirmationCode,
             Notes = Item.Notes
         };
@@ -104,26 +179,30 @@
         try
         {
             var request = new CreateTrackedItemRequest(
+                _model.TripLegId ?? Guid.Empty,
                 _model.ItemType,
                 _model.Title.Trim(),
                 _model.Location,
                 new DateTimeOffset(_model.StartsAt.ToUniversalTime(), TimeSpan.Zero),
                 new DateTimeOffset(_model.EndsAt.ToUniversalTime(), TimeSpan.Zero),
+                _model.DisplayColor,
                 _model.ConfirmationCode,
                 _model.Notes);
             if (Item is null)
             {
                 await TripApi.CreateItemAsync(TripId, request);
-                _model = new ItemModel();
+                _model = new ItemModel { TripLegId = Legs.Count > 0 ? Legs[0].TripLegId : null };
             }
             else
             {
                 await TripApi.UpdateItemAsync(TripId, Item.TrackedItemId, new UpdateTrackedItemRequest(
+                    request.TripLegId,
                     request.ItemType,
                     request.Title,
                     request.Location,
                     request.StartsAt,
                     request.EndsAt,
+                    request.DisplayColor,
                     request.ConfirmationCode,
                     request.Notes));
             }

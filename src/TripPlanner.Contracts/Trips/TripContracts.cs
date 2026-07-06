@@ -45,11 +45,13 @@ public sealed record TripLegDto(
 public sealed record TrackedItemDto(
     Guid TrackedItemId,
     Guid TripId,
+    Guid? TripLegId,
     string ItemType,
     string Title,
     string? Location,
     DateTimeOffset StartsAt,
     DateTimeOffset? EndsAt,
+    string DisplayColor,
     string? ConfirmationCode,
     string? Notes,
     int SortOrder);

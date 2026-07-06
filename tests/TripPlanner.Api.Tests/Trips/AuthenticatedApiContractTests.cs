@@ -164,6 +164,7 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
         public Task<Guid?> CreateTrackedItemAsync(string ownerUserId, Guid tripId, CreateTrackedItemRequest request, DateTimeOffset nowUtc, CancellationToken ct) => Task.FromResult<Guid?>(Guid.NewGuid());
         public Task<int> UpdateTrackedItemAsync(string ownerUserId, Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct) => Task.FromResult(1);
         public Task<int> DeleteTrackedItemAsync(string ownerUserId, Guid tripId, Guid trackedItemId, CancellationToken ct) => Task.FromResult(1);
+        public Task<int> CountItemsForLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, CancellationToken ct) => Task.FromResult(0);
     }
 
     private sealed class InMemoryAuditRepository : IAuditRepository
