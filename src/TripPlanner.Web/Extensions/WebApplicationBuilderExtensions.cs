@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
+using TripPlanner.Web.Features.Profile;
 using TripPlanner.Web.Features.Trips;
 using TripPlanner.Web.Features.Theme;
 
@@ -33,6 +34,12 @@ public static class WebApplicationBuilderExtensions
         .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
 
         builder.Services.AddHttpClient<IThemePreferenceApiClient, ThemePreferenceApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https+http://api");
+        })
+        .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
+
+        builder.Services.AddHttpClient<IProfileApiClient, ProfileApiClient>(client =>
         {
             client.BaseAddress = new Uri("https+http://api");
         })

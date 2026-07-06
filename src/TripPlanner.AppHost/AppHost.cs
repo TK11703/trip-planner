@@ -4,6 +4,7 @@ var postgresUser = builder.AddParameter("postgres-user", secret: false);
 var postgresPassword = builder.AddParameter("postgres-password", secret: true);
 
 var postgres = builder.AddPostgres("postgres", postgresUser, postgresPassword)
+    .WithPgAdmin()
     .WithLifetime(ContainerLifetime.Persistent);
 
 var tripPlannerDb = postgres.AddDatabase("tripplanner");

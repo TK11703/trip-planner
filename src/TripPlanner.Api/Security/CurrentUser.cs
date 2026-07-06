@@ -17,6 +17,12 @@ public sealed class CurrentUser : ICurrentUser
     public string UserId => TryGetUserId()
         ?? throw new InvalidOperationException("Current user is not authenticated.");
 
+    public string? FirstName => Principal?.FindFirst("given_name")?.Value
+        ?? Principal?.FindFirst(ClaimTypes.GivenName)?.Value;
+
+    public string? LastName => Principal?.FindFirst("family_name")?.Value
+        ?? Principal?.FindFirst(ClaimTypes.Surname)?.Value;
+
     public string? DisplayName => Principal?.FindFirst("name")?.Value ?? Principal?.Identity?.Name;
     public string? Email => Principal?.FindFirst(ClaimTypes.Email)?.Value
         ?? Principal?.FindFirst("preferred_username")?.Value

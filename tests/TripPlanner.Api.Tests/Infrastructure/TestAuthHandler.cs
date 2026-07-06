@@ -11,6 +11,9 @@ public sealed class TestAuthHandler : AuthenticationHandler<TestAuthHandlerOptio
     public const string SchemeName = "Test";
     public const string TestUserHeader = "X-Test-User";
     public const string TestNameHeader = "X-Test-Name";
+    public const string TestFirstNameHeader = "X-Test-First-Name";
+    public const string TestLastNameHeader = "X-Test-Last-Name";
+    public const string TestEmailHeader = "X-Test-Email";
     public const string TestScopeHeader = "X-Test-Scope";
 
     public TestAuthHandler(IOptionsMonitor<TestAuthHandlerOptions> options, ILoggerFactory logger, UrlEncoder encoder)
@@ -35,6 +38,21 @@ public sealed class TestAuthHandler : AuthenticationHandler<TestAuthHandlerOptio
         if (!string.IsNullOrWhiteSpace(displayName))
         {
             claims.Add(new Claim("name", displayName));
+        }
+        var firstName = Request.Headers[TestFirstNameHeader].ToString();
+        if (!string.IsNullOrWhiteSpace(firstName))
+        {
+            claims.Add(new Claim("given_name", firstName));
+        }
+        var lastName = Request.Headers[TestLastNameHeader].ToString();
+        if (!string.IsNullOrWhiteSpace(lastName))
+        {
+            claims.Add(new Claim("family_name", lastName));
+        }
+        var email = Request.Headers[TestEmailHeader].ToString();
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            claims.Add(new Claim(ClaimTypes.Email, email));
         }
         var identity = new ClaimsIdentity(claims, SchemeName);
         var principal = new ClaimsPrincipal(identity);

@@ -1,0 +1,191 @@
+@page "/profile"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IProfileApiClient ProfileApi
+
+<PageTitle>Profile</PageTitle>
+
+<section class="profile-page">
+<h1 class="mb-3">Profile</h1>
+
+@if (_isLoading)
+{
+    <div class="text-secondary">Loading profile...</div>
+}
+else if (_loadError is not null)
+{
+    <div class="alert alert-warning" role="alert">@_loadError</div>
+}
+else if (_model is not null)
+{
+    @if (_saveMessage is not null)
+    {
+        <div class="alert alert-success" role="status">@_saveMessage</div>
+    }
+    @if (_saveError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_saveError</div>
+    }
+    @if (!_isComplete)
+    {
+        <div class="alert alert-info" role="status">Complete your display name and email so Trip Planner can personalize your experience and send approved trip notifications.</div>
+    }
+
+    <EditForm Model="_model" OnValidSubmit="SaveAsync" FormName="profile-form">
+        <DataAnnotationsValidator />
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="firstName">First name</label>
+                <InputText id="firstName" class="form-control" @bind-Value="_model.FirstName" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="lastName">Last name</label>
+                <InputText id="lastName" class="form-control" @bind-Value="_model.LastName" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="displayName">Display name</label>
+                <InputText id="displayName" class="form-control" @bind-Value="_model.DisplayName" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="email">Email</label>
+                <InputText id="email" class="form-control" @bind-Value="_model.Email" />
+            </div>
+        </div>
+
+        <h2 class="h4 mt-4">Notifications</h2>
+        <div class="form-check">
+            <InputCheckbox id="emailNotifications" class="form-check-input" @bind-Value="_model.EmailNotificationsEnabled" />
+            <label class="form-check-label" for="emailNotifications">Email notifications</label>
+        </div>
+        <div class="form-check">
+            <InputCheckbox id="tripReminders" class="form-check-input" @bind-Value="_model.TripReminderNotificationsEnabled" />
+            <label class="form-check-label" for="tripReminders">Trip reminders</label>
+        </div>
+        <div class="form-check">
+            <InputCheckbox id="itineraryChanges" class="form-check-input" @bind-Value="_model.ItineraryChangeNotificationsEnabled" />
+            <label class="form-check-label" for="itineraryChanges">Itinerary change notifications</label>
+        </div>
+
+        <h2 class="h4 mt-4">Personalization</h2>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="travelInterests">Travel interests</label>
+                <InputText id="travelInterests" class="form-control" @bind-Value="_model.TravelInterests" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="homeAirport">Home airport</label>
+                <InputText id="homeAirport" class="form-control" @bind-Value="_model.HomeAirport" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="preferredTravelStyle">Preferred travel style</label>
+                <InputText id="preferredTravelStyle" class="form-control" @bind-Value="_model.PreferredTravelStyle" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="accessibilityNotes">Accessibility notes</label>
+                <InputText id="accessibilityNotes" class="form-control" @bind-Value="_model.AccessibilityNotes" />
+            </div>
+        </div>
+
+        <button class="btn btn-primary mt-4" type="submit" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Save profile")</button>
+    </EditForm>
+}
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private bool _isComplete;
+    private string? _loadError;
+    private string? _saveError;
+    private string? _saveMessage;
+    private ProfileFormModel? _model;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profile = await ProfileApi.GetAsync();
+            if (profile is null)
+            {
+                _loadError = "We couldn't load your profile right now.";
+                return;
+            }
+
+            ApplyProfile(profile);
+        }
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_model is null) return;
+
+        _isSaving = true;
+        _saveError = null;
+        _saveMessage = null;
+
+        try
+        {
+            var request = new UpdateUserProfileRequest(
+                _model.FirstName,
+                _model.LastName,
+                _model.DisplayName,
+                _model.Email,
+                new NotificationPreferences(_model.EmailNotificationsEnabled, _model.TripReminderNotificationsEnabled, _model.ItineraryChangeNotificationsEnabled),
+                new PersonalizationPreferences(_model.TravelInterests, _model.HomeAirport, _model.PreferredTravelStyle, _model.AccessibilityNotes));
+
+            var saved = await ProfileApi.SaveAsync(request);
+            ApplyProfile(saved);
+            _saveMessage = "Profile saved.";
+        }
+        catch (Exception ex)
+        {
+            _saveError = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void ApplyProfile(UserProfileResponse profile)
+    {
+        _isComplete = profile.IsComplete;
+        _model = new ProfileFormModel
+        {
+            FirstName = profile.FirstName,
+            LastName = profile.LastName,
+            DisplayName = profile.DisplayName,
+            Email = profile.Email,
+            EmailNotificationsEnabled = profile.NotificationPreferences.EmailNotificationsEnabled,
+            TripReminderNotificationsEnabled = profile.NotificationPreferences.TripReminderNotificationsEnabled,
+            ItineraryChangeNotificationsEnabled = profile.NotificationPreferences.ItineraryChangeNotificationsEnabled,
+            TravelInterests = profile.PersonalizationPreferences.TravelInterests,
+            HomeAirport = profile.PersonalizationPreferences.HomeAirport,
+            PreferredTravelStyle = profile.PersonalizationPreferences.PreferredTravelStyle,
+            AccessibilityNotes = profile.PersonalizationPreferences.AccessibilityNotes
+        };
+    }
+
+    private sealed class ProfileFormModel
+    {
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? DisplayName { get; set; }
+        public string? Email { get; set; }
+        public bool EmailNotificationsEnabled { get; set; }
+        public bool TripReminderNotificationsEnabled { get; set; }
+        public bool ItineraryChangeNotificationsEnabled { get; set; }
+        public string? TravelInterests { get; set; }
+        public string? HomeAirport { get; set; }
+        public string? PreferredTravelStyle { get; set; }
+        public string? AccessibilityNotes { get; set; }
+    }
+}

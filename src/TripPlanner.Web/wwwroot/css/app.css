@@ -258,6 +258,43 @@ body {
     border-color: var(--tp-selected);
 }
 
+.profile-page {
+    max-width: 960px;
+}
+
+.profile-page h1 {
+    font-weight: 800;
+    letter-spacing: -.03em;
+}
+
+.profile-page form {
+    background: var(--tp-surface-raised);
+    border: 1px solid var(--tp-border);
+    border-radius: 1.25rem;
+    box-shadow: 0 1rem 2.5rem rgba(20, 37, 28, .08);
+    padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.profile-page .form-label {
+    color: var(--tp-text);
+    font-weight: 700;
+}
+
+.profile-page .form-control {
+    border-color: var(--tp-border);
+    background-color: var(--tp-surface);
+    color: var(--tp-text);
+}
+
+.profile-page .form-check {
+    padding-block: .25rem;
+}
+
+.profile-page .form-check-input:checked {
+    background-color: var(--tp-brand);
+    border-color: var(--tp-brand);
+}
+
 :focus-visible {
     outline: .2rem solid var(--tp-focus);
     outline-offset: .2rem;
