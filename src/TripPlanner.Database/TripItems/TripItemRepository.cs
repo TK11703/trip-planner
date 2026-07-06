@@ -99,7 +99,11 @@ public sealed class TripItemRepository : ITripItemRepository
         {
             TrackedItemId = id, TripId = tripId, TripLegId = request.TripLegId, OwnerUserId = ownerUserId,
             request.ItemType, request.Title, request.Location,
-            request.StartsAt, request.EndsAt,
+            request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId,
+            StartsAt = ToInstant(request.StartLocal, request.StartTimeZoneId),
+            EndsAt = request.EndLocal is { } endLocal
+                ? ToInstant(endLocal, request.EndTimeZoneId ?? request.StartTimeZoneId)
+                : (DateTimeOffset?)null,
             DisplayColor = TrackedItemColors.Normalize(request.DisplayColor),
             request.ConfirmationCode, request.Notes,
             SortOrder = 0, NowUtc = nowUtc
@@ -114,7 +118,11 @@ public sealed class TripItemRepository : ITripItemRepository
         {
             TrackedItemId = trackedItemId, TripId = tripId, TripLegId = request.TripLegId, OwnerUserId = ownerUserId,
             request.ItemType, request.Title, request.Location,
-            request.StartsAt, request.EndsAt,
+            request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId,
+            StartsAt = ToInstant(request.StartLocal, request.StartTimeZoneId),
+            EndsAt = request.EndLocal is { } endLocal
+                ? ToInstant(endLocal, request.EndTimeZoneId ?? request.StartTimeZoneId)
+                : (DateTimeOffset?)null,
             DisplayColor = TrackedItemColors.Normalize(request.DisplayColor),
             request.ConfirmationCode, request.Notes,
             SortOrder = 0

@@ -1,5 +1,6 @@
 @using System.ComponentModel.DataAnnotations
 @inject ITripApiClient TripApi
+@inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
 
 <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName">
     <DataAnnotationsValidator />
@@ -41,13 +42,56 @@
         <InputText class="form-control" @bind-Value="_model.Location" />
     </div>
     <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="form-label">Start</label>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.StartsAt" />
+        <div class="col-md-6">
+            <div class="d-flex justify-content-between align-items-center">
+                <label class="form-label mb-0">Start</label>
+                <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyStartFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
+            </div>
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.StartLocal" />
+            @if (_confirmStartCopy)
+            {
+                <div class="alert alert-warning py-1 px-2 small mt-1 mb-0 d-flex justify-content-between align-items-center">
+                    <span>Overwrite the start you entered with the trip leg start?</span>
+                    <span class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-warning py-0" @onclick="ConfirmCopyStartFromLeg">Copy</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0" @onclick="() => _confirmStartCopy = false">Keep mine</button>
+                    </span>
+                </div>
+            }
+            <label class="form-label mt-2" for="item-start-timezone">Start timezone</label>
+            <InputSelect id="item-start-timezone" class="form-select" @bind-Value="_model.StartTimeZoneId">
+                <option value="">Select a timezone</option>
+                @foreach (var option in TimezoneOptions.GetOptions())
+                {
+                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="@(() => _model.StartTimeZoneId)" />
         </div>
-        <div class="col-6">
-            <label class="form-label">End</label>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndsAt" />
+        <div class="col-md-6">
+            <div class="d-flex justify-content-between align-items-center">
+                <label class="form-label mb-0">End</label>
+                <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyEndFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
+            </div>
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndLocal" />
+            @if (_confirmEndCopy)
+            {
+                <div class="alert alert-warning py-1 px-2 small mt-1 mb-0 d-flex justify-content-between align-items-center">
+                    <span>Overwrite the end you entered with the trip leg end?</span>
+                    <span class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-warning py-0" @onclick="ConfirmCopyEndFromLeg">Copy</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0" @onclick="() => _confirmEndCopy = false">Keep mine</button>
+                    </span>
+                </div>
+            }
+            <label class="form-label mt-2" for="item-end-timezone">End timezone</label>
+            <InputSelect id="item-end-timezone" class="form-select" @bind-Value="_model.EndTimeZoneId">
+                <option value="">Select a timezone</option>
+                @foreach (var option in TimezoneOptions.GetOptions())
+                {
+                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
+                }
+            </InputSelect>
         </div>
     </div>
     <div class="mb-2">
@@ -67,8 +111,14 @@
         </div>
     </div>
     <div class="mb-2">
-        <label class="form-label">Confirmation code</label>
-        <InputText class="form-control" @bind-Value="_model.ConfirmationCode" />
+        <label class="form-label" for="item-confirmation-code">Confirmation/Reservation Code</label>
+        <InputText id="item-confirmation-code" class="form-control" maxlength="255" @bind-Value="_model.ConfirmationCode" />
+        <ValidationMessage For="@(() => _model.ConfirmationCode)" />
+    </div>
+    <div class="mb-2">
+        <label class="form-label" for="item-notes">Notes</label>
+        <InputTextArea id="item-notes" class="form-control" rows="3" maxlength="2000" @bind-Value="_model.Notes" />
+        <ValidationMessage For="@(() => _model.Notes)" />
     </div>
     @if (!string.IsNullOrWhiteSpace(_error))
     {
@@ -85,11 +135,13 @@
         public string ItemType { get; set; } = "activity";
         [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
         public string? Location { get; set; }
-        public DateTime StartsAt { get; set; } = DateTime.UtcNow;
-        public DateTime EndsAt { get; set; } = DateTime.UtcNow.AddHours(1);
+        public DateTime StartLocal { get; set; } = DateTime.Now;
+        [Required(ErrorMessage = "Start timezone is required.")] public string StartTimeZoneId { get; set; } = "UTC";
+        public DateTime? EndLocal { get; set; } = DateTime.Now.AddHours(1);
+        public string? EndTimeZoneId { get; set; } = "UTC";
         public string DisplayColor { get; set; } = TrackedItemColors.Default;
-        public string? ConfirmationCode { get; set; }
-        public string? Notes { get; set; }
+        [StringLength(255, ErrorMessage = "Confirmation/Reservation Code must be 255 characters or fewer.")] public string? ConfirmationCode { get; set; }
+        [StringLength(2000, ErrorMessage = "Notes must be 2,000 characters or fewer.")] public string? Notes { get; set; }
     }
 
     [Parameter] public Guid TripId { get; set; }
@@ -104,9 +156,14 @@
     private bool _submitting;
     private Guid? _loadedItemId;
     private bool _appliedInitial;
+    private bool _tzInitialized;
+    private bool _confirmStartCopy;
+    private bool _confirmEndCopy;
 
     private bool IsEdit => Item is not null;
     private string FormName => IsEdit ? $"tracked-item-edit-{Item!.TrackedItemId}" : "tracked-item-create";
+
+    private TripLegDto? SelectedLeg => _model.TripLegId is { } id ? Legs.FirstOrDefault(l => l.TripLegId == id) : null;
 
     private static string SwatchColor(string color) => color.ToLowerInvariant() switch
     {
@@ -130,6 +187,7 @@
                 _model = new ItemModel();
                 _loadedItemId = null;
                 _appliedInitial = false;
+                _tzInitialized = false;
             }
 
             if (!_appliedInitial)
@@ -140,8 +198,8 @@
                 }
                 if (InitialStartsAt is { } initialStart)
                 {
-                    _model.StartsAt = initialStart;
-                    _model.EndsAt = initialStart.AddHours(1);
+                    _model.StartLocal = initialStart;
+                    _model.EndLocal = initialStart.AddHours(1);
                 }
                 _appliedInitial = true;
             }
@@ -149,6 +207,13 @@
             if (_model.TripLegId is null && Legs.Count > 0)
             {
                 _model.TripLegId = Legs[0].TripLegId;
+            }
+
+            if (!_tzInitialized && SelectedLeg is { } leg)
+            {
+                _model.StartTimeZoneId = leg.StartTimeZoneId;
+                _model.EndTimeZoneId = leg.EndTimeZoneId;
+                _tzInitialized = true;
             }
             return;
         }
@@ -164,13 +229,70 @@
             ItemType = Item.ItemType,
             Title = Item.Title,
             Location = Item.Location,
-            StartsAt = Item.StartsAt.LocalDateTime,
-            EndsAt = (Item.EndsAt ?? Item.StartsAt).LocalDateTime,
+            StartLocal = Item.StartLocal,
+            StartTimeZoneId = Item.StartTimeZoneId,
+            EndLocal = Item.EndLocal,
+            EndTimeZoneId = Item.EndTimeZoneId ?? Item.StartTimeZoneId,
             DisplayColor = TrackedItemColors.Normalize(Item.DisplayColor),
             ConfirmationCode = Item.ConfirmationCode,
             Notes = Item.Notes
         };
         _loadedItemId = Item.TrackedItemId;
+        _tzInitialized = true;
+    }
+
+    private void RequestCopyStartFromLeg()
+    {
+        var leg = SelectedLeg;
+        if (leg is null) return;
+        var differs = _model.StartLocal != leg.StartLocal || !string.Equals(_model.StartTimeZoneId, leg.StartTimeZoneId, StringComparison.Ordinal);
+        if (differs && !_confirmStartCopy)
+        {
+            _confirmStartCopy = true;
+            return;
+        }
+        ApplyStartFromLeg(leg);
+    }
+
+    private void ConfirmCopyStartFromLeg()
+    {
+        var leg = SelectedLeg;
+        if (leg is null) { _confirmStartCopy = false; return; }
+        ApplyStartFromLeg(leg);
+    }
+
+    private void ApplyStartFromLeg(TripLegDto leg)
+    {
+        _model.StartLocal = leg.StartLocal;
+        _model.StartTimeZoneId = leg.StartTimeZoneId;
+        _confirmStartCopy = false;
+    }
+
+    private void RequestCopyEndFromLeg()
+    {
+        var leg = SelectedLeg;
+        if (leg is null) return;
+        var differs = _model.EndLocal != leg.EndLocal || !string.Equals(_model.EndTimeZoneId, leg.EndTimeZoneId, StringComparison.Ordinal);
+        if (differs && !_confirmEndCopy)
+        {
+            _confirmEndCopy = true;
+            return;
+        }
+        ApplyEndFromLeg(leg);
+    }
+
+    private void ConfirmCopyEndFromLeg()
+    {
+        var leg = SelectedLeg;
+        if (leg is null) { _confirmEndCopy = false; return; }
+        ApplyEndFromLeg(leg);
+    }
+
+    private void ApplyEndFromLeg(TripLegDto leg)
+    {
+        _model.EndLocal = leg.EndLocal;
+        _model.EndTimeZoneId = leg.EndTimeZoneId;
+        _confirmEndCopy = false;
     }
 
     private async Task SubmitAsync()
@@ -178,13 +300,21 @@
         _error = null; _submitting = true;
         try
         {
+            if (_model.EndLocal is not null && string.IsNullOrWhiteSpace(_model.EndTimeZoneId))
+            {
+                _error = "Select an end timezone for the event end, or clear the end date.";
+                return;
+            }
+
             var request = new CreateTrackedItemRequest(
                 _model.TripLegId ?? Guid.Empty,
                 _model.ItemType,
                 _model.Title.Trim(),
                 _model.Location,
-                new DateTimeOffset(_model.StartsAt.ToUniversalTime(), TimeSpan.Zero),
-                new DateTimeOffset(_model.EndsAt.ToUniversalTime(), TimeSpan.Zero),
+                _model.StartLocal,
+                _model.StartTimeZoneId,
+                _model.EndLocal,
+                _model.EndLocal is null ? null : _model.EndTimeZoneId,
                 _model.DisplayColor,
                 _model.ConfirmationCode,
                 _model.Notes);
@@ -192,6 +322,7 @@
             {
                 await TripApi.CreateItemAsync(TripId, request);
                 _model = new ItemModel { TripLegId = Legs.Count > 0 ? Legs[0].TripLegId : null };
+                _tzInitialized = false;
             }
             else
             {
@@ -200,8 +331,10 @@
                     request.ItemType,
                     request.Title,
                     request.Location,
-                    request.StartsAt,
-                    request.EndsAt,
+                    request.StartLocal,
+                    request.StartTimeZoneId,
+                    request.EndLocal,
+                    request.EndTimeZoneId,
                     request.DisplayColor,
                     request.ConfirmationCode,
                     request.Notes));

@@ -82,9 +82,8 @@ else
                         <div class="ttl-leg-band" style="left:@(band.Left)px; width:@(band.Width)px"></div>
                         @foreach (var item in leg.Items)
                         {
-                            var tz = TimezoneOptions.FindTimeZone(leg.StartTimeZoneId) ?? TimeZoneInfo.Utc;
-                            var localStart = TimeZoneInfo.ConvertTime(item.StartsAt, tz).DateTime;
-                            DateTime? localEnd = item.EndsAt is { } e ? TimeZoneInfo.ConvertTime(e, tz).DateTime : null;
+                            var localStart = item.StartLocal;
+                            DateTime? localEnd = item.EndLocal;
                             var span = ComputeSpan(localStart, localEnd);
                             var outside = item.StartsOutsideLeg || item.EndsOutsideLeg;
                             <button type="button"
@@ -109,8 +108,8 @@ else
                         @laneGrid
                         @foreach (var item in _timeline.UnassignedItems)
                         {
-                            var localStart = item.StartsAt.UtcDateTime;
-                            DateTime? localEnd = item.EndsAt?.UtcDateTime;
+                            var localStart = item.StartLocal;
+                            DateTime? localEnd = item.EndLocal;
                             var span = ComputeSpan(localStart, localEnd);
                             <button type="button"
                                     class="ttl-item is-outside"

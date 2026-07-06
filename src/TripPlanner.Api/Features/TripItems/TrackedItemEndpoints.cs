@@ -35,6 +35,7 @@ public static class TrackedItemEndpoints
             await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "tracked-item", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
+        trip = trip with { Legs = await items.GetLegsAsync(ownerId, tripId, ct) };
         var validation = validator.Validate(request, trip);
         if (!validation.IsValid)
         {
@@ -64,6 +65,7 @@ public static class TrackedItemEndpoints
             await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "tracked-item", trackedItemId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
+        trip = trip with { Legs = await items.GetLegsAsync(ownerId, tripId, ct) };
         var validation = validator.Validate(request, trip);
         if (!validation.IsValid)
         {

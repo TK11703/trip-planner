@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using TripPlanner.Contracts.Errors;
 using TripPlanner.Contracts.Timeline;
 using TripPlanner.Contracts.TripItems;
 using TripPlanner.Contracts.Trips;
@@ -65,13 +66,13 @@ public sealed class TripApiClient : ITripApiClient
     }
 
     public async Task CreateLegAsync(Guid tripId, CreateTripLegRequest request, CancellationToken ct = default)
-        => (await _http.PostAsJsonAsync($"/api/trips/{tripId}/legs", request, ct)).EnsureSuccessStatusCode();
+        => await EnsureSuccessAsync(await _http.PostAsJsonAsync($"/api/trips/{tripId}/legs", request, ct), ct);
 
     public async Task UpdateLegAsync(Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct = default)
-        => (await _http.PutAsJsonAsync($"/api/trips/{tripId}/legs/{tripLegId}", request, ct)).EnsureSuccessStatusCode();
+        => await EnsureSuccessAsync(await _http.PutAsJsonAsync($"/api/trips/{tripId}/legs/{tripLegId}", request, ct), ct);
 
     public async Task DeleteLegAsync(Guid tripId, Guid tripLegId, CancellationToken ct = default)
-        => (await _http.DeleteAsync($"/api/trips/{tripId}/legs/{tripLegId}", ct)).EnsureSuccessStatusCode();
+        => await EnsureSuccessAsync(await _http.DeleteAsync($"/api/trips/{tripId}/legs/{tripLegId}", ct), ct);
 
     public async Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(Guid tripId, CancellationToken ct = default)
     {
@@ -81,18 +82,41 @@ public sealed class TripApiClient : ITripApiClient
     }
 
     public async Task CreateItemAsync(Guid tripId, CreateTrackedItemRequest request, CancellationToken ct = default)
-        => (await _http.PostAsJsonAsync($"/api/trips/{tripId}/items", request, ct)).EnsureSuccessStatusCode();
+        => await EnsureSuccessAsync(await _http.PostAsJsonAsync($"/api/trips/{tripId}/items", request, ct), ct);
 
     public async Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default)
-        => (await _http.PutAsJsonAsync($"/api/trips/{tripId}/items/{trackedItemId}", request, ct)).EnsureSuccessStatusCode();
+        => await EnsureSuccessAsync(await _http.PutAsJsonAsync($"/api/trips/{tripId}/items/{trackedItemId}", request, ct), ct);
 
     public async Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default)
-        => (await _http.DeleteAsync($"/api/trips/{tripId}/items/{trackedItemId}", ct)).EnsureSuccessStatusCode();
+        => await EnsureSuccessAsync(await _http.DeleteAsync($"/api/trips/{tripId}/items/{trackedItemId}", ct), ct);
 
     public async Task<TripTimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default)
     {
         var resp = await _http.GetAsync($"/api/trips/{tripId}/timeline", ct);
         if (!resp.IsSuccessStatusCode) return null;
         return await resp.Content.ReadFromJsonAsync<TripTimelineResponse>(cancellationToken: ct);
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        ApiError? error = null;
+        try
+        {
+            error = await response.Content.ReadFromJsonAsync<ApiError>(cancellationToken: ct);
+        }
+        catch
+        {
+            // Response body was not a structured ApiError; fall back to a generic message.
+        }
+
+        var message = string.IsNullOrWhiteSpace(error?.Message)
+            ? $"Request failed ({(int)response.StatusCode} {response.ReasonPhrase})."
+            : error!.Message;
+        throw new InvalidOperationException(message);
     }
 }

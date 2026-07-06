@@ -28,7 +28,11 @@ SELECT
     item_type                                       AS "ItemType",
     title                                           AS "Title",
     location                                        AS "Location",
+    start_local                                     AS "StartLocal",
+    start_time_zone_id                              AS "StartTimeZoneId",
     starts_at                                       AS "StartsAt",
+    end_local                                       AS "EndLocal",
+    end_time_zone_id                                AS "EndTimeZoneId",
     ends_at                                         AS "EndsAt",
     display_color                                   AS "DisplayColor",
     sort_order                                      AS "SortOrder"
