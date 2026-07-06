@@ -2,6 +2,7 @@ using Bunit;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Web.Features.Profile;
+using TripPlanner.Web.Features.Timezones;
 using TripPlanner.Web.Tests.Auth;
 using ProfilePage = TripPlanner.Web.Components.Pages.Profile;
 
@@ -14,6 +15,7 @@ public class ProfileNotificationPreferenceTests : TestContext
     {
         var profile = ProfileTestData.CompleteProfile(new(true, true, false));
         Services.AddSingleton<IProfileApiClient>(new RecordingProfileApiClient(profile));
+        Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
         var cut = RenderComponent<ProfilePage>();
@@ -27,6 +29,7 @@ public class ProfileNotificationPreferenceTests : TestContext
     public void ProfilePage_RendersSaveValidationErrors()
     {
         Services.AddSingleton<IProfileApiClient>(new ThrowingProfileApiClient(ProfileTestData.CompleteProfile()));
+        Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
         var cut = RenderComponent<ProfilePage>();
 

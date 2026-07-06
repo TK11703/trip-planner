@@ -33,8 +33,12 @@ public sealed record TripLegDto(
     string Title,
     string? Origin,
     string? Destination,
-    DateTimeOffset StartAt,
-    DateTimeOffset? EndAt,
+    DateTime StartLocal,
+    string StartTimeZoneId,
+    string? StartTimeZoneLabel,
+    DateTime EndLocal,
+    string EndTimeZoneId,
+    string? EndTimeZoneLabel,
     string? Notes,
     int SortOrder);
 

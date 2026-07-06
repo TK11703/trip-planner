@@ -42,6 +42,7 @@ public sealed class UserProfileRepository : IUserProfileRepository
             LastName = Normalize(lastName),
             DisplayName = Normalize(displayName) ?? BuildDisplayName(firstName, lastName),
             Email = Normalize(email),
+            TimeZoneId = "UTC",
             NowUtc = nowUtc
         }, cancellationToken: cancellationToken));
 
@@ -59,6 +60,7 @@ public sealed class UserProfileRepository : IUserProfileRepository
             LastName = Normalize(request.LastName),
             DisplayName = Normalize(request.DisplayName) ?? BuildDisplayName(request.FirstName, request.LastName),
             Email = Normalize(request.Email),
+            TimeZoneId = request.TimeZoneId.Trim(),
             request.NotificationPreferences.EmailNotificationsEnabled,
             request.NotificationPreferences.TripReminderNotificationsEnabled,
             request.NotificationPreferences.ItineraryChangeNotificationsEnabled,
@@ -88,6 +90,7 @@ public sealed class UserProfileRepository : IUserProfileRepository
         string? LastName,
         string? DisplayName,
         string? Email,
+        string TimeZoneId,
         bool EmailNotificationsEnabled,
         bool TripReminderNotificationsEnabled,
         bool ItineraryChangeNotificationsEnabled,
@@ -105,6 +108,7 @@ public sealed class UserProfileRepository : IUserProfileRepository
             LastName,
             DisplayName,
             Email,
+            TimeZoneId,
             IsComplete: !string.IsNullOrWhiteSpace(DisplayName) && !string.IsNullOrWhiteSpace(Email),
             new NotificationPreferences(EmailNotificationsEnabled, TripReminderNotificationsEnabled, ItineraryChangeNotificationsEnabled),
             new PersonalizationPreferences(TravelInterests, HomeAirport, PreferredTravelStyle, AccessibilityNotes),

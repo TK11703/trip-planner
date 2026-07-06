@@ -1,7 +1,10 @@
 @page "/profile"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using TripPlanner.Web.Features.Timezones
 @inject IProfileApiClient ProfileApi
+@inject ITimezoneOptionsProvider TimezoneOptions
 
 <PageTitle>Profile</PageTitle>
 
@@ -49,6 +52,17 @@ else if (_model is not null)
             <div class="col-md-6">
                 <label class="form-label" for="email">Email</label>
                 <InputText id="email" class="form-control" @bind-Value="_model.Email" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="timeZoneId">Default timezone</label>
+                <InputSelect id="timeZoneId" class="form-select" @bind-Value="_model.TimeZoneId">
+                    <option value="">Select a timezone</option>
+                    @foreach (var option in TimezoneOptions.GetOptions())
+                    {
+                        <option value="@option.Id">@option.DisplayName (@option.Id)</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="@(() => _model.TimeZoneId)" />
             </div>
         </div>
 
@@ -138,6 +152,7 @@ else if (_model is not null)
                 _model.LastName,
                 _model.DisplayName,
                 _model.Email,
+                _model.TimeZoneId,
                 new NotificationPreferences(_model.EmailNotificationsEnabled, _model.TripReminderNotificationsEnabled, _model.ItineraryChangeNotificationsEnabled),
                 new PersonalizationPreferences(_model.TravelInterests, _model.HomeAirport, _model.PreferredTravelStyle, _model.AccessibilityNotes));
 
@@ -164,6 +179,7 @@ else if (_model is not null)
             LastName = profile.LastName,
             DisplayName = profile.DisplayName,
             Email = profile.Email,
+            TimeZoneId = profile.TimeZoneId,
             EmailNotificationsEnabled = profile.NotificationPreferences.EmailNotificationsEnabled,
             TripReminderNotificationsEnabled = profile.NotificationPreferences.TripReminderNotificationsEnabled,
             ItineraryChangeNotificationsEnabled = profile.NotificationPreferences.ItineraryChangeNotificationsEnabled,
@@ -180,6 +196,8 @@ else if (_model is not null)
         public string? LastName { get; set; }
         public string? DisplayName { get; set; }
         public string? Email { get; set; }
+        [Required(ErrorMessage = "Timezone is required.")]
+        public string TimeZoneId { get; set; } = "UTC";
         public bool EmailNotificationsEnabled { get; set; }
         public bool TripReminderNotificationsEnabled { get; set; }
         public bool ItineraryChangeNotificationsEnabled { get; set; }

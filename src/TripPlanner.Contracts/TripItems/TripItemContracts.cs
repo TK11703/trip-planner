@@ -1,7 +1,9 @@
 namespace TripPlanner.Contracts.TripItems;
 
-public sealed record CreateTripLegRequest(string Title, string? Origin, string? Destination, DateTimeOffset StartAt, DateTimeOffset? EndAt, string? Notes);
-public sealed record UpdateTripLegRequest(string Title, string? Origin, string? Destination, DateTimeOffset StartAt, DateTimeOffset? EndAt, string? Notes);
+public sealed record CreateTripLegRequest(string Title, string? Origin, string? Destination, DateTime StartLocal, string StartTimeZoneId, DateTime EndLocal, string EndTimeZoneId, string? Notes);
+public sealed record UpdateTripLegRequest(string Title, string? Origin, string? Destination, DateTime StartLocal, string StartTimeZoneId, DateTime EndLocal, string EndTimeZoneId, string? Notes);
+
+public sealed record TripLegDefaultsResponse(string StartTimeZoneId, string EndTimeZoneId, string Source);
 
 public static class TrackedItemTypes
 {

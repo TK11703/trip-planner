@@ -19,6 +19,7 @@ public class UpdateProfileNotificationTests
             "Traveler",
             "Avery Traveler",
             "avery@example.test",
+            "UTC",
             new NotificationPreferences(true, true, false),
             new PersonalizationPreferences(null, null, null, null)));
 
@@ -41,6 +42,7 @@ public class UpdateProfileNotificationTests
             "Traveler",
             "Avery Traveler",
             null,
+            "UTC",
             new NotificationPreferences(true, false, false),
             new PersonalizationPreferences(null, null, null, null)));
 

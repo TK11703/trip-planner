@@ -8,6 +8,12 @@ public sealed record TimelineEvent(
     string Title,
     DateTimeOffset Start,
     DateTimeOffset? End,
+    string CalendarStart,
+    string? CalendarEnd,
+    string? StartTimeZoneId,
+    string? StartTimeZoneLabel,
+    string? EndTimeZoneId,
+    string? EndTimeZoneLabel,
     bool AllDay,
     int DisplayOrder,
     IReadOnlyDictionary<string, string?>? Metadata = null);

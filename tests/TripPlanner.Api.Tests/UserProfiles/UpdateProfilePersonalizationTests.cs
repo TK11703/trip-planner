@@ -17,6 +17,7 @@ public class UpdateProfilePersonalizationTests
             "Traveler",
             "Avery Traveler",
             "avery@example.test",
+            "UTC",
             new NotificationPreferences(false, false, false),
             new PersonalizationPreferences("museums", "SEA", "slow travel", "quiet rooms")));
         savedResponse.EnsureSuccessStatusCode();
@@ -28,6 +29,7 @@ public class UpdateProfilePersonalizationTests
             "Traveler",
             "Avery Traveler",
             "avery@example.test",
+            "UTC",
             new NotificationPreferences(false, false, false),
             new PersonalizationPreferences(" ", null, "", null)));
         clearedResponse.EnsureSuccessStatusCode();

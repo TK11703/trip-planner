@@ -1,5 +1,6 @@
 @using System.ComponentModel.DataAnnotations
 @inject ITripApiClient TripApi
+@inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
 
 <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName">
     <DataAnnotationsValidator />
@@ -28,6 +29,30 @@
             <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndAt" />
         </div>
     </div>
+    <div class="row g-2 mb-2">
+        <div class="col-6">
+            <label class="form-label" for="leg-start-timezone">Start timezone</label>
+            <InputSelect id="leg-start-timezone" class="form-select" @bind-Value="_model.StartTimeZoneId">
+                <option value="">Select a timezone</option>
+                @foreach (var option in TimezoneOptions.GetOptions())
+                {
+                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="@(() => _model.StartTimeZoneId)" />
+        </div>
+        <div class="col-6">
+            <label class="form-label" for="leg-end-timezone">End timezone</label>
+            <InputSelect id="leg-end-timezone" class="form-select" @bind-Value="_model.EndTimeZoneId">
+                <option value="">Select a timezone</option>
+                @foreach (var option in TimezoneOptions.GetOptions())
+                {
+                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="@(() => _model.EndTimeZoneId)" />
+        </div>
+    </div>
     <div class="mb-2">
         <label class="form-label">Notes</label>
         <InputTextArea class="form-control" rows="2" @bind-Value="_model.Notes" />
@@ -45,8 +70,10 @@
         [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
         public string? Origin { get; set; }
         public string? Destination { get; set; }
-        public DateTime StartAt { get; set; } = DateTime.UtcNow;
-        public DateTime EndAt { get; set; } = DateTime.UtcNow.AddHours(1);
+        public DateTime StartAt { get; set; } = DateTime.Now;
+        public DateTime EndAt { get; set; } = DateTime.Now.AddHours(1);
+        [Required(ErrorMessage = "Start timezone is required.")] public string StartTimeZoneId { get; set; } = "UTC";
+        [Required(ErrorMessage = "End timezone is required.")] public string EndTimeZoneId { get; set; } = "UTC";
         public string? Notes { get; set; }
     }
 
@@ -58,6 +85,7 @@
     private string? _error;
     private bool _submitting;
     private Guid? _loadedLegId;
+    private Guid? _defaultsLoadedForTripId;
 
     private bool IsEdit => Leg is not null;
     private string FormName => IsEdit ? $"trip-leg-edit-{Leg!.TripLegId}" : "trip-leg-create";
@@ -70,6 +98,7 @@
             {
                 _model = new LegModel();
                 _loadedLegId = null;
+                _defaultsLoadedForTripId = null;
             }
             return;
         }
@@ -84,11 +113,30 @@
             Title = Leg.Title,
             Origin = Leg.Origin,
             Destination = Leg.Destination,
-            StartAt = Leg.StartAt.LocalDateTime,
-            EndAt = (Leg.EndAt ?? Leg.StartAt).LocalDateTime,
+            StartAt = Leg.StartLocal,
+            EndAt = Leg.EndLocal,
+            StartTimeZoneId = Leg.StartTimeZoneId,
+            EndTimeZoneId = Leg.EndTimeZoneId,
             Notes = Leg.Notes
         };
         _loadedLegId = Leg.TripLegId;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Leg is not null || _defaultsLoadedForTripId == TripId)
+        {
+            return;
+        }
+
+        var defaults = await TripApi.GetLegDefaultsAsync(TripId);
+        if (defaults is not null)
+        {
+            _model.StartTimeZoneId = defaults.StartTimeZoneId;
+            _model.EndTimeZoneId = defaults.EndTimeZoneId;
+        }
+
+        _defaultsLoadedForTripId = TripId;
     }
 
     private async Task SubmitAsync()
@@ -100,13 +148,20 @@
                 _model.Title.Trim(),
                 _model.Origin,
                 _model.Destination,
-                new DateTimeOffset(_model.StartAt.ToUniversalTime(), TimeSpan.Zero),
-                new DateTimeOffset(_model.EndAt.ToUniversalTime(), TimeSpan.Zero),
+                _model.StartAt,
+                _model.StartTimeZoneId,
+                _model.EndAt,
+                _model.EndTimeZoneId,
                 _model.Notes);
             if (Leg is null)
             {
                 await TripApi.CreateLegAsync(TripId, request);
-                _model = new LegModel();
+                _model = new LegModel
+                {
+                    StartTimeZoneId = request.EndTimeZoneId,
+                    EndTimeZoneId = request.EndTimeZoneId
+                };
+                _defaultsLoadedForTripId = null;
             }
             else
             {
@@ -114,8 +169,10 @@
                     request.Title,
                     request.Origin,
                     request.Destination,
-                    request.StartAt,
-                    request.EndAt,
+                    request.StartLocal,
+                    request.StartTimeZoneId,
+                    request.EndLocal,
+                    request.EndTimeZoneId,
                     request.Notes));
             }
             await OnSaved.InvokeAsync();

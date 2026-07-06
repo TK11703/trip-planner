@@ -5,6 +5,7 @@ using Microsoft.Identity.Web.UI;
 using TripPlanner.Web.Features.Profile;
 using TripPlanner.Web.Features.Trips;
 using TripPlanner.Web.Features.Theme;
+using TripPlanner.Web.Features.Timezones;
 
 namespace TripPlanner.Web.Extensions;
 
@@ -23,6 +24,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddAuthorization();
         builder.Services.AddScoped<ThemeStateService>();
         builder.Services.AddScoped<AccountThemeInitializer>();
+        builder.Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
         builder.Services.AddScoped<ITripPlannerApiTokenProvider, MicrosoftIdentityTripPlannerApiTokenProvider>();
         builder.Services.AddTransient<AuthenticatedApiTokenHandler>();
 

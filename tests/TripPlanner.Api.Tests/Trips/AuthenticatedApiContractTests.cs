@@ -157,6 +157,7 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
     {
         public Task<IReadOnlyList<TripLegDto>> GetLegsAsync(string ownerUserId, Guid tripId, CancellationToken ct) => Task.FromResult<IReadOnlyList<TripLegDto>>(Array.Empty<TripLegDto>());
         public Task<IReadOnlyList<TrackedItemDto>> GetTrackedItemsAsync(string ownerUserId, Guid tripId, CancellationToken ct) => Task.FromResult<IReadOnlyList<TrackedItemDto>>(Array.Empty<TrackedItemDto>());
+        public Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(string ownerUserId, Guid tripId, CancellationToken ct) => Task.FromResult<TripLegDefaultsResponse?>(new TripLegDefaultsResponse("UTC", "UTC", "profile"));
         public Task<Guid?> CreateLegAsync(string ownerUserId, Guid tripId, CreateTripLegRequest request, DateTimeOffset nowUtc, CancellationToken ct) => Task.FromResult<Guid?>(Guid.NewGuid());
         public Task<int> UpdateLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct) => Task.FromResult(1);
         public Task<int> DeleteLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, CancellationToken ct) => Task.FromResult(1);

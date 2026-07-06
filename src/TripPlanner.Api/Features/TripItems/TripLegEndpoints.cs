@@ -16,10 +16,30 @@ public static class TripLegEndpoints
 {
     public static RouteGroupBuilder MapTripLegs(this RouteGroupBuilder group)
     {
+        group.MapGet("/defaults", GetDefaultsAsync).WithName("GetTripLegDefaults");
         group.MapPost("/", CreateAsync).WithName("CreateTripLeg");
         group.MapPut("/{tripLegId:guid}", UpdateAsync).WithName("UpdateTripLeg");
         group.MapDelete("/{tripLegId:guid}", DeleteAsync).WithName("DeleteTripLeg");
         return group;
+    }
+
+    private static async Task<Results<Ok<TripLegDefaultsResponse>, NotFound<ApiError>>> GetDefaultsAsync(
+        Guid tripId,
+        ICurrentUser currentUser,
+        ITripItemRepository items,
+        IAuditRepository audit,
+        IClock clock,
+        CancellationToken ct)
+    {
+        var ownerId = currentUser.UserId;
+        var defaults = await items.GetLegDefaultsAsync(ownerId, tripId, ct);
+        if (defaults is null)
+        {
+            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "trip-leg", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            return TypedResults.NotFound(ApiError.NotFoundOrDenied());
+        }
+
+        return TypedResults.Ok(defaults);
     }
 
     private static async Task<Results<Created, BadRequest<ApiError>, NotFound<ApiError>>> CreateAsync(

@@ -25,6 +25,7 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
             Normalize(lastName),
             Normalize(displayName) ?? BuildDisplayName(firstName, lastName),
             Normalize(email),
+            "UTC",
             IsComplete: !string.IsNullOrWhiteSpace(displayName ?? BuildDisplayName(firstName, lastName)) && !string.IsNullOrWhiteSpace(email),
             new NotificationPreferences(false, false, false),
             new PersonalizationPreferences(null, null, null, null),
@@ -49,6 +50,7 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
             LastName = Normalize(request.LastName),
             DisplayName = displayName,
             Email = Normalize(request.Email),
+            TimeZoneId = request.TimeZoneId,
             IsComplete = !string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(request.Email),
             NotificationPreferences = request.NotificationPreferences,
             PersonalizationPreferences = new PersonalizationPreferences(

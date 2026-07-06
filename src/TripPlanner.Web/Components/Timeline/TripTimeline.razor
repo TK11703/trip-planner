@@ -35,10 +35,18 @@
         {
             id = e.Id,
             title = e.Title,
-            start = e.Start.ToString("o"),
-            end = e.End?.ToString("o"),
+            start = e.CalendarStart,
+            end = e.CalendarEnd,
             allDay = e.AllDay,
-            extendedProps = new { sourceType = e.SourceType, displayOrder = e.DisplayOrder }
+            extendedProps = new
+            {
+                sourceType = e.SourceType,
+                displayOrder = e.DisplayOrder,
+                startTimeZoneId = e.StartTimeZoneId,
+                startTimeZoneLabel = e.StartTimeZoneLabel,
+                endTimeZoneId = e.EndTimeZoneId,
+                endTimeZoneLabel = e.EndTimeZoneLabel
+            }
         }).ToArray();
         if (_instance is null)
         {

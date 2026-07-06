@@ -1,4 +1,5 @@
 using Dapper;
+using TripPlanner.Contracts.Common;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Contracts.TripItems;
 using TripPlanner.Database.Connections;
@@ -10,6 +11,7 @@ public interface ITripItemRepository
 {
     Task<IReadOnlyList<TripLegDto>> GetLegsAsync(string ownerUserId, Guid tripId, CancellationToken ct);
     Task<IReadOnlyList<TrackedItemDto>> GetTrackedItemsAsync(string ownerUserId, Guid tripId, CancellationToken ct);
+    Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(string ownerUserId, Guid tripId, CancellationToken ct);
 
     Task<Guid?> CreateLegAsync(string ownerUserId, Guid tripId, CreateTripLegRequest request, DateTimeOffset nowUtc, CancellationToken ct);
     Task<int> UpdateLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct);
@@ -28,6 +30,13 @@ public sealed class TripItemRepository : ITripItemRepository
 
     private string LegSql(string section) => SqlSections.Extract(_sql.Get("Commands/TripLegs/UpsertAndDeleteTripLegs.sql"), section);
     private string ItemSql(string section) => SqlSections.Extract(_sql.Get("Commands/TrackedItems/UpsertAndDeleteTrackedItems.sql"), section);
+
+    public async Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(string ownerUserId, Guid tripId, CancellationToken ct)
+    {
+        await using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        var query = _sql.Get("Queries/TripLegs/GetTripLegDefaults.sql");
+        return await conn.QuerySingleOrDefaultAsync<TripLegDefaultsResponse>(new CommandDefinition(query, new { OwnerUserId = ownerUserId, TripId = tripId }, cancellationToken: ct));
+    }
 
     public async Task<IReadOnlyList<TripLegDto>> GetLegsAsync(string ownerUserId, Guid tripId, CancellationToken ct)
     {
@@ -51,7 +60,10 @@ public sealed class TripItemRepository : ITripItemRepository
         {
             TripLegId = id, TripId = tripId, OwnerUserId = ownerUserId,
             request.Title, request.Origin, request.Destination,
-            request.StartAt, request.EndAt, request.Notes,
+            request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId,
+            StartAt = ToInstant(request.StartLocal, request.StartTimeZoneId),
+            EndAt = ToInstant(request.EndLocal, request.EndTimeZoneId),
+            request.Notes,
             SortOrder = 0, NowUtc = nowUtc
         }, cancellationToken: ct));
         return rows == 0 ? null : id;
@@ -64,7 +76,10 @@ public sealed class TripItemRepository : ITripItemRepository
         {
             TripLegId = tripLegId, TripId = tripId, OwnerUserId = ownerUserId,
             request.Title, request.Origin, request.Destination,
-            request.StartAt, request.EndAt, request.Notes,
+            request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId,
+            StartAt = ToInstant(request.StartLocal, request.StartTimeZoneId),
+            EndAt = ToInstant(request.EndLocal, request.EndTimeZoneId),
+            request.Notes,
             SortOrder = 0
         }, cancellationToken: ct));
     }
@@ -105,6 +120,14 @@ public sealed class TripItemRepository : ITripItemRepository
     {
         await using var conn = await _factory.CreateOpenConnectionAsync(ct);
         return await conn.ExecuteAsync(new CommandDefinition(ItemSql("Delete"), new { TrackedItemId = trackedItemId, TripId = tripId, OwnerUserId = ownerUserId }, cancellationToken: ct));
+    }
+
+    private static DateTimeOffset ToInstant(DateTime local, string timeZoneId)
+    {
+        var timeZone = TimezoneOptions.FindTimeZone(timeZoneId) ?? TimeZoneInfo.Utc;
+        var unspecifiedLocal = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+        var offset = timeZone.GetUtcOffset(unspecifiedLocal);
+        return new DateTimeOffset(unspecifiedLocal, offset).ToUniversalTime();
     }
 }
 

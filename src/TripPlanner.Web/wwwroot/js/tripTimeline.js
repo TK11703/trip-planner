@@ -15,6 +15,7 @@
                 height: 'auto',
                 events: events,
                 eventOrder: 'extendedProps.displayOrder,start',
+                eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
                 eventClick: function (info) {
                     if (dotNetRef) {
                         dotNetRef.invokeMethodAsync('SelectItemAsync', info.event.extendedProps.sourceType, info.event.id);

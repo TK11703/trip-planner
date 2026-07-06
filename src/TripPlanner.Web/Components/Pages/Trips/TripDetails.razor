@@ -71,7 +71,9 @@ else
                             <dt>Type</dt>
                             <dd>Leg</dd>
                             <dt>When</dt>
-                            <dd>@leg.StartAt.ToString("g") @(leg.EndAt is { } end ? "- " + end.ToString("g") : null)</dd>
+                            <dd>@leg.StartLocal.ToString("g") - @leg.EndLocal.ToString("g")</dd>
+                            <dt>Timezones</dt>
+                            <dd>@FormatTimeZone(leg.StartTimeZoneLabel, leg.StartTimeZoneId) - @FormatTimeZone(leg.EndTimeZoneLabel, leg.EndTimeZoneId)</dd>
                             @if (!string.IsNullOrWhiteSpace(leg.Origin) || !string.IsNullOrWhiteSpace(leg.Destination))
                             {
                                 <dt>Route</dt>
@@ -322,4 +324,9 @@ else
             : calendarId;
         return Guid.TryParse(idPart, out var id) ? id : null;
     }
+
+    private static string FormatTimeZone(string? label, string timeZoneId)
+        => string.IsNullOrWhiteSpace(label) || string.Equals(label, timeZoneId, StringComparison.Ordinal)
+            ? timeZoneId
+            : $"{label} ({timeZoneId})";
 }

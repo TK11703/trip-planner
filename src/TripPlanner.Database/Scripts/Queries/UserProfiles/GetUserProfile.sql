@@ -4,6 +4,7 @@ SELECT
     last_name AS LastName,
     display_name AS DisplayName,
     email AS Email,
+    time_zone_id AS TimeZoneId,
     email_notifications_enabled AS EmailNotificationsEnabled,
     trip_reminder_notifications_enabled AS TripReminderNotificationsEnabled,
     itinerary_change_notifications_enabled AS ItineraryChangeNotificationsEnabled,

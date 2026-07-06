@@ -6,6 +6,7 @@ public sealed record UserProfileResponse(
     string? LastName,
     string? DisplayName,
     string? Email,
+    string TimeZoneId,
     bool IsComplete,
     NotificationPreferences NotificationPreferences,
     PersonalizationPreferences PersonalizationPreferences,
@@ -18,6 +19,7 @@ public sealed record UpdateUserProfileRequest(
     string? LastName,
     string? DisplayName,
     string? Email,
+    string TimeZoneId,
     NotificationPreferences NotificationPreferences,
     PersonalizationPreferences PersonalizationPreferences);
 

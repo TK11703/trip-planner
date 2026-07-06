@@ -2,6 +2,7 @@ using Bunit;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Web.Features.Profile;
+using TripPlanner.Web.Features.Timezones;
 using TripPlanner.Web.Tests.Auth;
 using ProfilePage = TripPlanner.Web.Components.Pages.Profile;
 
@@ -13,6 +14,7 @@ public class ProfilePageSeedTests : TestContext
     public void SignedInUser_DisplaysAzureSeededProfileValues()
     {
         Services.AddSingleton<IProfileApiClient>(new RecordingProfileApiClient(ProfileTestData.CompleteProfile()));
+        Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
         var cut = RenderComponent<ProfilePage>();
@@ -21,5 +23,6 @@ public class ProfilePageSeedTests : TestContext
         Assert.Equal("Avery", cut.Find("#firstName").GetAttribute("value"));
         Assert.Equal("Traveler", cut.Find("#lastName").GetAttribute("value"));
         Assert.Equal("avery@example.test", cut.Find("#email").GetAttribute("value"));
+        Assert.Equal("UTC", cut.Find("#timeZoneId").GetAttribute("value"));
     }
 }

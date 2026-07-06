@@ -18,6 +18,7 @@ public class UpdateProfileEndpointTests
             "User",
             "A Saved",
             "a.saved@example.test",
+            "UTC",
             new NotificationPreferences(false, false, false),
             new PersonalizationPreferences(null, null, null, null)));
 
@@ -40,6 +41,7 @@ public class UpdateProfileEndpointTests
             "Traveler",
             "Avery Saved",
             "avery.saved@example.test",
+            "UTC",
             new NotificationPreferences(false, false, false),
             new PersonalizationPreferences(null, null, null, null)));
         valid.EnsureSuccessStatusCode();
@@ -49,6 +51,7 @@ public class UpdateProfileEndpointTests
             "Traveler",
             "Broken Email",
             "not-an-email",
+            "UTC",
             new NotificationPreferences(false, false, false),
             new PersonalizationPreferences(null, null, null, null)));
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);

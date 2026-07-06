@@ -2,6 +2,7 @@ using Bunit;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Web.Features.Profile;
+using TripPlanner.Web.Features.Timezones;
 using TripPlanner.Web.Tests.Auth;
 using ProfilePage = TripPlanner.Web.Components.Pages.Profile;
 
@@ -14,6 +15,7 @@ public class ProfilePersonalizationTests : TestContext
     {
         var profile = ProfileTestData.CompleteProfile(personalization: new("museums", "SEA", "slow travel", "quiet rooms"));
         Services.AddSingleton<IProfileApiClient>(new RecordingProfileApiClient(profile));
+        Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
         var cut = RenderComponent<ProfilePage>();

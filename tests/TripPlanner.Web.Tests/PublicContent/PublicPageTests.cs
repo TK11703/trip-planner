@@ -54,6 +54,7 @@ public class PublicPageTests : TestContext
         public Task CreateLegAsync(Guid tripId, CreateTripLegRequest request, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }
         public Task UpdateLegAsync(Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }
         public Task DeleteLegAsync(Guid tripId, Guid tripLegId, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }
+        public Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult<TripLegDefaultsResponse?>(null);
         public Task CreateItemAsync(Guid tripId, CreateTrackedItemRequest request, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }
         public Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }
         public Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }

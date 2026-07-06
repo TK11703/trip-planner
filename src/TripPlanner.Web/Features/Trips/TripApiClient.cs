@@ -16,6 +16,7 @@ public interface ITripApiClient
     Task CreateLegAsync(Guid tripId, CreateTripLegRequest request, CancellationToken ct = default);
     Task UpdateLegAsync(Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct = default);
     Task DeleteLegAsync(Guid tripId, Guid tripLegId, CancellationToken ct = default);
+    Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(Guid tripId, CancellationToken ct = default);
 
     Task CreateItemAsync(Guid tripId, CreateTrackedItemRequest request, CancellationToken ct = default);
     Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default);
@@ -71,6 +72,13 @@ public sealed class TripApiClient : ITripApiClient
 
     public async Task DeleteLegAsync(Guid tripId, Guid tripLegId, CancellationToken ct = default)
         => (await _http.DeleteAsync($"/api/trips/{tripId}/legs/{tripLegId}", ct)).EnsureSuccessStatusCode();
+
+    public async Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(Guid tripId, CancellationToken ct = default)
+    {
+        var resp = await _http.GetAsync($"/api/trips/{tripId}/legs/defaults", ct);
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<TripLegDefaultsResponse>(cancellationToken: ct);
+    }
 
     public async Task CreateItemAsync(Guid tripId, CreateTrackedItemRequest request, CancellationToken ct = default)
         => (await _http.PostAsJsonAsync($"/api/trips/{tripId}/items", request, ct)).EnsureSuccessStatusCode();

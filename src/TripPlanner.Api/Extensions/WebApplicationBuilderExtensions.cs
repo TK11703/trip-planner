@@ -17,6 +17,7 @@ using TripPlanner.Api.Features.TripItems;
 using TripPlanner.Database.ThemePreferences;
 using TripPlanner.Api.Features.ThemePreferences;
 using TripPlanner.Api.Features.UserProfiles;
+using TripPlanner.Api.Features.Timezones;
 using TripPlanner.Database.UserProfiles;
 
 namespace TripPlanner.Api.Extensions;
@@ -51,6 +52,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton<TrackedItemValidator>();
         builder.Services.AddSingleton<ThemePreferenceValidator>();
         builder.Services.AddSingleton<UserProfileValidator>();
+        builder.Services.AddSingleton<ITimezoneIdValidator, TimezoneIdValidator>();
 
         builder.Services.AddSingleton<DatabaseInitializer>();
 
