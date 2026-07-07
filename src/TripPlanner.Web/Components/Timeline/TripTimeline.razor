@@ -74,17 +74,20 @@ else
                         }
                         <div class="ttl-leg-meta">
                             <span class="ttl-leg-count @(leg.Items.Count == 0 ? "ttl-leg-count-empty" : null)">@EventCountLabel(leg.Items.Count)</span>
-                            <button type="button"
-                                    class="ttl-leg-add"
-                                    title="Add an event to @leg.Title"
-                                    aria-label="Add an event to @leg.Title"
-                                    @onclick="() => AddEventToLegAsync(leg)"
-                                    @onclick:stopPropagation="true">
-                                <span aria-hidden="true">+</span> Add event
-                            </button>
+                            @if (CanEdit)
+                            {
+                                <button type="button"
+                                        class="ttl-leg-add"
+                                        title="Add an event to @leg.Title"
+                                        aria-label="Add an event to @leg.Title"
+                                        @onclick="() => AddEventToLegAsync(leg)"
+                                        @onclick:stopPropagation="true">
+                                    <span aria-hidden="true">+</span> Add event
+                                </button>
+                            }
                         </div>
                     </div>
-                    <div class="ttl-lane ttl-lane-clickable" style="width:@(TrackWidthPx)px; min-height:@(legRowHeight)rem" @onclick="args => OnLaneClickAsync(leg, args)">
+                    <div class="ttl-lane @(CanEdit ? "ttl-lane-clickable" : null)" style="width:@(TrackWidthPx)px; min-height:@(legRowHeight)rem" @onclick="args => OnLaneClickAsync(leg, args)">
                         @laneGrid
                         @{
                             var band = ComputeSpan(leg.StartLocal, leg.EndLocal);
@@ -140,6 +143,7 @@ else
 
 @code {
     [Parameter] public Guid TripId { get; set; }
+    [Parameter] public bool CanEdit { get; set; } = true;
     [Parameter] public EventCallback<Guid> OnLegSelected { get; set; }
     [Parameter] public EventCallback<Guid> OnItemSelected { get; set; }
     [Parameter] public EventCallback<TimelineSlotSelection> OnLegSlotSelected { get; set; }
@@ -280,6 +284,7 @@ else
 
     private async Task OnLaneClickAsync(TimelineLeg leg, MouseEventArgs args)
     {
+        if (!CanEdit) return;
         var totalSlots = _days * SlotsPerDay;
         var slotIndex = Math.Clamp((int)Math.Floor(args.OffsetX / SlotWidthPx), 0, totalSlots - 1);
         var startLocal = _start.ToDateTime(TimeOnly.MinValue).AddMinutes(slotIndex * SlotMinutes);

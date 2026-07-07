@@ -51,7 +51,7 @@ else
                     </div>
                 </div>
                 <div class="card-body">
-                    <TripTimeline @ref="_timeline" TripId="@TripId" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" />
+                    <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" />
                 </div>
             </div>
         </div>
