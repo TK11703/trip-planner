@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using TripPlanner.Api.Extensions;
 using TripPlanner.Api.Features.Trips.CreateTrip;
+using TripPlanner.Api.Features.Trips.DeleteTrip;
 using TripPlanner.Api.Features.Trips.GetRecentTrips;
 using TripPlanner.Api.Features.Trips.GetTripDetail;
 using TripPlanner.Api.Features.Trips.GetTrips;
@@ -22,6 +23,7 @@ public static class TripEndpointRouteBuilderExtensions
         group.MapGetTripDetail();
         group.MapCreateTrip();
         group.MapUpdateTrip();
+        group.MapDeleteTrip();
         return endpoints;
     }
 }

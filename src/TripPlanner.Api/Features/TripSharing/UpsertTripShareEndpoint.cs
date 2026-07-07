@@ -64,20 +64,20 @@ public static class UpsertTripShareEndpoint
 
         await audit.RecordAsync(callerId, AuditOperations.TripShareCreate, "trip-share", $"{tripId}:{member.UserId}", AuditResults.Success, clock.UtcNow, ct);
 
-        // Notify the member that a trip was shared with them. This is an actionable, trip-related
-        // notification (review the shared trip). Failure to notify must not fail the share itself.
+        // Alert the member that a trip was shared with them. This is awareness-only (no action required)
+        // and links to the trip. Failure to notify must not fail the share itself.
         try
         {
             var sharerName = currentUser.DisplayName ?? "Someone";
             await notifications.CreateAsync(new NewNotification(
                 RecipientUserId: member.UserId,
                 Category: NotificationCategories.TripSharing,
-                Kind: NotificationKind.Actionable,
+                Kind: NotificationKind.Awareness,
                 TargetType: NotificationTargetType.Trip,
                 RelatedTripId: tripId,
                 Title: "A trip was shared with you",
-                Message: $"{sharerName} shared a trip with you. Review the trip when you have a moment.",
-                SourceEventKey: $"trip-share:{tripId}:{member.UserId}",
+                Message: $"{sharerName} shared a trip with you as a {AccessLevelLabel(member.AccessLevel)}.",
+                SourceEventKey: $"trip-share-added:{tripId}:{member.UserId}:{Guid.NewGuid():N}",
                 RecipientEmail: member.Email), ct);
         }
         catch
@@ -87,4 +87,7 @@ public static class UpsertTripShareEndpoint
 
         return TypedResults.Ok(member);
     }
+
+    internal static string AccessLevelLabel(TripAccessLevel level)
+        => level == TripAccessLevel.Collaborator ? "collaborator" : "viewer";
 }

@@ -13,6 +13,7 @@ public interface ITripApiClient
     Task<TripDetail?> GetDetailAsync(Guid tripId, CancellationToken ct = default);
     Task<CreateTripResponse> CreateAsync(CreateTripRequest request, CancellationToken ct = default);
     Task<CreateTripResponse> UpdateAsync(Guid tripId, UpdateTripRequest request, CancellationToken ct = default);
+    Task DeleteTripAsync(Guid tripId, CancellationToken ct = default);
 
     Task CreateLegAsync(Guid tripId, CreateTripLegRequest request, CancellationToken ct = default);
     Task UpdateLegAsync(Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct = default);
@@ -70,6 +71,9 @@ public sealed class TripApiClient : ITripApiClient
         resp.EnsureSuccessStatusCode();
         return (await resp.Content.ReadFromJsonAsync<CreateTripResponse>(cancellationToken: ct))!;
     }
+
+    public async Task DeleteTripAsync(Guid tripId, CancellationToken ct = default)
+        => await EnsureSuccessAsync(await _http.DeleteAsync($"/api/trips/{tripId}", ct), ct);
 
     public async Task CreateLegAsync(Guid tripId, CreateTripLegRequest request, CancellationToken ct = default)
         => await EnsureSuccessAsync(await _http.PostAsJsonAsync($"/api/trips/{tripId}/legs", request, ct), ct);

@@ -32,9 +32,9 @@ public static class UpdateTripEndpoint
         CancellationToken cancellationToken)
     {
         var callerId = currentUser.UserId;
-        // Editing trip metadata is owner-only; collaborators and viewers cannot change the trip shell.
+        // Editing trip metadata is allowed for the owner and collaborators; viewers cannot change it.
         var access = await accessResolver.ResolveAsync(callerId, tripId, cancellationToken);
-        if (access is null || !access.IsOwner())
+        if (access is null || !access.CanEditContent())
         {
             await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip", tripId.ToString(), AuditResults.Denied, clock.UtcNow, cancellationToken);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());

@@ -28,7 +28,7 @@
                 localStorage.setItem(storageKey, applied);
                 localStorage.setItem(sourceKey, source || 'temporaryVisitorChoice');
             } else if (source === 'accountPreference') {
-                localStorage.removeItem(storageKey);
+                localStorage.setItem(storageKey, applied);
                 localStorage.setItem(sourceKey, source);
             }
             return applied;
@@ -38,4 +38,22 @@
     };
 
     window.tripPlannerTheme.applyInitialTheme();
+
+    // Blazor enhanced navigation morphs the <html> element to match the
+    // server response, which does not carry the theme attributes. Re-apply
+    // the persisted theme after each enhanced page load so it is retained
+    // when navigating between pages.
+    function reapplyTheme() {
+        window.tripPlannerTheme.applyInitialTheme();
+    }
+
+    function attachEnhancedNavigationHandler() {
+        if (window.Blazor && typeof window.Blazor.addEventListener === 'function') {
+            window.Blazor.addEventListener('enhancedload', reapplyTheme);
+        } else {
+            setTimeout(attachEnhancedNavigationHandler, 50);
+        }
+    }
+
+    attachEnhancedNavigationHandler();
 })();

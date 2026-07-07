@@ -460,6 +460,16 @@ body {
     flex: 0 0 auto;
 }
 
+.dropdown-menu {
+    --bs-dropdown-bg: var(--tp-surface-raised);
+    --bs-dropdown-border-color: var(--tp-border);
+    --bs-dropdown-link-color: var(--tp-text);
+    --bs-dropdown-link-hover-bg: color-mix(in srgb, var(--tp-brand) 12%, var(--tp-surface-raised));
+    --bs-dropdown-link-hover-color: var(--tp-text);
+    background-color: var(--tp-surface-raised);
+    box-shadow: 0 1rem 2.5rem rgba(20, 37, 28, .14);
+}
+
 .navbar-modern .dropdown-menu {
     border-color: var(--tp-border);
     border-radius: .85rem;

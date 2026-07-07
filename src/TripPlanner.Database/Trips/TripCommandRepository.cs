@@ -9,6 +9,7 @@ public interface ITripCommandRepository
 {
     Task<Guid> InsertAsync(string ownerUserId, CreateTripRequest request, DateTimeOffset nowUtc, CancellationToken cancellationToken);
     Task<int> UpdateAsync(string ownerUserId, Guid tripId, UpdateTripRequest request, CancellationToken cancellationToken);
+    Task<int> DeleteAsync(string ownerUserId, Guid tripId, CancellationToken cancellationToken);
 }
 
 public sealed class TripCommandRepository : ITripCommandRepository
@@ -48,6 +49,17 @@ public sealed class TripCommandRepository : ITripCommandRepository
             request.Description,
             request.StartDate,
             request.EndDate
+        }, cancellationToken: cancellationToken));
+    }
+
+    public async Task<int> DeleteAsync(string ownerUserId, Guid tripId, CancellationToken cancellationToken)
+    {
+        await using var conn = await _factory.CreateOpenConnectionAsync(cancellationToken);
+        var cmd = _sql.Get("Commands/Trips/DeleteTrip.sql");
+        return await conn.ExecuteAsync(new CommandDefinition(cmd, new
+        {
+            TripId = tripId,
+            OwnerUserId = ownerUserId
         }, cancellationToken: cancellationToken));
     }
 }

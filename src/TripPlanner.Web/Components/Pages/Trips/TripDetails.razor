@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject ITripApiClient TripApi
+@inject NavigationManager Nav
 
 <PageTitle>Trip details</PageTitle>
 
@@ -29,7 +30,21 @@ else
             @if (_trip.IsOwner)
             {
                 <button class="btn btn-outline-primary" @onclick="OpenShareModal">Share</button>
-                <button class="btn btn-primary" @onclick="OpenTripEditModal">Edit trip</button>
+            }
+            @if (CanEditContent)
+            {
+                <div class="btn-group">
+                    <button type="button" class="btn btn-primary" @onclick="OpenTripEditModal">Edit trip</button>
+                    @if (_trip.IsOwner)
+                    {
+                        <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="visually-hidden">Toggle trip actions</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><button class="dropdown-item text-danger" type="button" @onclick="OpenDeleteModal">Delete trip</button></li>
+                        </ul>
+                    }
+                </div>
             }
         </div>
     </header>
@@ -175,6 +190,32 @@ else
         </div>
         <div class="modal-backdrop show"></div>
     }
+
+    @if (_showDeleteModal)
+    {
+        <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5">Delete trip</h2>
+                        <button type="button" class="btn-close" aria-label="Close" @onclick="CloseDeleteModal" disabled="@_isDeleting"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (_deleteError is not null)
+                        {
+                            <div class="alert alert-danger small" role="alert">@_deleteError</div>
+                        }
+                        <p class="mb-0">Are you sure you want to delete <strong>@_trip.Name</strong>? This permanently removes the trip and all of its legs, events, and shares. This can't be undone.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseDeleteModal" disabled="@_isDeleting">Cancel</button>
+                        <button type="button" class="btn btn-danger" @onclick="HandleTripDeleteAsync" disabled="@_isDeleting">@(_isDeleting ? "Deleting…" : "Delete trip")</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop show"></div>
+    }
 }
 
 @code {
@@ -190,6 +231,9 @@ else
     private TrackedItemDto? _editingItem;
     private Guid? _initialItemLegId;
     private DateTime? _initialItemStart;
+    private bool _showDeleteModal;
+    private bool _isDeleting;
+    private string? _deleteError;
 
     private bool CanEditContent => _trip is not null && (_trip.IsOwner || _trip.AccessLevel == TripAccessLevel.Collaborator);
     private string AccessLevelLabel => _trip?.AccessLevel == TripAccessLevel.Collaborator ? "Collaborator" : "Viewer";
@@ -278,6 +322,20 @@ else
         _activeModal = ActiveModal.EditTrip;
     }
 
+    private void OpenDeleteModal()
+    {
+        _deleteError = null;
+        _isDeleting = false;
+        _showDeleteModal = true;
+    }
+
+    private void CloseDeleteModal()
+    {
+        if (_isDeleting) return;
+        _showDeleteModal = false;
+        _deleteError = null;
+    }
+
     private void OpenShareModal() => _showShareModal = true;
 
     private void CloseShareModal() => _showShareModal = false;
@@ -325,6 +383,22 @@ else
         await TripApi.UpdateAsync(TripId, request);
         CloseModal();
         await ReloadAsync();
+    }
+
+    private async Task HandleTripDeleteAsync()
+    {
+        _deleteError = null;
+        _isDeleting = true;
+        try
+        {
+            await TripApi.DeleteTripAsync(TripId);
+            Nav.NavigateTo("/trips");
+        }
+        catch
+        {
+            _deleteError = "We couldn't delete this trip. Please try again.";
+            _isDeleting = false;
+        }
     }
 
     private async Task HandleModalSavedAsync()
