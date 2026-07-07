@@ -673,3 +673,48 @@ body {
     .navbar .btn, .navbar .nav-link { min-height: 44px; display: inline-flex; align-items: center; }
 }
 
+/* Feature 011: notification indicator and notification list. */
+.notification-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    padding: 0 .4rem;
+    border-radius: 999px;
+    background: var(--tp-brand, #b3261e);
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.notifications-page {
+    max-width: 960px;
+}
+
+.notifications-page h1 {
+    font-weight: 800;
+    letter-spacing: -.03em;
+}
+
+.notification-card {
+    border: 1px solid var(--tp-border);
+    border-radius: 1rem;
+    background: var(--tp-surface-raised);
+}
+
+.notification-card.notification-unread {
+    border-left: .25rem solid var(--tp-brand, #b3261e);
+}
+
+@media (max-width: 575.98px) {
+    .notification-card .card-body > div {
+        flex-direction: column;
+    }
+    .notification-card .card-body .d-flex.flex-column.align-items-end {
+        align-items: stretch !important;
+    }
+}
+
+

@@ -3,6 +3,7 @@ using TripPlanner.Api.Features.TripItems;
 using TripPlanner.Api.Features.TripSharing;
 using TripPlanner.Api.Features.ThemePreferences;
 using TripPlanner.Api.Features.UserProfiles;
+using TripPlanner.Api.Features.Notifications;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Database.Audit;
 using TripPlanner.Database.Initialization;
@@ -40,6 +41,7 @@ public static class WebApplicationExtensions
         app.MapTripSharingEndpoints();
         app.MapThemePreferenceEndpoints();
         app.MapUserProfileEndpoints();
+        app.MapNotificationEndpoints();
 
         return app;
     }

@@ -2,11 +2,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using TripPlanner.Api.Security;
+using TripPlanner.Api.Features.Notifications;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Contracts.Common;
 using TripPlanner.Contracts.Errors;
+using TripPlanner.Contracts.Notifications;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Database.Audit;
+using TripPlanner.Database.Notifications;
 using TripPlanner.Database.TripSharing;
 
 namespace TripPlanner.Api.Features.TripSharing;
@@ -27,6 +30,7 @@ public static class UpsertTripShareEndpoint
         ITripSharingRepository sharing,
         TripSharingValidator validator,
         IAuditRepository audit,
+        INotificationService notifications,
         IClock clock,
         CancellationToken ct)
     {
@@ -59,6 +63,28 @@ public static class UpsertTripShareEndpoint
         }
 
         await audit.RecordAsync(callerId, AuditOperations.TripShareCreate, "trip-share", $"{tripId}:{member.UserId}", AuditResults.Success, clock.UtcNow, ct);
+
+        // Notify the member that a trip was shared with them. This is an actionable, trip-related
+        // notification (review the shared trip). Failure to notify must not fail the share itself.
+        try
+        {
+            var sharerName = currentUser.DisplayName ?? "Someone";
+            await notifications.CreateAsync(new NewNotification(
+                RecipientUserId: member.UserId,
+                Category: NotificationCategories.TripSharing,
+                Kind: NotificationKind.Actionable,
+                TargetType: NotificationTargetType.Trip,
+                RelatedTripId: tripId,
+                Title: "A trip was shared with you",
+                Message: $"{sharerName} shared a trip with you. Review the trip when you have a moment.",
+                SourceEventKey: $"trip-share:{tripId}:{member.UserId}",
+                RecipientEmail: member.Email), ct);
+        }
+        catch
+        {
+            // Swallow notification failures; the share succeeded and is the primary outcome.
+        }
+
         return TypedResults.Ok(member);
     }
 }

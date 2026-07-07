@@ -6,6 +6,7 @@ using TripPlanner.Web.Features.Profile;
 using TripPlanner.Web.Features.Trips;
 using TripPlanner.Web.Features.Theme;
 using TripPlanner.Web.Features.Timezones;
+using TripPlanner.Web.Features.Notifications;
 
 namespace TripPlanner.Web.Extensions;
 
@@ -42,6 +43,12 @@ public static class WebApplicationBuilderExtensions
         .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
 
         builder.Services.AddHttpClient<IProfileApiClient, ProfileApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https+http://api");
+        })
+        .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
+
+        builder.Services.AddHttpClient<INotificationApiClient, NotificationApiClient>(client =>
         {
             client.BaseAddress = new Uri("https+http://api");
         })

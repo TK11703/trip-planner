@@ -1,5 +1,6 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
+@inject INotificationApiClient NotificationApi
 
 <nav class="navbar navbar-modern border-bottom sticky-top" aria-label="Primary navigation">
     <div class="container navbar-3col">
@@ -20,13 +21,28 @@
             <AuthorizeView>
                 <Authorized>
                     <div class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle account-menu-toggle d-flex align-items-center gap-2"
+                        <a class="nav-link dropdown-toggle account-menu-toggle d-flex align-items-center gap-2 position-relative"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <span class="account-avatar" aria-hidden="true">@AvatarInitial(context.User)</span>
                             <span class="account-name">@DisplayLabel(context.User)</span>
+                            @if (_unreadCount > 0)
+                            {
+                                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
+                                    <span class="visually-hidden">Unread notifications</span>
+                                </span>
+                            }
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="/profile">Profile</a></li>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center justify-content-between gap-3" href="/notifications">
+                                    <span>Notifications</span>
+                                    @if (_unreadCount > 0)
+                                    {
+                                        <span class="notification-badge" aria-label="@($"{_unreadCount} unread notifications")">@DisplayCount</span>
+                                    }
+                                </a>
+                            </li>
                             <li><hr class="dropdown-divider" /></li>
                             <li><a class="dropdown-item" href="MicrosoftIdentity/Account/SignOut">Sign out</a></li>
                         </ul>
@@ -41,6 +57,41 @@
 </nav>
 
 @code {
+    private int _unreadCount;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private string DisplayCount => _unreadCount > 99 ? "99+" : _unreadCount.ToString();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Only signed-in users have notifications. Skipping the call for anonymous visitors avoids
+        // triggering an interactive sign-in/consent challenge (MSAL) during the first, unauthenticated
+        // page load, which would otherwise surface as a MicrosoftIdentityWebChallengeUserException.
+        if (AuthenticationStateTask is null)
+        {
+            return;
+        }
+
+        var authState = await AuthenticationStateTask;
+        if (authState.User.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+
+        try
+        {
+            _unreadCount = await NotificationApi.GetUnreadCountAsync();
+        }
+        catch
+        {
+            // Never let a notification-count failure (including a token/consent challenge) break the
+            // navigation bar; simply show no badge.
+            _unreadCount = 0;
+        }
+    }
+
     private static string DisplayLabel(ClaimsPrincipal user)
         => FirstNonEmpty(
             user.FindFirst("name")?.Value,

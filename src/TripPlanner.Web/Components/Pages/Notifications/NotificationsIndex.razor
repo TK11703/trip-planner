@@ -1,0 +1,261 @@
+@page "/notifications"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject INotificationApiClient NotificationApi
+
+<PageTitle>Notifications</PageTitle>
+
+<section class="notifications-page">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h1 class="mb-0">Notifications</h1>
+        @if (_notifications.Count > 0)
+        {
+            <button class="btn btn-outline-secondary btn-sm" @onclick="MarkAllReadAsync" disabled="@_isBusy">Mark all as read</button>
+        }
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-secondary">Loading notifications...</div>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="alert alert-warning" role="alert">@_loadError</div>
+    }
+    else if (_notifications.Count == 0)
+    {
+        <div class="alert alert-info" role="status">You're all caught up. There's nothing to review right now.</div>
+    }
+    else
+    {
+        <ul class="list-unstyled notification-list">
+            @foreach (var item in _notifications)
+            {
+                <li class="notification-card card mb-2 @(item.ReadAtUtc is null ? "notification-unread" : string.Empty)">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="fw-semibold">@item.Title</span>
+                                    @if (item.Kind == NotificationKind.Actionable)
+                                    {
+                                        <span class="badge text-bg-primary">Action needed</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-secondary">Info</span>
+                                    }
+                                    @if (item.ReadAtUtc is null)
+                                    {
+                                        <span class="badge text-bg-info">Unread</span>
+                                    }
+                                </div>
+                                <div class="text-body mb-1">@item.Message</div>
+                                <div class="small text-secondary">@item.CreatedAtUtc.ToLocalTime().ToString("g")</div>
+
+                                @if (item.TargetType == NotificationTargetType.Trip && item.RelatedTripId is Guid tripId)
+                                {
+                                    @if (item.CanOpenTrip)
+                                    {
+                                        <div class="mt-2">
+                                            <a class="btn btn-sm btn-outline-primary" href="@($"/trips/{tripId}")">
+                                                View @(string.IsNullOrWhiteSpace(item.RelatedTripName) ? "trip" : item.RelatedTripName)
+                                            </a>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="mt-2 small text-warning">This trip is no longer available to you.</div>
+                                    }
+                                }
+
+                                @if (item.ActionStatus == NotificationActionStatus.Completed && item.CompletedAtUtc is DateTimeOffset completedAt)
+                                {
+                                    <div class="mt-2 small text-success">
+                                        Completed @completedAt.ToLocalTime().ToString("g")
+                                        @if (item.CompletedBy is not null && !string.IsNullOrWhiteSpace(item.CompletedBy.DisplayName))
+                                        {
+                                            <text> by @item.CompletedBy.DisplayName</text>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="d-flex flex-column gap-2 align-items-end">
+                                @if (item.Kind == NotificationKind.Actionable && item.ActionStatus == NotificationActionStatus.Pending)
+                                {
+                                    <button class="btn btn-sm btn-success" @onclick="() => CompleteAsync(item.NotificationId)" disabled="@_isBusy">Complete</button>
+                                }
+                                @if (item.ReadAtUtc is null)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => MarkReadAsync(item.NotificationId)" disabled="@_isBusy">Mark read</button>
+                                }
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.NotificationId)" disabled="@_isBusy">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+
+    <hr class="my-4" />
+
+    <h2 class="h4 mb-3">Notification preferences</h2>
+    @if (_preferences.Count == 0)
+    {
+        <div class="text-secondary">Loading preferences...</div>
+    }
+    else
+    {
+        <div class="notification-preferences">
+            @foreach (var pref in _preferences)
+            {
+                <div class="d-flex align-items-center gap-4 py-2 border-bottom">
+                    <div class="flex-grow-1 fw-semibold">@pref.DisplayName</div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="@($"inapp-{pref.Category}")"
+                               checked="@pref.InAppEnabled"
+                               @onchange="e => UpdatePreferenceAsync(pref, (bool)e.Value!, pref.EmailEnabled)" disabled="@_isBusy" />
+                        <label class="form-check-label" for="@($"inapp-{pref.Category}")">In-app</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="@($"email-{pref.Category}")"
+                               checked="@pref.EmailEnabled"
+                               @onchange="e => UpdatePreferenceAsync(pref, pref.InAppEnabled, (bool)e.Value!)" disabled="@_isBusy" />
+                        <label class="form-check-label" for="@($"email-{pref.Category}")">Email</label>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _loadError;
+    private List<NotificationResponse> _notifications = new();
+    private List<NotificationPreferenceResponse> _preferences = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        await LoadPreferencesAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        try
+        {
+            var items = await NotificationApi.GetListAsync();
+            _notifications = items.ToList();
+        }
+        catch
+        {
+            _loadError = "We couldn't load your notifications. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadPreferencesAsync()
+    {
+        try
+        {
+            var response = await NotificationApi.GetPreferencesAsync();
+            _preferences = response?.Categories.ToList() ?? new();
+        }
+        catch
+        {
+            _preferences = new();
+        }
+    }
+
+    private async Task MarkReadAsync(Guid notificationId)
+    {
+        _isBusy = true;
+        try
+        {
+            if (await NotificationApi.MarkReadAsync(notificationId))
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        _isBusy = true;
+        try
+        {
+            await NotificationApi.MarkAllReadAsync();
+            await LoadAsync();
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task CompleteAsync(Guid notificationId)
+    {
+        _isBusy = true;
+        try
+        {
+            if (await NotificationApi.CompleteAsync(notificationId) is not null)
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task DeleteAsync(Guid notificationId)
+    {
+        _isBusy = true;
+        try
+        {
+            if (await NotificationApi.DeleteAsync(notificationId))
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task UpdatePreferenceAsync(NotificationPreferenceResponse pref, bool inAppEnabled, bool emailEnabled)
+    {
+        _isBusy = true;
+        try
+        {
+            var updated = await NotificationApi.UpdatePreferenceAsync(pref.Category, new UpdateNotificationPreferenceRequest(inAppEnabled, emailEnabled));
+            if (updated is not null)
+            {
+                var index = _preferences.FindIndex(p => string.Equals(p.Category, pref.Category, StringComparison.OrdinalIgnoreCase));
+                if (index >= 0)
+                {
+                    _preferences[index] = updated;
+                }
+            }
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+}
