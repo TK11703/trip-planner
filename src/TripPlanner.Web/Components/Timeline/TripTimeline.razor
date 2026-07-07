@@ -63,24 +63,34 @@ else
 
                 @foreach (var leg in _timeline.Legs)
                 {
-                    <div class="ttl-leg-label" @onclick="() => SelectLegAsync(leg.TripLegId)" role="button" tabindex="0">
+                    var legLanes = AssignLanes(leg.Items);
+                    var legLaneCount = LaneCount(legLanes);
+                    var legRowHeight = Rem(LaneMinHeightRem(legLaneCount));
+                    <div class="ttl-leg-label" style="min-height:@(legRowHeight)rem" @onclick="() => SelectLegAsync(leg.TripLegId)" role="button" tabindex="0">
                         <div class="fw-semibold">@leg.Title</div>
                         @if (!string.IsNullOrWhiteSpace(leg.Origin) || !string.IsNullOrWhiteSpace(leg.Destination))
                         {
                             <div class="small text-secondary">@leg.Origin @(string.IsNullOrWhiteSpace(leg.Origin) || string.IsNullOrWhiteSpace(leg.Destination) ? null : "→") @leg.Destination</div>
                         }
-                        @if (leg.Items.Count == 0)
-                        {
-                            <div class="small text-secondary fst-italic">No events yet</div>
-                        }
+                        <div class="ttl-leg-meta">
+                            <span class="ttl-leg-count @(leg.Items.Count == 0 ? "ttl-leg-count-empty" : null)">@EventCountLabel(leg.Items.Count)</span>
+                            <button type="button"
+                                    class="ttl-leg-add"
+                                    title="Add an event to @leg.Title"
+                                    aria-label="Add an event to @leg.Title"
+                                    @onclick="() => AddEventToLegAsync(leg)"
+                                    @onclick:stopPropagation="true">
+                                <span aria-hidden="true">+</span> Add event
+                            </button>
+                        </div>
                     </div>
-                    <div class="ttl-lane ttl-lane-clickable" style="width:@(TrackWidthPx)px" @onclick="args => OnLaneClickAsync(leg, args)">
+                    <div class="ttl-lane ttl-lane-clickable" style="width:@(TrackWidthPx)px; min-height:@(legRowHeight)rem" @onclick="args => OnLaneClickAsync(leg, args)">
                         @laneGrid
                         @{
                             var band = ComputeSpan(leg.StartLocal, leg.EndLocal);
                         }
                         <div class="ttl-leg-band" style="left:@(band.Left)px; width:@(band.Width)px"></div>
-                        @foreach (var item in leg.Items)
+                        @foreach (var (item, lane) in legLanes)
                         {
                             var localStart = item.StartLocal;
                             DateTime? localEnd = item.EndLocal;
@@ -88,7 +98,7 @@ else
                             var outside = item.StartsOutsideLeg || item.EndsOutsideLeg;
                             <button type="button"
                                     class="ttl-item @(outside ? "is-outside" : null)"
-                                    style="left:@(span.Left)px; width:@(span.Width)px; --tp-item:@SwatchColor(item.DisplayColor)"
+                                    style="left:@(span.Left)px; width:@(span.Width)px; top:@(Rem(ItemTopRem(lane)))rem; --tp-item:@SwatchColor(item.DisplayColor)"
                                     title="@ItemTooltip(item, localStart, localEnd, outside)"
                                     @onclick="() => SelectItemAsync(item.TrackedItemId)"
                                     @onclick:stopPropagation="true">
@@ -100,20 +110,22 @@ else
 
                 @if (_timeline.UnassignedItems.Count > 0)
                 {
-                    <div class="ttl-leg-label ttl-leg-label-muted">
+                    var unassignedLanes = AssignLanes(_timeline.UnassignedItems);
+                    var unassignedRowHeight = Rem(LaneMinHeightRem(LaneCount(unassignedLanes)));
+                    <div class="ttl-leg-label ttl-leg-label-muted" style="min-height:@(unassignedRowHeight)rem">
                         <div class="fw-semibold text-truncate">Unassigned</div>
                         <div class="small text-secondary fst-italic">Needs a trip leg</div>
                     </div>
-                    <div class="ttl-lane" style="width:@(TrackWidthPx)px">
+                    <div class="ttl-lane" style="width:@(TrackWidthPx)px; min-height:@(unassignedRowHeight)rem">
                         @laneGrid
-                        @foreach (var item in _timeline.UnassignedItems)
+                        @foreach (var (item, lane) in unassignedLanes)
                         {
                             var localStart = item.StartLocal;
                             DateTime? localEnd = item.EndLocal;
                             var span = ComputeSpan(localStart, localEnd);
                             <button type="button"
                                     class="ttl-item is-outside"
-                                    style="left:@(span.Left)px; width:@(span.Width)px; --tp-item:@SwatchColor(item.DisplayColor)"
+                                    style="left:@(span.Left)px; width:@(span.Width)px; top:@(Rem(ItemTopRem(lane)))rem; --tp-item:@SwatchColor(item.DisplayColor)"
                                     title="Unassigned event — select to relate it to a trip leg"
                                     @onclick="() => SelectItemAsync(item.TrackedItemId)">
                                 <span class="ttl-item-title text-truncate">@item.Title</span>
@@ -138,6 +150,15 @@ else
     private const int LabelWidthPx = 220;
     private const int SlotMinutes = 30;
     private const int SlotsPerDay = 24 * 60 / SlotMinutes;
+
+    // Vertical stacking of overlapping events within a leg row (values in rem).
+    private const double DefaultRowHeightRem = 3.75;
+    private const double ItemLaneHeightRem = 1.6;
+    private const double LaneGapRem = 0.3;
+    private const double LanePadRem = 0.35;
+    // Clickable buffer reserved below the last lane so a time slot can always be clicked
+    // to add another event, even when the lanes are full.
+    private const double LaneBottomBufferRem = 1.4;
 
     private TripTimelineResponse? _timeline;
     private DateOnly _start;
@@ -194,9 +215,68 @@ else
         return (startSlot * SlotWidthPx, Math.Max(SlotWidthPx, spanSlots * SlotWidthPx));
     }
 
+    // Greedy interval-graph lane assignment: overlapping events are pushed onto separate
+    // vertical lanes so they stack instead of covering each other. Items arrive ordered by
+    // start time from the timeline projection.
+    private static IReadOnlyList<(TimelineItem Item, int Lane)> AssignLanes(IReadOnlyList<TimelineItem> items)
+    {
+        var laneEnds = new List<DateTime>();
+        var result = new List<(TimelineItem Item, int Lane)>(items.Count);
+        foreach (var item in items)
+        {
+            var start = item.StartLocal;
+            var end = item.EndLocal ?? start;
+            if (end <= start)
+            {
+                end = start.AddMinutes(SlotMinutes);
+            }
+
+            var lane = -1;
+            for (var i = 0; i < laneEnds.Count; i++)
+            {
+                if (laneEnds[i] <= start)
+                {
+                    lane = i;
+                    break;
+                }
+            }
+
+            if (lane == -1)
+            {
+                lane = laneEnds.Count;
+                laneEnds.Add(end);
+            }
+            else
+            {
+                laneEnds[lane] = end;
+            }
+
+            result.Add((item, lane));
+        }
+
+        return result;
+    }
+
+    private static int LaneCount(IReadOnlyList<(TimelineItem Item, int Lane)> laneItems)
+        => laneItems.Count == 0 ? 0 : laneItems.Max(x => x.Lane) + 1;
+
+    private static double ItemTopRem(int lane) => LanePadRem + lane * (ItemLaneHeightRem + LaneGapRem);
+
+    private static double LaneMinHeightRem(int laneCount)
+    {
+        var lanes = Math.Max(laneCount, 1);
+        var contentHeight = LanePadRem + (lanes * ItemLaneHeightRem) + ((lanes - 1) * LaneGapRem) + LaneBottomBufferRem;
+        return Math.Max(DefaultRowHeightRem, contentHeight);
+    }
+
+    private static string Rem(double value) => value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
     private async Task SelectLegAsync(Guid tripLegId) => await OnLegSelected.InvokeAsync(tripLegId);
 
     private async Task SelectItemAsync(Guid trackedItemId) => await OnItemSelected.InvokeAsync(trackedItemId);
+
+    private async Task AddEventToLegAsync(TimelineLeg leg)
+        => await OnLegSlotSelected.InvokeAsync(new TimelineSlotSelection(leg.TripLegId, leg.StartLocal));
 
     private async Task OnLaneClickAsync(TimelineLeg leg, MouseEventArgs args)
     {
@@ -224,6 +304,13 @@ else
         12 => "12p",
         < 12 => $"{hour}a",
         _ => $"{hour - 12}p"
+    };
+
+    private static string EventCountLabel(int count) => count switch
+    {
+        0 => "0 events",
+        1 => "1 event",
+        _ => $"{count} events"
     };
 
     private static string ItemTooltip(TimelineItem item, DateTime localStart, DateTime? localEnd, bool outside)
