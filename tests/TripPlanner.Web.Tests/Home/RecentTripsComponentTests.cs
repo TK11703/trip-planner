@@ -116,6 +116,11 @@ public class RecentTripsComponentTests : TestContext
         public Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default) => throw new NotSupportedException();
         public Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<TripTimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult<TripTimelineResponse?>(null);
+        public Task<IReadOnlyList<TripShareMember>> GetSharesAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<TripShareMember>>(Array.Empty<TripShareMember>());
+        public Task<IReadOnlyList<DirectoryUserResult>> SearchDirectoryUsersAsync(Guid tripId, string query, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DirectoryUserResult>>(Array.Empty<DirectoryUserResult>());
+        public Task<TripShareMember> UpsertShareAsync(Guid tripId, UpsertTripShareRequest request, CancellationToken ct = default) => Task.FromResult(new TripShareMember(request.UserId, request.DisplayName, request.Email, request.AccessLevel, DateTimeOffset.UtcNow));
+        public Task<TripShareMember> UpdateShareAccessAsync(Guid tripId, string userId, UpdateTripShareAccessRequest request, CancellationToken ct = default) => Task.FromResult(new TripShareMember(userId, null, null, request.AccessLevel, DateTimeOffset.UtcNow));
+        public Task RemoveShareAsync(Guid tripId, string userId, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private sealed class RecordingHttpHandler : HttpMessageHandler

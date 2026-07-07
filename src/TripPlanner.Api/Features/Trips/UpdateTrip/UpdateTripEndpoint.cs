@@ -8,6 +8,7 @@ using TripPlanner.Contracts.Errors;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Database.Audit;
 using TripPlanner.Database.Trips;
+using TripPlanner.Database.TripSharing;
 
 namespace TripPlanner.Api.Features.Trips.UpdateTrip;
 
@@ -23,26 +24,34 @@ public static class UpdateTripEndpoint
         Guid tripId,
         UpdateTripRequest request,
         ICurrentUser currentUser,
+        ITripAccessResolver accessResolver,
         UpdateTripValidator validator,
         ITripCommandRepository commands,
         IAuditRepository audit,
         IClock clock,
         CancellationToken cancellationToken)
     {
-        var ownerId = currentUser.UserId;
+        var callerId = currentUser.UserId;
+        // Editing trip metadata is owner-only; collaborators and viewers cannot change the trip shell.
+        var access = await accessResolver.ResolveAsync(callerId, tripId, cancellationToken);
+        if (access is null || !access.IsOwner())
+        {
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip", tripId.ToString(), AuditResults.Denied, clock.UtcNow, cancellationToken);
+            return TypedResults.NotFound(ApiError.NotFoundOrDenied());
+        }
         var validation = validator.Validate(request);
         if (!validation.IsValid)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.TripUpdate, "trip", tripId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, cancellationToken);
+            await audit.RecordAsync(callerId, AuditOperations.TripUpdate, "trip", tripId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, cancellationToken);
             return TypedResults.BadRequest(validation.Error!);
         }
-        var affected = await commands.UpdateAsync(ownerId, tripId, request, cancellationToken);
+        var affected = await commands.UpdateAsync(access.OwnerUserId, tripId, request, cancellationToken);
         if (affected == 0)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "trip", tripId.ToString(), AuditResults.Denied, clock.UtcNow, cancellationToken);
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip", tripId.ToString(), AuditResults.Denied, clock.UtcNow, cancellationToken);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
-        await audit.RecordAsync(ownerId, AuditOperations.TripUpdate, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
+        await audit.RecordAsync(callerId, AuditOperations.TripUpdate, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
         return TypedResults.Ok(new CreateTripResponse(tripId, request.Name, request.Description, request.StartDate, request.EndDate));
     }
 }

@@ -1,0 +1,371 @@
+@inject ITripApiClient TripApi
+@implements IDisposable
+
+<div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="shareModalTitle">Share trip</h2>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAsync"></button>
+            </div>
+            <div class="modal-body">
+                @if (_error is not null)
+                {
+                    <div class="alert alert-danger" role="alert">@_error</div>
+                }
+
+                <div class="card mb-4 border-primary-subtle">
+                    <div class="card-header bg-primary-subtle fw-semibold">Add a shared person</div>
+                    <div class="card-body">
+                        <label class="form-label" for="shareSearch">Search for a user or enter an email address</label>
+                        <div class="input-group">
+                            <input id="shareSearch" class="form-control" type="search" placeholder="Name or email address"
+                                   @bind="_searchTerm" @bind:event="oninput" @onkeydown="OnSearchKeyDownAsync" disabled="@_busy" />
+                            <button type="button" class="btn btn-outline-secondary" @onclick="RunSearchAsync" disabled="@(_busy || _searching)">Search</button>
+                        </div>
+                        <div class="form-text">Press Enter or select Search. Choose each person's permission, then select Share. You can also invite someone outside the directory by their email.</div>
+
+                        <div class="mt-2">
+                            @if (_searching)
+                            {
+                                <p class="text-secondary mb-0">Searching...</p>
+                            }
+                            else if (_results.Count > 0)
+                            {
+                                <ul class="list-group">
+                                    @foreach (var user in _results)
+                                    {
+                                        <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                            <div>
+                                                <div class="fw-semibold">@(string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email ?? user.UserPrincipalName ?? user.UserId : user.DisplayName)</div>
+                                                <div class="small text-secondary">@(user.Email ?? user.UserPrincipalName)</div>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <label class="visually-hidden" for="@($"new-level-{user.UserId}")">Access level</label>
+                                                <select id="@($"new-level-{user.UserId}")" class="form-select form-select-sm w-auto"
+                                                        value="@LevelFor(user.UserId)"
+                                                        @onchange="e => SetLevelFor(user.UserId, e)"
+                                                        disabled="@_busy">
+                                                    <option value="@TripAccessLevel.Viewer">Viewer</option>
+                                                    <option value="@TripAccessLevel.Collaborator">Collaborator</option>
+                                                </select>
+                                                <button type="button" class="btn btn-sm btn-primary"
+                                                        @onclick="() => AddAsync(user)" disabled="@_busy">
+                                                    Share
+                                                </button>
+                                            </div>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            else if (_searchAttempted && CanInviteByEmail)
+                            {
+                                <ul class="list-group">
+                                    <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <div class="fw-semibold">Invite @EmailTerm</div>
+                                            <div class="small text-secondary">Not found in the directory - they'll get access after signing in with this email.</div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <label class="visually-hidden" for="invite-level">Access level</label>
+                                            <select id="invite-level" class="form-select form-select-sm w-auto"
+                                                    value="@LevelFor(EmailTerm)"
+                                                    @onchange="e => SetLevelFor(EmailTerm, e)"
+                                                    disabled="@_busy">
+                                                <option value="@TripAccessLevel.Viewer">Viewer</option>
+                                                <option value="@TripAccessLevel.Collaborator">Collaborator</option>
+                                            </select>
+                                            <button type="button" class="btn btn-sm btn-primary"
+                                                    @onclick="InviteByEmailAsync" disabled="@_busy">
+                                                Share
+                                            </button>
+                                        </div>
+                                    </li>
+                                </ul>
+                            }
+                            else if (_searchAttempted && EmailAlreadyShared)
+                            {
+                                <p class="text-secondary mb-0">@EmailTerm already has access to this trip.</p>
+                            }
+                            else if (_searchAttempted)
+                            {
+                                <p class="text-secondary mb-0">No matching people found. Enter a full email address to invite someone outside the directory.</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header fw-semibold">People with access</div>
+                    <div class="card-body">
+                        @if (_loadingMembers)
+                        {
+                            <p class="text-secondary mb-0">Loading people...</p>
+                        }
+                        else
+                        {
+                            <ul class="list-group">
+                                @foreach (var member in _members)
+                                {
+                                    <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <div class="fw-semibold">@(string.IsNullOrWhiteSpace(member.DisplayName) ? member.Email ?? member.UserId : member.DisplayName)</div>
+                                            @if (!string.IsNullOrWhiteSpace(member.Email))
+                                            {
+                                                <div class="small text-secondary">@member.Email</div>
+                                            }
+                                        </div>
+                                        @if (member.AccessLevel == TripAccessLevel.Owner)
+                                        {
+                                            <span class="badge text-bg-dark">Owner</span>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex align-items-center gap-2">
+                                                <label class="visually-hidden" for="@($"level-{member.UserId}")">Access level</label>
+                                                <select id="@($"level-{member.UserId}")" class="form-select form-select-sm w-auto"
+                                                        value="@member.AccessLevel"
+                                                        @onchange="e => OnChangeLevelAsync(member, e)"
+                                                        disabled="@_busy">
+                                                    <option value="@TripAccessLevel.Viewer">Viewer</option>
+                                                    <option value="@TripAccessLevel.Collaborator">Collaborator</option>
+                                                </select>
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        @onclick="() => RemoveAsync(member)" disabled="@_busy">
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                            @if (_members.Count <= 1)
+                            {
+                                <p class="text-secondary small mb-0 mt-2">This trip isn't shared with anyone else yet.</p>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="CloseAsync" disabled="@_busy">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop show"></div>
+
+@code {
+    [Parameter] public Guid TripId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly List<TripShareMember> _members = new();
+    private readonly List<DirectoryUserResult> _results = new();
+    private readonly Dictionary<string, TripAccessLevel> _newLevels = new(StringComparer.Ordinal);
+    private bool _loadingMembers = true;
+    private bool _searching;
+    private bool _searchAttempted;
+    private bool _busy;
+    private string? _error;
+    private string _searchTerm = string.Empty;
+    private readonly CancellationTokenSource _disposeCts = new();
+    private int _searchSeq;
+
+    private TripAccessLevel LevelFor(string userId)
+        => _newLevels.TryGetValue(userId, out var level) ? level : TripAccessLevel.Viewer;
+
+    private void SetLevelFor(string userId, ChangeEventArgs e)
+    {
+        if (Enum.TryParse<TripAccessLevel>(e.Value?.ToString(), out var level))
+        {
+            _newLevels[userId] = level;
+        }
+    }
+
+    private string EmailTerm => _searchTerm.Trim();
+
+    private bool CanInviteByEmail => IsValidEmail(EmailTerm) && !AlreadyHasAccess(EmailTerm);
+
+    private bool EmailAlreadyShared => IsValidEmail(EmailTerm) && AlreadyHasAccess(EmailTerm);
+
+    private bool AlreadyHasAccess(string email)
+        => _members.Any(m =>
+            string.Equals(m.Email, email, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(m.UserId, email, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsValidEmail(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Contains(' ', StringComparison.Ordinal))
+        {
+            return false;
+        }
+        var at = value.IndexOf('@', StringComparison.Ordinal);
+        if (at <= 0 || at == value.Length - 1)
+        {
+            return false;
+        }
+        var dot = value.IndexOf('.', at);
+        return dot > at + 1 && dot < value.Length - 1;
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadMembersAsync();
+
+    private async Task LoadMembersAsync()
+    {
+        _loadingMembers = true;
+        try
+        {
+            var members = await TripApi.GetSharesAsync(TripId);
+            _members.Clear();
+            _members.AddRange(members);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loadingMembers = false;
+        }
+    }
+
+    private async Task OnSearchKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await RunSearchAsync();
+        }
+    }
+
+    // Search runs only when the user presses Enter or the Search button, so typing never fires
+    // (and never cancels) in-flight HTTP requests. A sequence number ignores stale responses.
+    private async Task RunSearchAsync()
+    {
+        var term = _searchTerm.Trim();
+        if (term.Length < 2)
+        {
+            _results.Clear();
+            _searchAttempted = false;
+            _searching = false;
+            return;
+        }
+
+        var seq = ++_searchSeq;
+        _searching = true;
+        _error = null;
+        try
+        {
+            var results = await TripApi.SearchDirectoryUsersAsync(TripId, term, _disposeCts.Token);
+            if (seq != _searchSeq)
+            {
+                return;
+            }
+            _results.Clear();
+            _results.AddRange(results);
+            _searchAttempted = true;
+        }
+        catch (OperationCanceledException)
+        {
+            // The modal was closed while searching; ignore.
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            if (seq == _searchSeq)
+            {
+                _searching = false;
+            }
+        }
+    }
+
+    private async Task InviteByEmailAsync()
+    {
+        // Guard against inviting an email that already has access (e.g. a prior email invite).
+        if (AlreadyHasAccess(EmailTerm))
+        {
+            _error = "That email already has access to this trip.";
+            return;
+        }
+        await AddAsync(new DirectoryUserResult(EmailTerm, null, EmailTerm, null));
+    }
+
+    private async Task AddAsync(DirectoryUserResult user)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await TripApi.UpsertShareAsync(TripId, new UpsertTripShareRequest(user.UserId, user.DisplayName, user.Email ?? user.UserPrincipalName, LevelFor(user.UserId)));
+            _results.RemoveAll(r => r.UserId == user.UserId);
+            _newLevels.Remove(user.UserId);
+            _searchTerm = string.Empty;
+            _searchAttempted = false;
+            await LoadMembersAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task OnChangeLevelAsync(TripShareMember member, ChangeEventArgs e)
+    {
+        if (!Enum.TryParse<TripAccessLevel>(e.Value?.ToString(), out var level) || level == member.AccessLevel)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        try
+        {
+            await TripApi.UpdateShareAccessAsync(TripId, member.UserId, new UpdateTripShareAccessRequest(level));
+            await LoadMembersAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RemoveAsync(TripShareMember member)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await TripApi.RemoveShareAsync(TripId, member.UserId);
+            await LoadMembersAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CloseAsync() => await OnClose.InvokeAsync();
+
+    public void Dispose()
+    {
+        _disposeCts.Cancel();
+        _disposeCts.Dispose();
+    }
+}

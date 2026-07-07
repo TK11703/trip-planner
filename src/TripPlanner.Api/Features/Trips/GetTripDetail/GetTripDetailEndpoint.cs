@@ -9,6 +9,7 @@ using TripPlanner.Contracts.Trips;
 using TripPlanner.Database.Audit;
 using TripPlanner.Database.Trips;
 using TripPlanner.Database.TripItems;
+using TripPlanner.Database.TripSharing;
 
 namespace TripPlanner.Api.Features.Trips.GetTripDetail;
 
@@ -23,24 +24,44 @@ public static class GetTripDetailEndpoint
     private static async Task<Results<Ok<TripDetail>, NotFound<ApiError>>> HandleAsync(
         Guid tripId,
         ICurrentUser currentUser,
+        ITripAccessResolver accessResolver,
         ITripReadRepository tripReads,
         ITripItemRepository itemReads,
+        ITripSharingRepository sharing,
         IAuditRepository audit,
         IClock clock,
         CancellationToken cancellationToken)
     {
-        var ownerId = currentUser.UserId;
+        var callerId = currentUser.UserId;
+        var access = await accessResolver.ResolveAsync(callerId, tripId, cancellationToken);
+        if (access is null)
+        {
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip", tripId.ToString(), AuditResults.Denied, clock.UtcNow, cancellationToken);
+            return TypedResults.NotFound(ApiError.NotFoundOrDenied());
+        }
+
+        // Reads use the trip owner's id so existing owner-scoped queries return the trip's data for
+        // owners, collaborators, and viewers alike.
+        var ownerId = access.OwnerUserId;
         var detail = await tripReads.GetDetailAsync(ownerId, tripId, cancellationToken);
         if (detail is null)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "trip", tripId.ToString(), AuditResults.Denied, clock.UtcNow, cancellationToken);
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip", tripId.ToString(), AuditResults.Denied, clock.UtcNow, cancellationToken);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
 
         var legs = await itemReads.GetLegsAsync(ownerId, tripId, cancellationToken);
         var items = await itemReads.GetTrackedItemsAsync(ownerId, tripId, cancellationToken);
-        var withChildren = detail with { Legs = legs, TrackedItems = items };
-        await audit.RecordAsync(ownerId, AuditOperations.TripRead, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
+        var sharedPeople = await sharing.GetSharesAsync(tripId, cancellationToken);
+        var withChildren = detail with
+        {
+            Legs = legs,
+            TrackedItems = items,
+            AccessLevel = access.AccessLevel,
+            IsOwner = access.IsOwner(),
+            SharedPeople = sharedPeople
+        };
+        await audit.RecordAsync(callerId, AuditOperations.TripRead, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
         return TypedResults.Ok(withChildren);
     }
 }

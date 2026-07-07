@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Api.Tests.Infrastructure;
+using TripPlanner.Api.Security;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Contracts.TripItems;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Database.Audit;
 using TripPlanner.Database.TripItems;
 using TripPlanner.Database.Trips;
+using TripPlanner.Database.TripSharing;
 using Xunit;
 
 namespace TripPlanner.Api.Tests.Trips;
@@ -27,11 +29,13 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
             services.RemoveAll<ITripCommandRepository>();
             services.RemoveAll<ITripItemRepository>();
             services.RemoveAll<IAuditRepository>();
+            services.RemoveAll<ITripAccessResolver>();
             services.AddSingleton<FakeTripStore>();
             services.AddSingleton<ITripReadRepository>(sp => sp.GetRequiredService<FakeTripStore>());
             services.AddSingleton<ITripCommandRepository>(sp => sp.GetRequiredService<FakeTripStore>());
             services.AddSingleton<ITripItemRepository, EmptyTripItemRepository>();
             services.AddSingleton<IAuditRepository, InMemoryAuditRepository>();
+            services.AddSingleton<ITripAccessResolver>(sp => new FakeOwnerAccessResolver(sp.GetRequiredService<FakeTripStore>().SeedTripId));
         }));
     }
 
@@ -111,7 +115,7 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
         public string? LastReadOwnerUserId { get; private set; }
         public string? LastWriteOwnerUserId { get; private set; }
 
-        public Task<TripListResponse> GetPageAsync(string ownerUserId, int page, int pageSize, CancellationToken cancellationToken)
+        public Task<TripListResponse> GetPageAsync(string ownerUserId, string? callerEmail, int page, int pageSize, CancellationToken cancellationToken)
         {
             LastReadOwnerUserId = ownerUserId;
             IReadOnlyList<TripSummary> result = new[]
@@ -171,5 +175,14 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
     {
         public Task RecordAsync(string? userId, string operation, string resourceType, string? resourceId, string result, DateTimeOffset occurredAtUtc, CancellationToken cancellationToken)
             => Task.CompletedTask;
+    }
+
+    private sealed class FakeOwnerAccessResolver : ITripAccessResolver
+    {
+        private readonly Guid _seedTripId;
+        public FakeOwnerAccessResolver(Guid seedTripId) => _seedTripId = seedTripId;
+
+        public Task<TripAccess?> ResolveAsync(string callerUserId, Guid tripId, CancellationToken ct)
+            => Task.FromResult(tripId == _seedTripId ? new TripAccess(callerUserId, TripAccessLevel.Owner) : null);
     }
 }

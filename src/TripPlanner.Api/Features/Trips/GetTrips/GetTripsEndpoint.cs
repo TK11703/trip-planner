@@ -30,7 +30,7 @@ public static class GetTripsEndpoint
         var ownerId = currentUser.UserId;
         var effectivePage = QueryLimits.CoerceTripPage(page);
         var effectivePageSize = QueryLimits.CoerceTripPageSize(pageSize);
-        var trips = await repository.GetPageAsync(ownerId, effectivePage, effectivePageSize, cancellationToken);
+        var trips = await repository.GetPageAsync(ownerId, currentUser.Email, effectivePage, effectivePageSize, cancellationToken);
         await audit.RecordAsync(ownerId, AuditOperations.TripRead, "trip-list", null, AuditResults.Success, clock.UtcNow, cancellationToken);
         return TypedResults.Ok(trips);
     }

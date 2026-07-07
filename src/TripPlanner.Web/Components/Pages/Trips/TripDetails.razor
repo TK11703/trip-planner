@@ -19,10 +19,18 @@ else
         <div>
             <h1 class="mb-1">@_trip.Name</h1>
             <p class="text-secondary mb-0">@_trip.StartDate.ToLongDateString() - @_trip.EndDate.ToLongDateString()</p>
+            @if (!_trip.IsOwner)
+            {
+                <span class="badge @AccessBadgeClass mt-2">Shared - @AccessLevelLabel</span>
+            }
         </div>
         <div class="d-flex gap-2">
             <a class="btn btn-outline-secondary" href="/trips">All trips</a>
-            <button class="btn btn-primary" @onclick="OpenTripEditModal">Edit trip</button>
+            @if (_trip.IsOwner)
+            {
+                <button class="btn btn-outline-primary" @onclick="OpenShareModal">Share</button>
+                <button class="btn btn-primary" @onclick="OpenTripEditModal">Edit trip</button>
+            }
         </div>
     </header>
 
@@ -35,8 +43,11 @@ else
                         <div class="small text-secondary">Trip legs are listed on the left. Scroll the grid to see each day, hour, and the events on each leg. Select a leg or event to edit it.</div>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-primary" @onclick="OpenCreateLegModal">Add leg</button>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="OpenCreateItemModal">Add event</button>
+                        @if (CanEditContent)
+                        {
+                            <button class="btn btn-sm btn-outline-primary" @onclick="OpenCreateLegModal">Add leg</button>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="OpenCreateItemModal">Add event</button>
+                        }
                     </div>
                 </div>
                 <div class="card-body">
@@ -71,7 +82,61 @@ else
                 </ul>
             </div>
         </div>
+
+        <div class="col-md-6 col-xl-4">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>People with access</span>
+                    @if (_trip.IsOwner)
+                    {
+                        <button class="btn btn-sm btn-outline-primary" @onclick="OpenShareModal">Manage</button>
+                    }
+                </div>
+                @{
+                    var sharedPeople = _trip.SharedPeople ?? Array.Empty<TripShareMember>();
+                    var hasMembers = sharedPeople.Any(p => p.AccessLevel != TripAccessLevel.Owner);
+                }
+                @if (sharedPeople.Count == 0)
+                {
+                    <div class="card-body">
+                        @if (_trip.IsOwner)
+                        {
+                            <p class="text-secondary mb-0">This trip isn't shared yet. Select Share to invite viewers or collaborators.</p>
+                        }
+                        else
+                        {
+                            <p class="text-secondary mb-0">No one else has access to this trip yet.</p>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush small">
+                        @foreach (var person in sharedPeople)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                                <span class="text-truncate">@(string.IsNullOrWhiteSpace(person.DisplayName) ? person.Email ?? person.UserId : person.DisplayName)</span>
+                                <span class="badge @AccessBadge(person.AccessLevel)">
+                                    @AccessText(person.AccessLevel)
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                    @if (_trip.IsOwner && !hasMembers)
+                    {
+                        <div class="card-body py-2">
+                            <p class="text-secondary small mb-0">Only you have access. Select Manage to invite viewers or collaborators.</p>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
     </div>
+
+    @if (_showShareModal)
+    {
+        <ShareTripModal TripId="@TripId" OnClose="CloseShareModal" OnChanged="ReloadAsync" />
+    }
 
     @if (_activeModal is not ActiveModal.None)
     {
@@ -119,11 +184,30 @@ else
     private TripDetail? _trip;
     private TripTimeline? _timeline;
     private ActiveModal _activeModal = ActiveModal.None;
+    private bool _showShareModal;
     private TripPlanner.Web.Components.Trips.TripForm.TripFormModel _tripEditModel = new();
     private TripLegDto? _editingLeg;
     private TrackedItemDto? _editingItem;
     private Guid? _initialItemLegId;
     private DateTime? _initialItemStart;
+
+    private bool CanEditContent => _trip is not null && (_trip.IsOwner || _trip.AccessLevel == TripAccessLevel.Collaborator);
+    private string AccessLevelLabel => _trip?.AccessLevel == TripAccessLevel.Collaborator ? "Collaborator" : "Viewer";
+    private string AccessBadgeClass => _trip?.AccessLevel == TripAccessLevel.Collaborator ? "text-bg-success" : "text-bg-secondary";
+
+    private static string AccessBadge(TripAccessLevel level) => level switch
+    {
+        TripAccessLevel.Owner => "text-bg-dark",
+        TripAccessLevel.Collaborator => "text-bg-success",
+        _ => "text-bg-secondary"
+    };
+
+    private static string AccessText(TripAccessLevel level) => level switch
+    {
+        TripAccessLevel.Owner => "Owner",
+        TripAccessLevel.Collaborator => "Collaborator",
+        _ => "Viewer"
+    };
 
     private enum ActiveModal
     {
@@ -194,6 +278,10 @@ else
         _activeModal = ActiveModal.EditTrip;
     }
 
+    private void OpenShareModal() => _showShareModal = true;
+
+    private void CloseShareModal() => _showShareModal = false;
+
     private void OpenCreateLegModal()
     {
         _editingLeg = null;
@@ -247,6 +335,7 @@ else
 
     private void OnTimelineLegSelected(Guid tripLegId)
     {
+        if (!CanEditContent) return;
         var leg = _trip?.Legs.FirstOrDefault(l => l.TripLegId == tripLegId);
         if (leg is not null)
         {
@@ -256,6 +345,7 @@ else
 
     private void OnTimelineItemSelected(Guid trackedItemId)
     {
+        if (!CanEditContent) return;
         var item = _trip?.TrackedItems.FirstOrDefault(i => i.TrackedItemId == trackedItemId);
         if (item is not null)
         {
@@ -265,6 +355,7 @@ else
 
     private void OnTimelineLegSlotSelected(TripTimeline.TimelineSlotSelection selection)
     {
+        if (!CanEditContent) return;
         _editingItem = null;
         _initialItemLegId = selection.TripLegId;
         _initialItemStart = selection.StartLocal;

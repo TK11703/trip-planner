@@ -8,7 +8,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
     <div>
         <h1 class="mb-1">Trips</h1>
-        <p class="text-secondary mb-0">All trips you have created.</p>
+        <p class="text-secondary mb-0">Trips you own and trips shared with you.</p>
     </div>
     <a class="btn btn-primary" href="/trips/new">New trip</a>
 </div>
@@ -34,8 +34,19 @@ else
                 <a class="card h-100 text-decoration-none text-reset shadow-sm" href="@($"/trips/{trip.TripId}")">
                     <div class="card-body">
                         <h2 class="h5 mb-2">@trip.Name</h2>
-                        <div class="small mb-2">
+                        <div class="small mb-2 d-flex flex-wrap gap-1">
                             <span class="badge bg-secondary">@trip.StartDate.ToShortDateString() - @trip.EndDate.ToShortDateString()</span>
+                            @if (trip.IsOwner)
+                            {
+                                <span class="badge text-bg-primary">Owned</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-info">Shared</span>
+                                <span class="badge @(trip.AccessLevel == TripAccessLevel.Collaborator ? "text-bg-success" : "text-bg-secondary")">
+                                    @(trip.AccessLevel == TripAccessLevel.Collaborator ? "Collaborator" : "Viewer")
+                                </span>
+                            }
                         </div>
                         <div class="small text-secondary">@trip.ItemCount itinerary items</div>
                     </div>

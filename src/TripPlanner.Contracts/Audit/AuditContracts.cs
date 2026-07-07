@@ -13,6 +13,10 @@ public static class AuditOperations
     public const string TrackedItemUpdate = "tracked-item.update";
     public const string TrackedItemDelete = "tracked-item.delete";
     public const string TimelineRead = "timeline.read";
+    public const string TripShareCreate = "trip-share.create";
+    public const string TripShareUpdate = "trip-share.update";
+    public const string TripShareDelete = "trip-share.delete";
+    public const string DirectorySearch = "directory.search";
     public const string AccessDenied = "access.denied";
 }
 

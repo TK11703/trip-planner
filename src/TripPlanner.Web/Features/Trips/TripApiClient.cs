@@ -24,6 +24,12 @@ public interface ITripApiClient
     Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default);
 
     Task<TripTimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default);
+
+    Task<IReadOnlyList<TripShareMember>> GetSharesAsync(Guid tripId, CancellationToken ct = default);
+    Task<IReadOnlyList<DirectoryUserResult>> SearchDirectoryUsersAsync(Guid tripId, string query, CancellationToken ct = default);
+    Task<TripShareMember> UpsertShareAsync(Guid tripId, UpsertTripShareRequest request, CancellationToken ct = default);
+    Task<TripShareMember> UpdateShareAccessAsync(Guid tripId, string userId, UpdateTripShareAccessRequest request, CancellationToken ct = default);
+    Task RemoveShareAsync(Guid tripId, string userId, CancellationToken ct = default);
 }
 
 public sealed class TripApiClient : ITripApiClient
@@ -96,6 +102,37 @@ public sealed class TripApiClient : ITripApiClient
         if (!resp.IsSuccessStatusCode) return null;
         return await resp.Content.ReadFromJsonAsync<TripTimelineResponse>(cancellationToken: ct);
     }
+
+    public async Task<IReadOnlyList<TripShareMember>> GetSharesAsync(Guid tripId, CancellationToken ct = default)
+    {
+        var result = await _http.GetFromJsonAsync<TripShareMember[]>($"/api/trips/{tripId}/shares", ct);
+        return result ?? Array.Empty<TripShareMember>();
+    }
+
+    public async Task<IReadOnlyList<DirectoryUserResult>> SearchDirectoryUsersAsync(Guid tripId, string query, CancellationToken ct = default)
+    {
+        var resp = await _http.GetAsync($"/api/trips/{tripId}/shares/directory-users?query={Uri.EscapeDataString(query)}", ct);
+        if (!resp.IsSuccessStatusCode) return Array.Empty<DirectoryUserResult>();
+        var result = await resp.Content.ReadFromJsonAsync<DirectoryUserResult[]>(cancellationToken: ct);
+        return result ?? Array.Empty<DirectoryUserResult>();
+    }
+
+    public async Task<TripShareMember> UpsertShareAsync(Guid tripId, UpsertTripShareRequest request, CancellationToken ct = default)
+    {
+        var resp = await _http.PostAsJsonAsync($"/api/trips/{tripId}/shares", request, ct);
+        await EnsureSuccessAsync(resp, ct);
+        return (await resp.Content.ReadFromJsonAsync<TripShareMember>(cancellationToken: ct))!;
+    }
+
+    public async Task<TripShareMember> UpdateShareAccessAsync(Guid tripId, string userId, UpdateTripShareAccessRequest request, CancellationToken ct = default)
+    {
+        var resp = await _http.PutAsJsonAsync($"/api/trips/{tripId}/shares/{Uri.EscapeDataString(userId)}", request, ct);
+        await EnsureSuccessAsync(resp, ct);
+        return (await resp.Content.ReadFromJsonAsync<TripShareMember>(cancellationToken: ct))!;
+    }
+
+    public async Task RemoveShareAsync(Guid tripId, string userId, CancellationToken ct = default)
+        => await EnsureSuccessAsync(await _http.DeleteAsync($"/api/trips/{tripId}/shares/{Uri.EscapeDataString(userId)}", ct), ct);
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
     {

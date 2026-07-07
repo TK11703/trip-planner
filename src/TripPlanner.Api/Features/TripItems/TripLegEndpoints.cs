@@ -9,6 +9,7 @@ using TripPlanner.Contracts.TripItems;
 using TripPlanner.Database.Audit;
 using TripPlanner.Database.TripItems;
 using TripPlanner.Database.Trips;
+using TripPlanner.Database.TripSharing;
 
 namespace TripPlanner.Api.Features.TripItems;
 
@@ -26,16 +27,24 @@ public static class TripLegEndpoints
     private static async Task<Results<Ok<TripLegDefaultsResponse>, NotFound<ApiError>>> GetDefaultsAsync(
         Guid tripId,
         ICurrentUser currentUser,
+        ITripAccessResolver accessResolver,
         ITripItemRepository items,
         IAuditRepository audit,
         IClock clock,
         CancellationToken ct)
     {
-        var ownerId = currentUser.UserId;
-        var defaults = await items.GetLegDefaultsAsync(ownerId, tripId, ct);
+        var callerId = currentUser.UserId;
+        var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
+        if (access is null)
+        {
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            return TypedResults.NotFound(ApiError.NotFoundOrDenied());
+        }
+
+        var defaults = await items.GetLegDefaultsAsync(access.OwnerUserId, tripId, ct);
         if (defaults is null)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "trip-leg", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
 
@@ -44,72 +53,93 @@ public static class TripLegEndpoints
 
     private static async Task<Results<Created, BadRequest<ApiError>, NotFound<ApiError>>> CreateAsync(
         Guid tripId, CreateTripLegRequest request,
-        ICurrentUser currentUser, TripLegValidator validator,
+        ICurrentUser currentUser, ITripAccessResolver accessResolver, TripLegValidator validator,
         ITripReadRepository tripReads, ITripItemRepository items,
         IAuditRepository audit, IClock clock, CancellationToken ct)
     {
-        var ownerId = currentUser.UserId;
+        var callerId = currentUser.UserId;
+        var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
+        if (access is null || !access.CanEditContent())
+        {
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            return TypedResults.NotFound(ApiError.NotFoundOrDenied());
+        }
+        var ownerId = access.OwnerUserId;
         var trip = await tripReads.GetDetailAsync(ownerId, tripId, ct);
         if (trip is null)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "trip-leg", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         var validation = validator.Validate(request, trip);
         if (!validation.IsValid)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.TripLegCreate, "trip-leg", tripId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.TripLegCreate, "trip-leg", tripId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
             return TypedResults.BadRequest(validation.Error!);
         }
         var id = await items.CreateLegAsync(ownerId, tripId, request, clock.UtcNow, ct);
         if (id is null)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "trip-leg", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
-        await audit.RecordAsync(ownerId, AuditOperations.TripLegCreate, "trip-leg", id.Value.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await audit.RecordAsync(callerId, AuditOperations.TripLegCreate, "trip-leg", id.Value.ToString(), AuditResults.Success, clock.UtcNow, ct);
         return TypedResults.Created($"/api/trips/{tripId}/legs/{id}");
     }
 
     private static async Task<Results<NoContent, BadRequest<ApiError>, NotFound<ApiError>>> UpdateAsync(
         Guid tripId, Guid tripLegId, UpdateTripLegRequest request,
-        ICurrentUser currentUser, TripLegValidator validator,
+        ICurrentUser currentUser, ITripAccessResolver accessResolver, TripLegValidator validator,
         ITripReadRepository tripReads, ITripItemRepository items,
         IAuditRepository audit, IClock clock, CancellationToken ct)
     {
-        var ownerId = currentUser.UserId;
+        var callerId = currentUser.UserId;
+        var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
+        if (access is null || !access.CanEditContent())
+        {
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripLegId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            return TypedResults.NotFound(ApiError.NotFoundOrDenied());
+        }
+        var ownerId = access.OwnerUserId;
         var trip = await tripReads.GetDetailAsync(ownerId, tripId, ct);
         if (trip is null)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "trip-leg", tripLegId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripLegId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         var validation = validator.Validate(request, trip);
         if (!validation.IsValid)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
             return TypedResults.BadRequest(validation.Error!);
         }
         var affected = await items.UpdateLegAsync(ownerId, tripId, tripLegId, request, ct);
         if (affected == 0)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "trip-leg", tripLegId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripLegId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
-        await audit.RecordAsync(ownerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await audit.RecordAsync(callerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
         return TypedResults.NoContent();
     }
 
     private static async Task<Results<NoContent, BadRequest<ApiError>, NotFound<ApiError>>> DeleteAsync(
         Guid tripId, Guid tripLegId,
-        ICurrentUser currentUser, ITripItemRepository items,
+        ICurrentUser currentUser, ITripAccessResolver accessResolver, ITripItemRepository items,
         IAuditRepository audit, IClock clock, CancellationToken ct)
     {
-        var ownerId = currentUser.UserId;
+        var callerId = currentUser.UserId;
+        var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
+        if (access is null || !access.CanEditContent())
+        {
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripLegId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            return TypedResults.NotFound(ApiError.NotFoundOrDenied());
+        }
+        var ownerId = access.OwnerUserId;
         var relatedItems = await items.CountItemsForLegAsync(ownerId, tripId, tripLegId, ct);
         if (relatedItems > 0)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.TripLegDelete, "trip-leg", tripLegId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.TripLegDelete, "trip-leg", tripLegId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
             return TypedResults.BadRequest(ApiError.ValidationFailed(
                 "This trip leg still has related events. Reassign or remove those events before deleting the leg.",
                 "tripLegId"));
@@ -117,10 +147,10 @@ public static class TripLegEndpoints
         var affected = await items.DeleteLegAsync(ownerId, tripId, tripLegId, ct);
         if (affected == 0)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "trip-leg", tripLegId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripLegId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
-        await audit.RecordAsync(ownerId, AuditOperations.TripLegDelete, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await audit.RecordAsync(callerId, AuditOperations.TripLegDelete, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
         return TypedResults.NoContent();
     }
 }

@@ -10,6 +10,7 @@ using TripPlanner.Contracts.Trips;
 using TripPlanner.Database.Audit;
 using TripPlanner.Database.Timeline;
 using TripPlanner.Database.Trips;
+using TripPlanner.Database.TripSharing;
 
 namespace TripPlanner.Api.Features.Timeline;
 
@@ -26,22 +27,30 @@ public static class GetTripTimelineEndpoint
     private static async Task<Results<Ok<TripTimelineResponse>, NotFound<ApiError>>> HandleAsync(
         Guid tripId,
         ICurrentUser currentUser,
+        ITripAccessResolver accessResolver,
         ITripReadRepository tripReads,
         ITimelineRepository timeline,
         IAuditRepository audit,
         IClock clock,
         CancellationToken ct)
     {
-        var ownerId = currentUser.UserId;
+        var callerId = currentUser.UserId;
+        var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
+        if (access is null)
+        {
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "timeline", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            return TypedResults.NotFound(ApiError.NotFoundOrDenied());
+        }
+        var ownerId = access.OwnerUserId;
         var trip = await tripReads.GetDetailAsync(ownerId, tripId, ct);
         if (trip is null)
         {
-            await audit.RecordAsync(ownerId, AuditOperations.AccessDenied, "timeline", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
+            await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "timeline", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         var projection = await timeline.GetTimelineAsync(ownerId, tripId, ct);
         var (startDate, endDate) = ComputeRange(trip, projection);
-        await audit.RecordAsync(ownerId, AuditOperations.TimelineRead, "timeline", tripId.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await audit.RecordAsync(callerId, AuditOperations.TimelineRead, "timeline", tripId.ToString(), AuditResults.Success, clock.UtcNow, ct);
         return TypedResults.Ok(new TripTimelineResponse(tripId, startDate, endDate, SlotMinutes, projection.Legs, projection.UnassignedItems));
     }
 
