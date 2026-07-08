@@ -47,7 +47,7 @@ public class TripSharingComponentTests : TestContext
 
         cut.WaitForAssertion(() =>
         {
-            Assert.Contains("Currently assigned shared people", cut.Markup);
+            Assert.Contains("People with access", cut.Markup);
             Assert.Contains("Alex Doe", cut.Markup);
         });
     }

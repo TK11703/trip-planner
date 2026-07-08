@@ -32,7 +32,7 @@
 
 **Content**:
 
-- Section: `Currently assigned shared people`
+- Section: `People with access`
   - Lists each member's display name/email.
   - Shows current access level.
   - Allows changing access level between `Viewer` and `Collaborator`.

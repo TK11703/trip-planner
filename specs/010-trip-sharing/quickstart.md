@@ -34,7 +34,7 @@
 
 **Expected results**:
 
-- The modal lists both users under `Currently assigned shared people`.
+- The modal lists both users under `People with access`.
 - Each user shows the assigned permission level.
 - The bottom shared people card on the trip detail page shows both users and their levels.
 - The owner still sees `Share`, `Edit trip`, and itinerary edit controls.
