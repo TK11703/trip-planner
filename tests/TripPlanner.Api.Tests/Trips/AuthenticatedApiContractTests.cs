@@ -155,6 +155,12 @@ public class AuthenticatedApiContractTests : IClassFixture<TestApiFactory>
             LastWriteOwnerUserId = ownerUserId;
             return Task.FromResult(tripId == SeedTripId ? 1 : 0);
         }
+
+        public Task<int> DeleteAsync(string ownerUserId, Guid tripId, CancellationToken cancellationToken)
+        {
+            LastWriteOwnerUserId = ownerUserId;
+            return Task.FromResult(tripId == SeedTripId ? 1 : 0);
+        }
     }
 
     private sealed class EmptyTripItemRepository : ITripItemRepository
