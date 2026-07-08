@@ -6,7 +6,10 @@ builder.AddTripPlannerApi();
 var app = builder.Build();
 app.UseTripPlannerApi();
 
-if (app.Environment.IsDevelopment())
+// Apply schema scripts locally (Development) and in hosted environments when
+// RunDatabaseMigrations is enabled (the production Postgres is internal-only, so
+// migrations run from the API on startup rather than from the CI runner).
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("RunDatabaseMigrations"))
 {
     await app.InitializeDatabaseAsync();
 }

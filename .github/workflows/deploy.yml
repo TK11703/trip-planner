@@ -1,0 +1,195 @@
+name: deploy
+
+# CI/CD for Trip Planner.
+# - Pull requests: build + test only (required status check, no deploy).
+# - Push to main: build + test, then (after manual approval on the `production` environment)
+#   provision Bicep infra, build/push images, and update the web + api container apps.
+# - Manual dispatch: optional rollback to a prior image tag (commit SHA).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: 'Commit SHA of a previously built image to roll back to (leave blank to deploy current).'
+        required: false
+        default: ''
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  # Cancel superseded PR runs; never cancel an in-flight production deploy.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore TripPlanner.slnx
+
+      - name: Build
+        run: dotnet build TripPlanner.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test TripPlanner.slnx -c Release --no-build --verbosity normal
+
+  deploy:
+    name: Provision & Deploy
+    # Deploy only on push to main or manual dispatch — never on pull_request (fork-safe).
+    if: github.event_name != 'pull_request'
+    needs: build-test
+    runs-on: ubuntu-latest
+    # Manual approval gate: the `production` environment's "Required reviewers" protection
+    # rule pauses this job (before any infra/deploy step runs) until a reviewer approves.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate required configuration
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+        run: |
+          missing=()
+          for v in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_ENV_NAME AZURE_LOCATION; do
+            if [ -z "${!v}" ]; then missing+=("$v"); fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing required repository variables: ${missing[*]}"
+            exit 1
+          fi
+          echo "All required variables are present."
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.rollback_sha }}" ]; then
+            echo "value=${{ github.event.inputs.rollback_sha }}" >> "$GITHUB_OUTPUT"
+            echo "rollback=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "rollback=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure resource group
+        run: az group create -n "rg-${{ vars.AZURE_ENV_NAME }}" -l "${{ vars.AZURE_LOCATION }}" --only-show-errors
+
+      - name: Provision registry (pre-push)
+        id: registry
+        run: |
+          outputs=$(az deployment group create \
+            -g "rg-${{ vars.AZURE_ENV_NAME }}" \
+            -n "registry-${{ github.run_id }}" \
+            -f infra/registry.bicep \
+            -p environmentName="${{ vars.AZURE_ENV_NAME }}" location="${{ vars.AZURE_LOCATION }}" \
+            --query properties.outputs -o json)
+          echo "login_server=$(echo "$outputs" | jq -r '.loginServer.value')" >> "$GITHUB_OUTPUT"
+          echo "acr_name=$(echo "$outputs" | jq -r '.name.value')" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push images
+        if: steps.tag.outputs.rollback == 'false'
+        env:
+          ACR: ${{ steps.registry.outputs.login_server }}
+          TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          az acr login -n "${{ steps.registry.outputs.acr_name }}"
+          dotnet publish src/TripPlanner.Api/TripPlanner.Api.csproj -c Release \
+            -t:PublishContainer \
+            -p:ContainerRegistry="$ACR" \
+            -p:ContainerImageTags="\"$TAG;latest\""
+          dotnet publish src/TripPlanner.Web/TripPlanner.Web.csproj -c Release \
+            -t:PublishContainer \
+            -p:ContainerRegistry="$ACR" \
+            -p:ContainerImageTags="\"$TAG;latest\""
+
+      - name: Provision infrastructure & deploy apps
+        id: deploy
+        env:
+          ACR: ${{ steps.registry.outputs.login_server }}
+          TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          outputs=$(az deployment group create \
+            -g "rg-${{ vars.AZURE_ENV_NAME }}" \
+            -n "main-${{ github.run_id }}" \
+            -f infra/main.bicep \
+            -p environmentName="${{ vars.AZURE_ENV_NAME }}" \
+               location="${{ vars.AZURE_LOCATION }}" \
+               postgresPassword="${{ secrets.POSTGRES_PASSWORD }}" \
+               entraTenantId="${{ secrets.AZURE_TENANT_ID }}" \
+               entraWebClientId="${{ secrets.AZURE_ENTRA_WEB_CLIENT_ID }}" \
+               entraApiClientId="${{ secrets.AZURE_ENTRA_API_CLIENT_ID }}" \
+               webImage="$ACR/web:$TAG" \
+               apiImage="$ACR/api:$TAG" \
+            --query properties.outputs -o json)
+          web_url=$(echo "$outputs" | jq -r '.webUrl.value')
+          echo "web_url=$web_url" >> "$GITHUB_OUTPUT"
+
+      - name: Health check
+        run: |
+          url="${{ steps.deploy.outputs.web_url }}"
+          echo "Checking $url ..."
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$url" || echo "000")
+            if [ "$code" = "200" ] || [ "$code" = "302" ]; then
+              echo "Web app healthy (HTTP $code)."
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $code — retrying in 15s"
+            sleep 15
+          done
+          echo "::error::Web app did not become healthy at $url"
+          exit 1
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Deployment"
+            echo ""
+            echo "- Commit / image tag: \`${{ steps.tag.outputs.value }}\`"
+            echo "- Rollback run: \`${{ steps.tag.outputs.rollback }}\`"
+            echo "- Web URL: ${{ steps.deploy.outputs.web_url }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notify-failure:
+    name: Notify on failure
+    needs: [build-test, deploy]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report failure
+        run: |
+          echo "::error::Pipeline failed for ${{ github.sha }} (event: ${{ github.event_name }}). Review the failed job above."

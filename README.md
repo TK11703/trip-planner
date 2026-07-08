@@ -76,8 +76,9 @@ The Aspire dashboard prints the URLs for the Web app and API.
 ## Database
 
 Schema scripts in `src/TripPlanner.Database/Scripts/Schema/` are applied on startup
-in Development by `DatabaseInitializer`. In Production, run them manually as part of
-your deployment pipeline. All data access uses `owner_user_id` (Entra `oid`) for
+in Development by `DatabaseInitializer`. In hosted environments they are applied on
+API startup when `RunDatabaseMigrations=true` (set on the deployed API container app).
+All data access uses `owner_user_id` (Entra `oid`) for
 isolation — the owner ID is taken from the authenticated principal and never from
 the request payload.
 
@@ -93,6 +94,37 @@ dotnet test TripPlanner.slnx
   up an ephemeral PostgreSQL 16 instance and apply all schema scripts.
 - Playwright E2E tests are skipped by default; they require the AppHost to be
   running and Playwright browsers installed via `playwright install`.
+
+## Deployment (CI/CD)
+
+Production deployment is automated by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
+
+- **Pull requests** run build + test only (required status check — no deploy).
+- **Push to `main`** builds + tests, then provisions Azure infrastructure with Bicep
+  (`infra/`), builds the `web` and `api` images with `dotnet publish -t:PublishContainer`,
+  pushes them to Azure Container Registry (tagged with the commit SHA), and updates the
+  two **separate** Azure Container Apps. The deploy job waits for **manual approval** on the
+  `production` environment before provisioning or deploying.
+- **Manual dispatch** with a `rollback_sha` input redeploys a previously built image.
+
+Hosting is cheap by design: `web` and `api` run on the **Container Apps Consumption**
+plan (scale-to-zero), images live in a **Basic** ACR, and PostgreSQL runs as its own
+container app backed by an **Azure Files** share (min 1 replica).
+
+### Required GitHub configuration
+
+Cloud auth uses **OIDC** (no stored credentials). Configure once (see
+[specs/012-cicd-container-deploy/quickstart.md](specs/012-cicd-container-deploy/quickstart.md)):
+
+- **Variables**: `AZURE_ENV_NAME`, `AZURE_LOCATION`.
+- **Secrets**: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`,
+  `POSTGRES_PASSWORD`, `AZURE_ENTRA_WEB_CLIENT_ID`, `AZURE_ENTRA_API_CLIENT_ID`.
+- A GitHub **`production` environment** (federated credential subjects for `main` and the
+  environment), plus an Entra app registration granted `Contributor` +
+  `User Access Administrator` on the subscription.
+
+> **Database caveat**: the container-hosted Postgres has **no managed backups or HA**.
+> The image is version-pinned; for durability add a scheduled `pg_dump` to Blob storage.
 
 ## Constitution & follow-ups
 

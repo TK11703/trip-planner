@@ -17,6 +17,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <UserSecretsId>c9828c05-4918-4a88-978b-28e806979bb4</UserSecretsId>
+    <!-- .NET SDK container publish (dotnet publish -t:PublishContainer) -->
+    <ContainerRepository>web</ContainerRepository>
   </PropertyGroup>
 
 </Project>

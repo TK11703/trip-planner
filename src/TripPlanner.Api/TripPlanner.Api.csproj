@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>f7be4042-2f12-4058-a943-00d5a54d229f</UserSecretsId>
+    <!-- .NET SDK container publish (dotnet publish -t:PublishContainer) -->
+    <ContainerRepository>api</ContainerRepository>
   </PropertyGroup>
 
   <ItemGroup>
