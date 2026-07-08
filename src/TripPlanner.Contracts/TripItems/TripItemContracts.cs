@@ -23,7 +23,7 @@ public static class TrackedItemColors
     public static readonly IReadOnlyList<string> All = new[]
     { "slate", "teal", "blue", "green", "gold", "orange", "red", "purple" };
 
-    private static readonly IReadOnlySet<string> Allowed =
+    private static readonly HashSet<string> Allowed =
         new HashSet<string>(All, StringComparer.OrdinalIgnoreCase);
 
     public static bool IsValid(string? color) => !string.IsNullOrWhiteSpace(color) && Allowed.Contains(color);
