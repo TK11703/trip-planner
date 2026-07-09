@@ -72,7 +72,7 @@ public static class UpdateTripShareAccessEndpoint
                 RelatedTripId: tripId,
                 Title: "Your trip access changed",
                 Message: $"{actorName} changed your access to a shared trip to {UpsertTripShareEndpoint.AccessLevelLabel(member.AccessLevel)}.",
-                SourceEventKey: $"trip-share-changed:{tripId}:{member.UserId}:{Guid.NewGuid():N}",
+                SourceEventKey: TripSharingNotificationKeys.PermissionChanged(tripId, member.UserId),
                 RecipientEmail: member.Email), ct);
         }
         catch

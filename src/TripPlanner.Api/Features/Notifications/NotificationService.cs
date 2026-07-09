@@ -26,11 +26,18 @@ public sealed class NotificationService : INotificationService
     public async Task<NotificationRecord?> CreateAsync(NewNotification notification, CancellationToken ct)
     {
         var nowUtc = DateTimeOffset.UtcNow;
-        var (inAppEnabled, emailEnabled) = await ResolveDeliveryAsync(notification.RecipientUserId, notification.Category, ct);
+        var decision = await ResolveDeliveryAsync(notification.RecipientUserId, notification.Category, ct);
 
-        // In-app is the master switch for a notification's existence. If a category is fully disabled
-        // (in-app off) nothing is delivered on any channel.
-        if (!inAppEnabled)
+        // A recipient's saved preferences overrule delivery. When every channel is disabled for the
+        // category, nothing is delivered on any channel.
+        if (decision.Outcome == NotificationDeliveryOutcome.SuppressAll)
+        {
+            return null;
+        }
+
+        // In-app is the master channel for a notification's existence. If in-app is disabled we do not
+        // persist an in-app notification; email-only delivery is out of scope for these categories.
+        if (!decision.InAppAllowed)
         {
             return null;
         }
@@ -42,7 +49,7 @@ public sealed class NotificationService : INotificationService
             return null;
         }
 
-        if (emailEnabled)
+        if (decision.EmailAllowed)
         {
             await DeliverEmailAsync(record, notification.RecipientEmail, nowUtc, ct);
         }
@@ -50,17 +57,13 @@ public sealed class NotificationService : INotificationService
         return record;
     }
 
-    private async Task<(bool InApp, bool Email)> ResolveDeliveryAsync(string userId, string category, CancellationToken ct)
+    private async Task<NotificationDeliveryDecision> ResolveDeliveryAsync(string userId, string category, CancellationToken ct)
     {
         var preferences = await _repository.GetPreferencesAsync(userId, ct);
         var match = preferences.FirstOrDefault(p => string.Equals(p.Category, category, StringComparison.OrdinalIgnoreCase));
-        if (match is not null)
-        {
-            return (match.InAppEnabled, match.EmailEnabled);
-        }
-
-        var definition = NotificationCategories.Resolve(category);
-        return (definition.DefaultInAppEnabled, definition.DefaultEmailEnabled);
+        return match is not null
+            ? NotificationDeliveryDecision.FromPreference(match.InAppEnabled, match.EmailEnabled)
+            : NotificationDeliveryDecision.FromDefaults(category);
     }
 
     private async Task DeliverEmailAsync(NotificationRecord record, string? recipientEmail, DateTimeOffset nowUtc, CancellationToken ct)

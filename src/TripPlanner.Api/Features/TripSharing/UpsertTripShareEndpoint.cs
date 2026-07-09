@@ -77,7 +77,7 @@ public static class UpsertTripShareEndpoint
                 RelatedTripId: tripId,
                 Title: "A trip was shared with you",
                 Message: $"{sharerName} shared a trip with you as a {AccessLevelLabel(member.AccessLevel)}.",
-                SourceEventKey: $"trip-share-added:{tripId}:{member.UserId}:{Guid.NewGuid():N}",
+                SourceEventKey: TripSharingNotificationKeys.Added(tripId, member.UserId),
                 RecipientEmail: member.Email), ct);
         }
         catch

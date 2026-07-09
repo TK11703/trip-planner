@@ -1,4 +1,6 @@
+using System.Data;
 using Dapper;
+using TripPlanner.Contracts.Notifications;
 using TripPlanner.Contracts.Profile;
 using TripPlanner.Database.Connections;
 using TripPlanner.Database.Sql;
@@ -28,7 +30,13 @@ public sealed class UserProfileRepository : IUserProfileRepository
         await using var conn = await _factory.CreateOpenConnectionAsync(cancellationToken);
         var query = _sql.Get("Queries/UserProfiles/GetUserProfile.sql");
         var row = await conn.QuerySingleOrDefaultAsync<UserProfileRow>(new CommandDefinition(query, new { UserId = userId }, cancellationToken: cancellationToken));
-        return row?.ToResponse();
+        if (row is null)
+        {
+            return null;
+        }
+
+        var preferences = await LoadPreferencesAsync(conn, userId, cancellationToken);
+        return row.ToResponse(preferences);
     }
 
     public async Task<UserProfileResponse> EnsureFromAuthenticatedUserAsync(string userId, string? firstName, string? lastName, string? displayName, string? email, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
@@ -46,7 +54,8 @@ public sealed class UserProfileRepository : IUserProfileRepository
             NowUtc = nowUtc
         }, cancellationToken: cancellationToken));
 
-        return row.ToResponse();
+        var preferences = await LoadPreferencesAsync(conn, userId, cancellationToken);
+        return row.ToResponse(preferences);
     }
 
     public async Task<UserProfileResponse?> UpdateAsync(string userId, UpdateUserProfileRequest request, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
@@ -61,9 +70,6 @@ public sealed class UserProfileRepository : IUserProfileRepository
             DisplayName = Normalize(request.DisplayName) ?? BuildDisplayName(request.FirstName, request.LastName),
             Email = Normalize(request.Email),
             TimeZoneId = request.TimeZoneId.Trim(),
-            request.NotificationPreferences.EmailNotificationsEnabled,
-            request.NotificationPreferences.TripReminderNotificationsEnabled,
-            request.NotificationPreferences.ItineraryChangeNotificationsEnabled,
             TravelInterests = Normalize(request.PersonalizationPreferences.TravelInterests),
             HomeAirport = Normalize(request.PersonalizationPreferences.HomeAirport),
             PreferredTravelStyle = Normalize(request.PersonalizationPreferences.PreferredTravelStyle),
@@ -71,7 +77,62 @@ public sealed class UserProfileRepository : IUserProfileRepository
             NowUtc = nowUtc
         }, cancellationToken: cancellationToken));
 
-        return row?.ToResponse();
+        if (row is null)
+        {
+            return null;
+        }
+
+        var upsert = _sql.Get("Commands/Notifications/UpsertNotificationPreference.sql");
+        foreach (var category in request.NotificationPreferences.Categories)
+        {
+            if (!NotificationCategories.IsKnown(category.Category))
+            {
+                continue;
+            }
+
+            await conn.ExecuteAsync(new CommandDefinition(upsert, new
+            {
+                UserId = userId,
+                Category = NotificationCategories.Resolve(category.Category).Category,
+                category.InAppEnabled,
+                category.EmailEnabled,
+                NowUtc = nowUtc
+            }, cancellationToken: cancellationToken));
+        }
+
+        var preferences = await LoadPreferencesAsync(conn, userId, cancellationToken);
+        return row.ToResponse(preferences);
+    }
+
+    private async Task<NotificationPreferences> LoadPreferencesAsync(IDbConnection conn, string userId, CancellationToken cancellationToken)
+    {
+        var query = _sql.Get("Queries/Notifications/GetNotificationPreferences.sql");
+        var rows = await conn.QueryAsync<PreferenceRow>(new CommandDefinition(query, new { UserId = userId }, cancellationToken: cancellationToken));
+        var saved = rows.ToDictionary(r => r.Category, StringComparer.OrdinalIgnoreCase);
+
+        var categories = NotificationCategories.All.Select(definition =>
+        {
+            if (saved.TryGetValue(definition.Category, out var match))
+            {
+                return new NotificationCategoryPreference(
+                    definition.Category,
+                    definition.DisplayName,
+                    match.InAppEnabled,
+                    match.EmailEnabled,
+                    NotificationPreferenceSource.Saved,
+                    match.UpdatedAtUtc);
+            }
+
+            return new NotificationCategoryPreference(
+                definition.Category,
+                definition.DisplayName,
+                definition.DefaultInAppEnabled,
+                definition.DefaultEmailEnabled,
+                NotificationPreferenceSource.Default,
+                UpdatedAtUtc: null);
+        }).ToArray();
+
+        return new NotificationPreferences(categories);
     }
 
     private static string? Normalize(string? value)
@@ -84,6 +145,8 @@ public sealed class UserProfileRepository : IUserProfileRepository
         return string.IsNullOrWhiteSpace(displayName) ? null : displayName;
     }
 
+    private sealed record PreferenceRow(string UserId, string Category, bool InAppEnabled, bool EmailEnabled, DateTimeOffset UpdatedAtUtc);
+
     private sealed record UserProfileRow(
         string UserId,
         string? FirstName,
@@ -91,9 +154,6 @@ public sealed class UserProfileRepository : IUserProfileRepository
         string? DisplayName,
         string? Email,
         string TimeZoneId,
-        bool EmailNotificationsEnabled,
-        bool TripReminderNotificationsEnabled,
-        bool ItineraryChangeNotificationsEnabled,
         string? TravelInterests,
         string? HomeAirport,
         string? PreferredTravelStyle,
@@ -102,7 +162,7 @@ public sealed class UserProfileRepository : IUserProfileRepository
         DateTimeOffset UpdatedAtUtc,
         DateTimeOffset LastSeenAtUtc)
     {
-        public UserProfileResponse ToResponse() => new(
+        public UserProfileResponse ToResponse(NotificationPreferences notificationPreferences) => new(
             UserId,
             FirstName,
             LastName,
@@ -110,7 +170,7 @@ public sealed class UserProfileRepository : IUserProfileRepository
             Email,
             TimeZoneId,
             IsComplete: !string.IsNullOrWhiteSpace(DisplayName) && !string.IsNullOrWhiteSpace(Email),
-            new NotificationPreferences(EmailNotificationsEnabled, TripReminderNotificationsEnabled, ItineraryChangeNotificationsEnabled),
+            notificationPreferences,
             new PersonalizationPreferences(TravelInterests, HomeAirport, PreferredTravelStyle, AccessibilityNotes),
             CreatedAtUtc,
             UpdatedAtUtc,

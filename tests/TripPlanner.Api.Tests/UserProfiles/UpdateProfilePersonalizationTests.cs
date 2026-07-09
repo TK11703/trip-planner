@@ -18,7 +18,7 @@ public class UpdateProfilePersonalizationTests
             "Avery Traveler",
             "avery@example.test",
             "UTC",
-            new NotificationPreferences(false, false, false),
+            NotificationPreferences.Default,
             new PersonalizationPreferences("museums", "SEA", "slow travel", "quiet rooms")));
         savedResponse.EnsureSuccessStatusCode();
         var saved = await savedResponse.Content.ReadFromJsonAsync<UserProfileResponse>();
@@ -30,7 +30,7 @@ public class UpdateProfilePersonalizationTests
             "Avery Traveler",
             "avery@example.test",
             "UTC",
-            new NotificationPreferences(false, false, false),
+            NotificationPreferences.Default,
             new PersonalizationPreferences(" ", null, "", null)));
         clearedResponse.EnsureSuccessStatusCode();
         var cleared = await clearedResponse.Content.ReadFromJsonAsync<UserProfileResponse>();

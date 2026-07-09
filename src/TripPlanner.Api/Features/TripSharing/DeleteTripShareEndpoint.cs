@@ -67,7 +67,7 @@ public static class DeleteTripShareEndpoint
                 RelatedTripId: null,
                 Title: "Your trip access was removed",
                 Message: $"{actorName} removed your access to a shared trip.",
-                SourceEventKey: $"trip-share-removed:{tripId}:{userId}:{Guid.NewGuid():N}",
+                SourceEventKey: TripSharingNotificationKeys.Removed(tripId, userId),
                 RecipientEmail: member?.Email), ct);
         }
         catch

@@ -55,6 +55,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
         builder.Services.AddScoped<INotificationService, NotificationService>();
+        builder.Services.AddScoped<IItineraryNotificationService, ItineraryNotificationService>();
         builder.Services.AddSingleton<INotificationEmailSender, DevelopmentNotificationEmailSender>();
 
         builder.Services.AddSingleton<CreateTripValidator>();

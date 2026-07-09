@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
+using TripPlanner.Api.Features.Notifications;
 using TripPlanner.Api.Security;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Contracts.Common;
@@ -28,6 +29,7 @@ public static class UpdateTripEndpoint
         UpdateTripValidator validator,
         ITripCommandRepository commands,
         IAuditRepository audit,
+        IItineraryNotificationService itineraryNotifications,
         IClock clock,
         CancellationToken cancellationToken)
     {
@@ -52,6 +54,7 @@ public static class UpdateTripEndpoint
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripUpdate, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
+        await itineraryNotifications.NotifyChangeAsync(tripId, access.OwnerUserId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripUpdated, cancellationToken);
         return TypedResults.Ok(new CreateTripResponse(tripId, request.Name, request.Description, request.StartDate, request.EndDate));
     }
 }

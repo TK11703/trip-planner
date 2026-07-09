@@ -101,34 +101,7 @@
 
     <hr class="my-4" />
 
-    <h2 class="h4 mb-3">Notification preferences</h2>
-    @if (_preferences.Count == 0)
-    {
-        <div class="text-secondary">Loading preferences...</div>
-    }
-    else
-    {
-        <div class="notification-preferences">
-            @foreach (var pref in _preferences)
-            {
-                <div class="d-flex align-items-center gap-4 py-2 border-bottom">
-                    <div class="flex-grow-1 fw-semibold">@pref.DisplayName</div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="@($"inapp-{pref.Category}")"
-                               checked="@pref.InAppEnabled"
-                               @onchange="e => UpdatePreferenceAsync(pref, (bool)e.Value!, pref.EmailEnabled)" disabled="@_isBusy" />
-                        <label class="form-check-label" for="@($"inapp-{pref.Category}")">In-app</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="@($"email-{pref.Category}")"
-                               checked="@pref.EmailEnabled"
-                               @onchange="e => UpdatePreferenceAsync(pref, pref.InAppEnabled, (bool)e.Value!)" disabled="@_isBusy" />
-                        <label class="form-check-label" for="@($"email-{pref.Category}")">Email</label>
-                    </div>
-                </div>
-            }
-        </div>
-    }
+    <p class="text-secondary">Manage how you're notified from your <a href="/profile">profile</a>.</p>
 </section>
 
 @code {
@@ -136,12 +109,10 @@
     private bool _isBusy;
     private string? _loadError;
     private List<NotificationResponse> _notifications = new();
-    private List<NotificationPreferenceResponse> _preferences = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
-        await LoadPreferencesAsync();
     }
 
     private async Task LoadAsync()
@@ -160,19 +131,6 @@
         finally
         {
             _isLoading = false;
-        }
-    }
-
-    private async Task LoadPreferencesAsync()
-    {
-        try
-        {
-            var response = await NotificationApi.GetPreferencesAsync();
-            _preferences = response?.Categories.ToList() ?? new();
-        }
-        catch
-        {
-            _preferences = new();
         }
     }
 
@@ -230,27 +188,6 @@
             if (await NotificationApi.DeleteAsync(notificationId))
             {
                 await LoadAsync();
-            }
-        }
-        finally
-        {
-            _isBusy = false;
-        }
-    }
-
-    private async Task UpdatePreferenceAsync(NotificationPreferenceResponse pref, bool inAppEnabled, bool emailEnabled)
-    {
-        _isBusy = true;
-        try
-        {
-            var updated = await NotificationApi.UpdatePreferenceAsync(pref.Category, new UpdateNotificationPreferenceRequest(inAppEnabled, emailEnabled));
-            if (updated is not null)
-            {
-                var index = _preferences.FindIndex(p => string.Equals(p.Category, pref.Category, StringComparison.OrdinalIgnoreCase));
-                if (index >= 0)
-                {
-                    _preferences[index] = updated;
-                }
             }
         }
         finally

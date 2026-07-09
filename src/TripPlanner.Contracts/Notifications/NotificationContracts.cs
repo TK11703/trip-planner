@@ -91,16 +91,17 @@ public sealed record UpdateNotificationPreferenceRequest(bool InAppEnabled, bool
 /// <summary>Known notification categories and their user-facing names and defaults.</summary>
 public static class NotificationCategories
 {
+    public const string ItineraryChanges = "ItineraryChanges";
     public const string TripSharing = "TripSharing";
-    public const string TripActivity = "TripActivity";
-    public const string General = "General";
 
     public static IReadOnlyList<NotificationCategoryDefinition> All { get; } = new[]
     {
-        new NotificationCategoryDefinition(TripSharing, "Trip sharing", true, true),
-        new NotificationCategoryDefinition(TripActivity, "Trip activity", true, true),
-        new NotificationCategoryDefinition(General, "General", true, true)
+        new NotificationCategoryDefinition(ItineraryChanges, "Itinerary changes", true, true),
+        new NotificationCategoryDefinition(TripSharing, "Trip sharing", true, true)
     };
+
+    public static bool IsKnown(string category)
+        => All.Any(c => string.Equals(c.Category, category, StringComparison.OrdinalIgnoreCase));
 
     public static NotificationCategoryDefinition Resolve(string category)
         => All.FirstOrDefault(c => string.Equals(c.Category, category, StringComparison.OrdinalIgnoreCase))

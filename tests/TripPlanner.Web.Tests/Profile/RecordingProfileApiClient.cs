@@ -65,7 +65,7 @@ internal static class ProfileTestData
             "avery@example.test",
             "UTC",
             true,
-            notifications ?? new NotificationPreferences(false, false, false),
+            notifications ?? NotificationPreferences.Default,
             personalization ?? new PersonalizationPreferences(null, null, null, null),
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow,

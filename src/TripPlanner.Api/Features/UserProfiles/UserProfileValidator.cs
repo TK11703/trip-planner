@@ -1,6 +1,7 @@
 using System.Net.Mail;
 using TripPlanner.Api.Features.Timezones;
 using TripPlanner.Contracts.Errors;
+using TripPlanner.Contracts.Notifications;
 using TripPlanner.Contracts.Profile;
 
 namespace TripPlanner.Api.Features.UserProfiles;
@@ -33,9 +34,18 @@ public sealed class UserProfileValidator
             return (false, ApiError.ValidationFailed("Enter a valid email address.", nameof(request.Email)));
         }
 
-        if (request.NotificationPreferences.EmailNotificationsEnabled && email is null)
+        foreach (var category in request.NotificationPreferences.Categories)
         {
-            return (false, ApiError.ValidationFailed("Email notifications require a valid email address.", nameof(request.NotificationPreferences.EmailNotificationsEnabled)));
+            if (!NotificationCategories.IsKnown(category.Category))
+            {
+                return (false, ApiError.ValidationFailed($"Unknown notification category '{category.Category}'.", nameof(request.NotificationPreferences)));
+            }
+        }
+
+        var emailPreferenceEnabled = request.NotificationPreferences.Categories.Any(category => category.EmailEnabled);
+        if (emailPreferenceEnabled && email is null)
+        {
+            return (false, ApiError.ValidationFailed("Email notifications require a valid email address.", nameof(request.NotificationPreferences)));
         }
 
         if (!_timezones.IsValid(request.TimeZoneId))

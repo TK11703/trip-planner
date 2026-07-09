@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
+using TripPlanner.Api.Features.Notifications;
 using TripPlanner.Api.Security;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Contracts.Common;
@@ -55,7 +56,7 @@ public static class TripLegEndpoints
         Guid tripId, CreateTripLegRequest request,
         ICurrentUser currentUser, ITripAccessResolver accessResolver, TripLegValidator validator,
         ITripReadRepository tripReads, ITripItemRepository items,
-        IAuditRepository audit, IClock clock, CancellationToken ct)
+        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, CancellationToken ct)
     {
         var callerId = currentUser.UserId;
         var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
@@ -84,6 +85,7 @@ public static class TripLegEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripLegCreate, "trip-leg", id.Value.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegCreated, ct);
         return TypedResults.Created($"/api/trips/{tripId}/legs/{id}");
     }
 
@@ -91,7 +93,7 @@ public static class TripLegEndpoints
         Guid tripId, Guid tripLegId, UpdateTripLegRequest request,
         ICurrentUser currentUser, ITripAccessResolver accessResolver, TripLegValidator validator,
         ITripReadRepository tripReads, ITripItemRepository items,
-        IAuditRepository audit, IClock clock, CancellationToken ct)
+        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, CancellationToken ct)
     {
         var callerId = currentUser.UserId;
         var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
@@ -120,13 +122,14 @@ public static class TripLegEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegUpdated, ct);
         return TypedResults.NoContent();
     }
 
     private static async Task<Results<NoContent, BadRequest<ApiError>, NotFound<ApiError>>> DeleteAsync(
         Guid tripId, Guid tripLegId,
         ICurrentUser currentUser, ITripAccessResolver accessResolver, ITripItemRepository items,
-        IAuditRepository audit, IClock clock, CancellationToken ct)
+        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, CancellationToken ct)
     {
         var callerId = currentUser.UserId;
         var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
@@ -151,6 +154,7 @@ public static class TripLegEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripLegDelete, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegDeleted, ct);
         return TypedResults.NoContent();
     }
 }

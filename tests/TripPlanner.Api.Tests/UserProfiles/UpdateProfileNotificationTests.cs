@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using TripPlanner.Contracts.Errors;
+using TripPlanner.Contracts.Notifications;
 using TripPlanner.Contracts.Profile;
 
 namespace TripPlanner.Api.Tests.UserProfiles;
@@ -20,14 +21,21 @@ public class UpdateProfileNotificationTests
             "Avery Traveler",
             "avery@example.test",
             "UTC",
-            new NotificationPreferences(true, true, false),
+            new NotificationPreferences(new[]
+            {
+                new NotificationCategoryPreference(NotificationCategories.ItineraryChanges, "Itinerary changes", true, false),
+                new NotificationCategoryPreference(NotificationCategories.TripSharing, "Trip sharing", false, false)
+            }),
             new PersonalizationPreferences(null, null, null, null)));
 
         response.EnsureSuccessStatusCode();
         var profile = await response.Content.ReadFromJsonAsync<UserProfileResponse>();
-        Assert.True(profile!.NotificationPreferences.EmailNotificationsEnabled);
-        Assert.True(profile.NotificationPreferences.TripReminderNotificationsEnabled);
-        Assert.False(profile.NotificationPreferences.ItineraryChangeNotificationsEnabled);
+        var itinerary = profile!.NotificationPreferences.Find(NotificationCategories.ItineraryChanges);
+        var sharing = profile.NotificationPreferences.Find(NotificationCategories.TripSharing);
+        Assert.True(itinerary!.InAppEnabled);
+        Assert.False(itinerary.EmailEnabled);
+        Assert.False(sharing!.InAppEnabled);
+        Assert.False(sharing.EmailEnabled);
     }
 
     [Fact]
@@ -43,7 +51,10 @@ public class UpdateProfileNotificationTests
             "Avery Traveler",
             null,
             "UTC",
-            new NotificationPreferences(true, false, false),
+            new NotificationPreferences(new[]
+            {
+                new NotificationCategoryPreference(NotificationCategories.ItineraryChanges, "Itinerary changes", true, true)
+            }),
             new PersonalizationPreferences(null, null, null, null)));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

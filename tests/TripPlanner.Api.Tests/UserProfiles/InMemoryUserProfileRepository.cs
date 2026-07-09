@@ -1,3 +1,4 @@
+using TripPlanner.Contracts.Notifications;
 using TripPlanner.Contracts.Profile;
 using TripPlanner.Database.UserProfiles;
 
@@ -27,7 +28,7 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
             Normalize(email),
             "UTC",
             IsComplete: !string.IsNullOrWhiteSpace(displayName ?? BuildDisplayName(firstName, lastName)) && !string.IsNullOrWhiteSpace(email),
-            new NotificationPreferences(false, false, false),
+            NotificationPreferences.Default,
             new PersonalizationPreferences(null, null, null, null),
             nowUtc,
             nowUtc,
@@ -52,7 +53,7 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
             Email = Normalize(request.Email),
             TimeZoneId = request.TimeZoneId,
             IsComplete = !string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(request.Email),
-            NotificationPreferences = request.NotificationPreferences,
+            NotificationPreferences = MergePreferences(request.NotificationPreferences, nowUtc),
             PersonalizationPreferences = new PersonalizationPreferences(
                 Normalize(request.PersonalizationPreferences.TravelInterests),
                 Normalize(request.PersonalizationPreferences.HomeAirport),
@@ -67,6 +68,18 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static NotificationPreferences MergePreferences(NotificationPreferences requested, DateTimeOffset nowUtc)
+    {
+        var categories = NotificationCategories.All.Select(definition =>
+        {
+            var match = requested.Find(definition.Category);
+            return match is not null
+                ? new NotificationCategoryPreference(definition.Category, definition.DisplayName, match.InAppEnabled, match.EmailEnabled, NotificationPreferenceSource.Saved, nowUtc)
+                : new NotificationCategoryPreference(definition.Category, definition.DisplayName, definition.DefaultInAppEnabled, definition.DefaultEmailEnabled, NotificationPreferenceSource.Default, null);
+        }).ToArray();
+        return new NotificationPreferences(categories);
+    }
 
     private static string? BuildDisplayName(string? firstName, string? lastName)
     {

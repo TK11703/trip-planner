@@ -803,6 +803,18 @@ body {
     border-color: var(--tp-brand);
 }
 
+.profile-page .notification-category {
+    border: 1px solid var(--tp-border);
+    border-radius: .75rem;
+    padding: .75rem 1rem;
+}
+
+.profile-page .notification-category legend {
+    float: none;
+    width: auto;
+    margin-bottom: .25rem;
+}
+
 :focus-visible {
     outline: .2rem solid var(--tp-focus);
     outline-offset: .2rem;

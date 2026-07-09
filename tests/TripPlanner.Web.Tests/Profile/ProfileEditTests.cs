@@ -20,7 +20,7 @@ public class ProfileEditTests : TestContext
         var cut = RenderComponent<ProfilePage>();
 
         cut.Find("#displayName").Change("Avery Updated");
-        cut.Find("#emailNotifications").Change(true);
+        cut.Find("#notif-TripSharing-email").Change(false);
         cut.Find("#travelInterests").Change("food markets");
         cut.Find("form").Submit();
 
@@ -28,7 +28,7 @@ public class ProfileEditTests : TestContext
         Assert.Equal(1, client.SaveCallCount);
         Assert.Equal("Avery Updated", client.LastRequest!.DisplayName);
         Assert.Equal("UTC", client.LastRequest.TimeZoneId);
-        Assert.True(client.LastRequest.NotificationPreferences.EmailNotificationsEnabled);
+        Assert.False(client.LastRequest.NotificationPreferences.Find("TripSharing")!.EmailEnabled);
         Assert.Equal("food markets", client.LastRequest.PersonalizationPreferences.TravelInterests);
     }
 }
