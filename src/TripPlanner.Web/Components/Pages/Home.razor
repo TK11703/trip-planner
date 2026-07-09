@@ -3,35 +3,72 @@
 
 <PageTitle>Trip Planner</PageTitle>
 
-<section class="hero-adventure rounded-4 p-4 p-md-5 mb-4 shadow-sm">
+<section class="hero-welcome rounded-4 p-4 p-md-5 mb-4 shadow-sm">
     <div class="row align-items-center g-4">
-        <div class="col-lg-7">
-            <p class="brand-eyebrow text-white-50">Adventurous explorer trip planning</p>
-            <h1 class="display-5 fw-bold mb-3">Scout your next great trip before you pack.</h1>
-            <p class="lead mb-4">Bring flights, stays, activities, reservations, and day-by-day plans into one private expedition map built for calm, confident travel.</p>
+        <div class="col-lg-6">
+            <p class="brand-eyebrow text-white-50">Plan trips with confidence</p>
+            <h1 class="display-5 fw-bold mb-3">Plan your next great trip before you pack.</h1>
+            <p class="lead mb-4">Bring stays, activities, reservations, and day-by-day plans into one clear trip plan built for calm, confident travel by car, train, plane, or boat.</p>
             <AuthorizeView>
                 <Authorized>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-light btn-lg fw-semibold" href="/trips/new">Plot a new trip</a>
-                        <a class="btn btn-outline-light btn-lg" href="/trips">Review your journeys</a>
+                    <div class="d-flex flex-wrap gap-2 mb-4">
+                        <a class="btn btn-light btn-lg fw-semibold" href="/trips/new">Plan a trip</a>
+                        <a class="btn btn-outline-light btn-lg" href="/trips">Review recent trips</a>
                     </div>
                 </Authorized>
                 <NotAuthorized>
-                    <div class="d-flex flex-wrap gap-2">
+                    <div class="d-flex flex-wrap gap-2 mb-4">
                         <a class="btn btn-light btn-lg fw-semibold" href="MicrosoftIdentity/Account/SignIn">Sign in to begin</a>
                         <a class="btn btn-outline-light btn-lg" href="/about">See how it works</a>
                     </div>
                 </NotAuthorized>
             </AuthorizeView>
+            <ul class="transport-cues" aria-label="Ways to travel">
+                <li class="transport-cue"><span class="transport-glyph" aria-hidden="true">🚗</span> Car</li>
+                <li class="transport-cue"><span class="transport-glyph" aria-hidden="true">🚆</span> Train</li>
+                <li class="transport-cue"><span class="transport-glyph" aria-hidden="true">✈️</span> Plane</li>
+                <li class="transport-cue"><span class="transport-glyph" aria-hidden="true">⛴️</span> Boat</li>
+            </ul>
         </div>
-        <div class="col-lg-5">
-            <div class="hero-map-card" aria-label="Trip Planner adventure compass illustration">
-                <div class="explorer-compass">
-                    <div class="explorer-compass-inner">
-                        <div>
-                            <div class="display-6">✦</div>
-                            <div>Plan<br />Explore<br />Remember</div>
-                        </div>
+        <div class="col-lg-6">
+            <img class="hero-media" src="img/brand/home-welcome.svg" alt="A globe under aurora light with car, train, plane, and boat travel icons" loading="eager" width="640" height="460" />
+        </div>
+    </div>
+</section>
+
+<section class="mb-4" aria-labelledby="planning-tips-heading">
+    <p class="brand-eyebrow mb-1">Tips for a smoother trip</p>
+    <h2 id="planning-tips-heading" class="h3 mb-3">Small habits that make big trips easier</h2>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card h-100 modern-card">
+                <div class="card-body planning-tip">
+                    <span class="planning-tip-badge" aria-hidden="true">🕑</span>
+                    <div>
+                        <h3 class="h6 mb-1">Leave buffers between legs</h3>
+                        <p class="mb-0 text-secondary">Add a little time around transfers so a late train or flight doesn't unravel the rest of the day.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 modern-card">
+                <div class="card-body planning-tip">
+                    <span class="planning-tip-badge" aria-hidden="true">🗂️</span>
+                    <div>
+                        <h3 class="h6 mb-1">Group plans by day</h3>
+                        <p class="mb-0 text-secondary">Keep each day's stays, activities, and reservations together so you always know what's next.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 modern-card">
+                <div class="card-body planning-tip">
+                    <span class="planning-tip-badge" aria-hidden="true">📌</span>
+                    <div>
+                        <h3 class="h6 mb-1">Keep details close</h3>
+                        <p class="mb-0 text-secondary">Save confirmation numbers and departure times next to each stop so they're ready when you travel.</p>
                     </div>
                 </div>
             </div>
@@ -49,8 +86,8 @@
                 <div class="card h-100 modern-card">
                     <div class="card-body">
                         <p class="brand-eyebrow">Private</p>
-                        <h2 class="h5">Your data stays yours</h2>
-                        <p class="mb-0 text-secondary">Owner-scoped storage keeps each itinerary isolated by your Azure Entra identity.</p>
+                        <h2 class="h5">Your trips stay yours</h2>
+                        <p class="mb-0 text-secondary">Every trip you plan is kept to your account, so your itineraries stay private to you.</p>
                     </div>
                 </div>
             </div>
@@ -58,17 +95,17 @@
                 <div class="card h-100 modern-card">
                     <div class="card-body">
                         <p class="brand-eyebrow">Organized</p>
-                        <h2 class="h5">Visualize the whole route</h2>
-                        <p class="mb-0 text-secondary">A calendar timeline connects every leg, activity, and reservation across your date range.</p>
+                        <h2 class="h5">See the whole route</h2>
+                        <p class="mb-0 text-secondary">A calendar timeline connects every leg, activity, and reservation across your travel dates.</p>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="card h-100 modern-card">
                     <div class="card-body">
-                        <p class="brand-eyebrow">Responsive</p>
-                        <h2 class="h5">Plan from any trailhead</h2>
-                        <p class="mb-0 text-secondary">Use a modern light or dark experience that adapts from desktop to phone.</p>
+                        <p class="brand-eyebrow">Anywhere</p>
+                        <h2 class="h5">Plan from any device</h2>
+                        <p class="mb-0 text-secondary">Use a modern light or dark experience that adapts smoothly from desktop to phone.</p>
                     </div>
                 </div>
             </div>

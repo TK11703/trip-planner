@@ -16,7 +16,7 @@
         document.documentElement.dataset.themeMode = normalized;
         document.documentElement.dataset.themeSource = source || 'deviceBrowser';
         const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', normalized === 'dark' ? '#0f1720' : '#f6f1e8');
+        if (meta) meta.setAttribute('content', normalized === 'dark' ? '#0a1017' : '#f3f7f9');
         return normalized;
     }
 

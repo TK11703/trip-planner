@@ -2,8 +2,8 @@
 
 <PageTitle>Trip Planner — FAQ</PageTitle>
 
-<BrandSurface Eyebrow="Field guide" Title="Frequently asked questions" Class="mb-4">
-    <p class="lead mb-0">Public help content for charting trips confidently. This page does not load or display personal trip data.</p>
+<BrandSurface Eyebrow="Help center" Title="Frequently asked questions" Class="mb-4">
+    <p class="lead mb-0">Public help for planning trips confidently. This page does not load or display personal trip data.</p>
 </BrandSurface>
 
 @if (_entries is { Count: > 0 })
@@ -17,7 +17,7 @@
             <div class="accordion-item">
                 <h2 class="accordion-header" id="@headerId">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-controls="@collapseId">
-                        <span class="me-2" aria-hidden="true">✦</span>@entry.Question
+                        <span class="me-2" aria-hidden="true">🌐</span>@entry.Question
                     </button>
                 </h2>
                 <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#faqAccordion" aria-labelledby="@headerId">
@@ -37,10 +37,14 @@ else
 
     private readonly IReadOnlyList<FaqEntry> _entries = new List<FaqEntry>
     {
-        new("How do I sign in?", "Sign in with your Azure Entra account. The planner uses Microsoft Identity Web to keep your session secure."),
-        new("Can other people see my trips?", "No. Every trip query is filtered by your immutable Azure Entra identifier, and cross-user lookups return a generic not-found response."),
-        new("How are dates validated?", "Trips require an end date on or after the start date. Tracked items must fall within their parent trip's date range."),
-        new("What does the timeline show?", "The timeline plots every trip leg and tracked item across the trip date range, including empty days."),
-        new("How do I delete a trip?", "Trip deletion is a planned enhancement. For now you can update trip details or remove tracked items individually."),
+        new("How do I sign in?", "Sign in with your account to reach your private trips. Public pages like this one never show personal trip data."),
+        new("Can other people see my trips?", "Only if you share a trip with them. By default every trip is private to you. When you share a trip, the people you choose can see just that trip, and they must sign in to open it."),
+        new("How do I share a trip?", "Open a trip you own and use Share to add another registered person as a Viewer or Collaborator. You can change someone's access level or remove their access at any time."),
+        new("What's the difference between a Viewer and a Collaborator?", "A Viewer can open and read the trip but not change it. A Collaborator can help edit the trip's details, such as legs and events. Only the owner can share the trip or delete it."),
+        new("Will I be notified about my trips?", "Yes. You'll see notifications for relevant activity, such as a trip being shared with you. Your unread count appears in the account menu, and you can review everything on the Notifications page."),
+        new("Can I set time zones for legs and events?", "Yes. Each trip leg and event saves its own start and end time zone, and the timeline shows those scheduled local times instead of shifting them to the time zone of whoever is viewing."),
+        new("How are dates validated?", "Trips require an end date on or after the start date. Legs and events must fall within their trip's date range."),
+        new("What does the timeline show?", "The timeline plots every trip leg and event across the trip's date range, including empty days, so you can see the whole trip at a glance."),
+        new("How do I delete a trip?", "Open a trip you own and delete it. Deleting a trip also removes its legs, events, and any shares. Only the trip's owner can delete it."),
     };
 }

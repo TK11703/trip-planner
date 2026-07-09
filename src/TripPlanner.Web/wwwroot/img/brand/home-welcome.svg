@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 460" role="img" aria-labelledby="hwTitle hwDesc" preserveAspectRatio="xMidYMid meet">
+  <title id="hwTitle">Trip Planner welcome illustration</title>
+  <desc id="hwDesc">A globe under aurora light with car, train, plane, and boat travel icons.</desc>
+  <defs>
+    <linearGradient id="hwSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1017"/>
+      <stop offset=".55" stop-color="#12303a"/>
+      <stop offset="1" stop-color="#1f7a8c"/>
+    </linearGradient>
+    <linearGradient id="hwAurora" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4fe0b5"/>
+      <stop offset=".5" stop-color="#6fe3ff"/>
+      <stop offset="1" stop-color="#8a7dff"/>
+    </linearGradient>
+    <linearGradient id="hwGlobe" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6fe3ff"/>
+      <stop offset="1" stop-color="#4f5bd5"/>
+    </linearGradient>
+    <radialGradient id="hwGlow" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#6fe3ff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#6fe3ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="640" height="460" rx="28" fill="url(#hwSky)"/>
+
+  <g opacity=".85" fill="none" stroke="url(#hwAurora)" stroke-linecap="round">
+    <path d="M40 96c120-64 240 40 360-16s180-8 200 4" stroke-width="10" opacity=".55"/>
+    <path d="M20 140c140-58 250 38 380-8s170 2 224 14" stroke-width="6" opacity=".7"/>
+    <path d="M60 66c120-40 250 30 340 6s150-16 190-6" stroke-width="4" opacity=".5"/>
+  </g>
+
+  <g fill="#eaf6f2">
+    <circle cx="96" cy="60" r="2"/>
+    <circle cx="180" cy="40" r="1.6"/>
+    <circle cx="300" cy="52" r="2.2"/>
+    <circle cx="470" cy="44" r="1.6"/>
+    <circle cx="560" cy="70" r="2"/>
+    <circle cx="610" cy="120" r="1.6"/>
+  </g>
+
+  <circle cx="320" cy="280" r="150" fill="url(#hwGlow)"/>
+
+  <g transform="translate(320 280)">
+    <circle r="118" fill="#0f1a24" stroke="url(#hwGlobe)" stroke-width="5"/>
+    <g fill="none" stroke="url(#hwGlobe)" stroke-width="3" opacity=".9">
+      <ellipse rx="46" ry="118"/>
+      <ellipse rx="86" ry="118"/>
+      <path d="M-118 0H118"/>
+      <path d="M-108 -50H108"/>
+      <path d="M-108 50H108"/>
+      <path d="M-92 -86H92"/>
+      <path d="M-92 86H92"/>
+    </g>
+    <path d="M-96 44C-52 20-30-34 22-58c26-12 52-14 82-8" fill="none" stroke="#f0a500" stroke-width="4" stroke-linecap="round" stroke-dasharray="1 12"/>
+    <circle cx="-96" cy="44" r="7" fill="#f0a500"/>
+    <circle cx="104" cy="-66" r="7" fill="#6fe3ff"/>
+  </g>
+
+  <g fill="#0a1017">
+    <!-- Plane -->
+    <circle cx="150" cy="196" r="30" fill="#6fe3ff"/>
+    <path transform="translate(150 196)" d="M-14-2 4-2 -2-11h5l12 9h5c3 0 3 6 0 6h-5l-12 9h-5l6-9h-18z"/>
+    <!-- Train -->
+    <circle cx="150" cy="300" r="30" fill="#4fe0b5"/>
+    <path transform="translate(150 300)" d="M-11-13h22a4 4 0 0 1 4 4v14a5 5 0 0 1-5 5l4 6h-5l-4-6h-9l-4 6h-5l4-6a5 5 0 0 1-5-5v-14a4 4 0 0 1 4-4zm0 6v7h22v-7zm4 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm14 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+    <!-- Car -->
+    <circle cx="490" cy="196" r="30" fill="#8a7dff"/>
+    <path transform="translate(490 196)" d="M-16 2 -12-8a4 4 0 0 1 4-3h16a4 4 0 0 1 4 3l4 10h2a3 3 0 0 1 3 3v5h-5a5 5 0 0 1-10 0h-10a5 5 0 0 1-10 0h-3v-5a3 3 0 0 1 3-3zm4-2h16l-3-7h-10z"/>
+    <!-- Boat -->
+    <circle cx="490" cy="300" r="30" fill="#f0a500"/>
+    <path transform="translate(490 300)" d="M-2-15h3v4h9a2 2 0 0 1 2 3l-6 9h-7v3h16l-4 9a10 10 0 0 1-8 4 10 10 0 0 1-8-4 10 10 0 0 1-8 4h-3l-4-9h16v-3h-9v-16h11v-4h3zm3 12h-6v3h6z"/>
+  </g>
+</svg>

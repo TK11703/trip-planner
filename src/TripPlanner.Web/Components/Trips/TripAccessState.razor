@@ -1,6 +1,6 @@
 @if (State == TripAccessStateKind.SignInRequired)
 {
-    <StateMessage Title="Sign in required" Message="Sign in with your Azure Entra account before loading personal trip data." Tone="info" Icon="🔐">
+    <StateMessage Title="Sign in required" Message="Sign in to your account before loading personal trip data." Tone="info" Icon="🔐">
         <a class="btn btn-primary btn-sm" href="MicrosoftIdentity/Account/SignIn">Sign in</a>
     </StateMessage>
 }
@@ -18,7 +18,7 @@ else if (State == TripAccessStateKind.ReauthRequired)
 }
 else if (State == TripAccessStateKind.Loading)
 {
-    <StateMessage Title="Loading trip…" Message="We are checking your private route notes." Tone="info" Icon="⌛" />
+    <StateMessage Title="Loading trip…" Message="We are checking your private trip details." Tone="info" Icon="⌛" />
 }
 
 @code {

@@ -2,13 +2,13 @@
   <title id="title">Trip Planner globe mark</title>
   <desc id="desc">A wire frame globe with a travel route arc.</desc>
   <defs>
-    <linearGradient id="g" x1="20" x2="108" y1="20" y2="108" gradientUnits="userSpaceOnUse">
+    <linearGradient id="tpGlobe" x1="20" x2="108" y1="20" y2="108" gradientUnits="userSpaceOnUse">
       <stop stop-color="#1f7a8c"/>
       <stop offset=".55" stop-color="#4f5bd5"/>
       <stop offset="1" stop-color="#6fe3ff"/>
     </linearGradient>
   </defs>
-  <g fill="none" stroke="url(#g)" stroke-width="4" stroke-linecap="round">
+  <g fill="none" stroke="url(#tpGlobe)" stroke-width="4" stroke-linecap="round">
     <circle cx="64" cy="64" r="46"/>
     <ellipse cx="64" cy="64" rx="18" ry="46"/>
     <path d="M18 64h92"/>

@@ -7,11 +7,12 @@ namespace TripPlanner.Web.Tests.Brand;
 public class BrandSystemContractTests : TestContext
 {
     [Fact]
-    public void BrandMark_RendersCompactExplorerIdentity()
+    public void BrandMark_RendersCompactGlobeIdentity()
     {
         var cut = RenderComponent<BrandMark>();
         Assert.Contains("Trip Planner", cut.Markup);
         Assert.Contains("brand-mark", cut.Markup);
+        Assert.Contains("brand-globe", cut.Markup);
     }
 
     [Fact]

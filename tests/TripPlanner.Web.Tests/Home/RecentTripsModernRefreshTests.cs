@@ -14,15 +14,15 @@ namespace TripPlanner.Web.Tests.Home;
 public class RecentTripsModernRefreshTests : TestContext
 {
     [Fact]
-    public void EmptyRecentTrips_UsesBrandedExplorerRecoveryState()
+    public void EmptyRecentTrips_UsesBrandedRecoveryState()
     {
         Services.AddSingleton<ITripApiClient>(new EmptyTripApiClient());
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
         var cut = RenderComponent<RecentTripsList>();
 
-        cut.WaitForAssertion(() => Assert.Contains("empty-explorer", cut.Markup));
-        cut.WaitForAssertion(() => Assert.Contains("Map your first adventure", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("empty-trip", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("Plan your first trip", cut.Markup));
     }
 
     private sealed class EmptyTripApiClient : ITripApiClient
