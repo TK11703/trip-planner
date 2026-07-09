@@ -3,6 +3,7 @@ using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Web.Components.Pages;
+using TripPlanner.Web.Components.Pages.Trips;
 using TripPlanner.Web.Components.Trips;
 using TripPlanner.Web.Features.Trips;
 using TripPlanner.Web.Tests.Infrastructure;
@@ -56,5 +57,22 @@ public class BrandCopyContractTests : TestContext
 
         Assert.Contains("Leave buffers between legs", cut.Markup);
         Assert.Contains("Group plans by day", cut.Markup);
+    }
+
+    [Fact]
+    public void TripsIndexHeaderAndFacts_AvoidOutdatedBrandTerms()
+    {
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
+
+        var cut = RenderComponent<TripsIndex>();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Travel planning tips", cut.Markup);
+            foreach (var term in OutdatedBrandTerms)
+            {
+                Assert.DoesNotContain(term, cut.Markup);
+            }
+        });
     }
 }

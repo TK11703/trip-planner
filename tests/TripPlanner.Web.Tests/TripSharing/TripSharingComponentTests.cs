@@ -36,6 +36,21 @@ public class TripSharingComponentTests : TestContext
     }
 
     [Fact]
+    public void TripsIndex_EmptyState_KeepsBrandingAndCreateActionWithFacts()
+    {
+        Services.AddSingleton<ITripApiClient>(new StubShareApiClient());
+
+        var cut = RenderComponent<TripsIndex>();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Plan your first trip", cut.Markup);
+            Assert.Contains("Create your first trip", cut.Markup);
+            Assert.Contains("Travel planning tips", cut.Markup);
+        });
+    }
+
+    [Fact]
     public void ShareModal_ListsCurrentMembers()
     {
         var member = new TripShareMember("user-x", "Alex Doe", "alex@example.com", TripAccessLevel.Viewer, DateTimeOffset.UtcNow);

@@ -1,0 +1,22 @@
+@* Non-interactive supporting content: curated travel planning motivation for empty/sparse Trips states. *@
+
+<section class="motivational-facts @(Secondary ? "motivational-facts-secondary" : string.Empty)" aria-label="Travel planning tips">
+    <h3 class="h6 text-secondary text-uppercase mb-3">Travel planning tips</h3>
+    <ul class="list-unstyled row g-3 mb-0">
+        @foreach (var fact in MotivationalTravelFacts.All)
+        {
+            <li class="col-12 col-md-6 col-xl-4">
+                <div class="h-100 p-3 rounded border bg-body-tertiary">
+                    <p class="fw-semibold mb-1">@fact.Title</p>
+                    <p class="text-secondary small mb-0">@fact.Body</p>
+                </div>
+            </li>
+        }
+    </ul>
+</section>
+
+@code {
+    /// <summary>When true, renders the facts as visually secondary supporting content beside real trip cards.</summary>
+    [Parameter]
+    public bool Secondary { get; set; }
+}

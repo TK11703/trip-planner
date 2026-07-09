@@ -8,7 +8,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
     <div>
         <h1 class="mb-1">Trips</h1>
-        <p class="text-secondary mb-0">Trips you own and trips shared with you.</p>
+        <p class="text-secondary mb-0">Keep your upcoming and shared travel plans organized in one place — trips you own and trips shared with you.</p>
     </div>
     <a class="btn btn-primary" href="/trips/new">New trip</a>
 </div>
@@ -64,6 +64,13 @@ else
             <button type="button" class="btn btn-outline-secondary" disabled="@(_response.Page >= TotalPages)" @onclick="NextPageAsync">Next</button>
         </div>
     </nav>
+
+    @if (MotivationalTravelFacts.ShouldShowFacts(_response))
+    {
+        <div class="mt-4">
+            <MotivationalTravelFactList Secondary="true" />
+        </div>
+    }
 }
 
 @code {
