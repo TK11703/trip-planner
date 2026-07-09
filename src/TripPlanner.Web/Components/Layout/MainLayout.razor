@@ -1,5 +1,4 @@
 @inherits LayoutComponentBase
-@inject AccountThemeInitializer AccountThemeInitializer
 
 <div class="page d-flex flex-column min-vh-100">
     <NavMenu />
@@ -29,13 +28,3 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
-
-@code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await AccountThemeInitializer.InitializeAsync();
-        }
-    }
-}

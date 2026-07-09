@@ -2,8 +2,9 @@
 @implements IDisposable
 @inject ThemeStateService ThemeState
 @inject IThemePreferenceApiClient ThemePreferenceApi
+@inject AccountThemeInitializer AccountThemeInitializer
 
-<div class="theme-selector" role="group" aria-label="Theme preference">
+<div class="theme-selector @(_initialized ? null : "theme-selector-loading")" role="group" aria-label="Theme preference">
     <button type="button" class="btn btn-sm @(ThemeState.CurrentMode == TripPlanner.Web.Features.Theme.ThemeMode.Light ? "active" : null)" @onclick="() => SetThemeAsync(TripPlanner.Contracts.Theme.ThemeMode.Light)" aria-pressed="@(ThemeState.CurrentMode == TripPlanner.Web.Features.Theme.ThemeMode.Light)">Light</button>
     <button type="button" class="btn btn-sm @(ThemeState.CurrentMode == TripPlanner.Web.Features.Theme.ThemeMode.Dark ? "active" : null)" @onclick="() => SetThemeAsync(TripPlanner.Contracts.Theme.ThemeMode.Dark)" aria-pressed="@(ThemeState.CurrentMode == TripPlanner.Web.Features.Theme.ThemeMode.Dark)">Dark</button>
 </div>
@@ -14,10 +15,28 @@
 
 @code {
     private string? _message;
+    private bool _initialized;
 
     protected override void OnInitialized()
     {
         ThemeState.Changed += StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // The layout renders as static SSR, so the selector (an interactive
+            // island) is responsible for syncing the applied theme into state on
+            // load. Without this the toggle resets to its default after a refresh
+            // while the page still shows the persisted theme.
+            await AccountThemeInitializer.InitializeAsync();
+
+            // Reveal the selector only after the applied theme is synced so the
+            // active button doesn't visibly flip from Light to Dark on load.
+            _initialized = true;
+            StateHasChanged();
+        }
     }
 
     private async Task SetThemeAsync(TripPlanner.Contracts.Theme.ThemeMode mode)

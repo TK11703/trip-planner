@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 460" role="img" aria-labelledby="abTitle abDesc" preserveAspectRatio="xMidYMid meet">
+  <title id="abTitle">Trip Planner about illustration</title>
+  <desc id="abDesc">A wire frame globe beside an itinerary board under aurora light, showing trip plans gathered in one place.</desc>
+  <defs>
+    <linearGradient id="abSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1017"/>
+      <stop offset=".6" stop-color="#12303a"/>
+      <stop offset="1" stop-color="#173e49"/>
+    </linearGradient>
+    <linearGradient id="abAurora" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4fe0b5"/>
+      <stop offset=".5" stop-color="#6fe3ff"/>
+      <stop offset="1" stop-color="#8a7dff"/>
+    </linearGradient>
+    <linearGradient id="abGlobe" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6fe3ff"/>
+      <stop offset="1" stop-color="#4f5bd5"/>
+    </linearGradient>
+    <linearGradient id="abCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a2b38"/>
+      <stop offset="1" stop-color="#122029"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="640" height="460" rx="28" fill="url(#abSky)"/>
+
+  <g opacity=".8" fill="none" stroke="url(#abAurora)" stroke-linecap="round">
+    <path d="M30 92c130-52 250 34 372-10s170 0 236 12" stroke-width="9" opacity=".5"/>
+    <path d="M16 132c150-46 250 30 384-8s150 4 226 16" stroke-width="5" opacity=".65"/>
+    <path d="M64 62c120-34 250 26 338 6s150-14 190-6" stroke-width="3" opacity=".45"/>
+  </g>
+
+  <g fill="#eaf6f2">
+    <circle cx="120" cy="52" r="1.8"/>
+    <circle cx="250" cy="40" r="1.4"/>
+    <circle cx="410" cy="48" r="2"/>
+    <circle cx="540" cy="66" r="1.5"/>
+    <circle cx="600" cy="120" r="1.6"/>
+  </g>
+
+  <!-- Wire frame globe -->
+  <g transform="translate(196 262)">
+    <circle r="112" fill="#0f1a24" stroke="url(#abGlobe)" stroke-width="5"/>
+    <g fill="none" stroke="url(#abGlobe)" stroke-width="3" opacity=".9">
+      <ellipse rx="44" ry="112"/>
+      <ellipse rx="82" ry="112"/>
+      <path d="M-112 0H112"/>
+      <path d="M-102 -48H102"/>
+      <path d="M-102 48H102"/>
+      <path d="M-88 -82H88"/>
+      <path d="M-88 82H88"/>
+    </g>
+    <path d="M-92 40C-50 18-28-32 20-54c24-11 48-13 78-8" fill="none" stroke="#f0a500" stroke-width="4" stroke-linecap="round" stroke-dasharray="1 12"/>
+    <circle cx="-92" cy="40" r="6.5" fill="#f0a500"/>
+    <circle cx="98" cy="-62" r="6.5" fill="#6fe3ff"/>
+  </g>
+
+  <!-- Itinerary board: consolidated trip plans in one place -->
+  <g transform="translate(360 118)">
+    <rect width="238" height="248" rx="20" fill="url(#abCard)" stroke="#2b4250" stroke-width="2"/>
+    <rect x="22" y="26" width="120" height="14" rx="7" fill="#6fe3ff"/>
+    <rect x="22" y="50" width="70" height="10" rx="5" fill="#4fe0b5" opacity=".8"/>
+
+    <!-- plan rows with category dots -->
+    <g>
+      <circle cx="34" cy="96" r="7" fill="#8a7dff"/>
+      <rect x="52" y="90" width="150" height="12" rx="6" fill="#20323d"/>
+      <rect x="52" y="90" width="96" height="12" rx="6" fill="#2f4a58"/>
+
+      <circle cx="34" cy="130" r="7" fill="#4fe0b5"/>
+      <rect x="52" y="124" width="150" height="12" rx="6" fill="#20323d"/>
+      <rect x="52" y="124" width="128" height="12" rx="6" fill="#2f4a58"/>
+
+      <circle cx="34" cy="164" r="7" fill="#f0a500"/>
+      <rect x="52" y="158" width="150" height="12" rx="6" fill="#20323d"/>
+      <rect x="52" y="158" width="72" height="12" rx="6" fill="#2f4a58"/>
+
+      <circle cx="34" cy="198" r="7" fill="#6fe3ff"/>
+      <rect x="52" y="192" width="150" height="12" rx="6" fill="#20323d"/>
+      <rect x="52" y="192" width="112" height="12" rx="6" fill="#2f4a58"/>
+    </g>
+
+    <rect x="22" y="224" width="194" height="2" rx="1" fill="#2b4250"/>
+  </g>
+</svg>

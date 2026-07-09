@@ -1,11 +1,12 @@
+@using Microsoft.AspNetCore.Http
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="@_theme" data-theme-mode="@_theme">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#f3f7f9" />
+    <meta name="theme-color" content="@(_theme == "dark" ? "#0a1017" : "#f3f7f9")" />
     <base href="/" />
     <ResourcePreloader />
     <script src="js/themeMode.js"></script>
@@ -28,3 +29,18 @@
 </body>
 
 </html>
+
+@code {
+    // Render the persisted theme on the server (from a cookie kept in sync with
+    // the account preference) so the first paint is already correct and the
+    // toggle/page do not visibly flip from light to dark on load.
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private string _theme = "light";
+
+    protected override void OnInitialized()
+    {
+        var cookie = HttpContext?.Request.Cookies["tp-theme"];
+        _theme = cookie == "dark" ? "dark" : "light";
+    }
+}

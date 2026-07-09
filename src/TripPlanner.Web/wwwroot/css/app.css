@@ -524,6 +524,38 @@ body {
     box-shadow: 0 1rem 2.5rem rgba(20, 37, 28, .08);
 }
 
+/* Themed list groups (e.g. Itinerary summary, People with access) so flush
+   items match the card surface. Without this the darker default item
+   background squares off the card's rounded bottom corners in dark mode. */
+.list-group {
+    --bs-list-group-bg: var(--tp-surface-raised);
+    --bs-list-group-color: var(--tp-text);
+    --bs-list-group-border-color: var(--tp-border);
+    --bs-list-group-action-color: var(--tp-text);
+    --bs-list-group-action-hover-bg: color-mix(in srgb, var(--tp-brand) 12%, var(--tp-surface-raised));
+    --bs-list-group-action-hover-color: var(--tp-text);
+}
+
+.card > .list-group-flush:last-child {
+    border-bottom-left-radius: inherit;
+    border-bottom-right-radius: inherit;
+    overflow: hidden;
+}
+
+/* Themed accordions (e.g. the FAQ) so item/button surfaces match the card in
+   dark mode instead of using the darker default page background. */
+.accordion {
+    --bs-accordion-color: var(--tp-text);
+    --bs-accordion-bg: var(--tp-surface-raised);
+    --bs-accordion-border-color: var(--tp-border);
+    --bs-accordion-btn-color: var(--tp-text);
+    --bs-accordion-btn-bg: var(--tp-surface-raised);
+    --bs-accordion-active-color: var(--tp-text);
+    --bs-accordion-active-bg: color-mix(in srgb, var(--tp-brand) 14%, var(--tp-surface-raised));
+    --bs-accordion-btn-focus-border-color: var(--tp-brand);
+    --bs-accordion-btn-focus-box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--tp-brand) 30%, transparent);
+}
+
 .brand-surface {
     border: 1px solid var(--tp-border);
     border-radius: 1.25rem;
@@ -655,6 +687,11 @@ body {
     border: 1px solid var(--tp-border);
     border-radius: 999px;
     background: var(--tp-surface);
+}
+/* Keep the control's footprint but hide it until the applied theme is synced,
+   so the active button doesn't visibly flip from Light to Dark on load. */
+.theme-selector-loading {
+    visibility: hidden;
 }
 .theme-selector .btn {
     border-radius: 999px;

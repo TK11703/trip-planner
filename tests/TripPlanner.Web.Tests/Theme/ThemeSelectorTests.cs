@@ -1,4 +1,5 @@
 using Bunit;
+using Bunit.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Contracts.Theme;
 using TripPlanner.Web.Components.Layout;
@@ -13,8 +14,11 @@ public class ThemeSelectorTests : TestContext
     public void ThemeSelector_RendersLightAndDarkOptions()
     {
         JSInterop.SetupVoid("tripPlannerTheme.applyTheme", _ => true);
+        JSInterop.Setup<string>("tripPlannerTheme.getAppliedMode").SetResult("light");
+        this.AddTestAuthorization().SetNotAuthorized();
         Services.AddScoped<ThemeStateService>();
         Services.AddSingleton<IThemePreferenceApiClient>(new RecordingThemePreferenceApiClient());
+        Services.AddScoped<AccountThemeInitializer>();
 
         var cut = RenderComponent<ThemeSelector>();
 
