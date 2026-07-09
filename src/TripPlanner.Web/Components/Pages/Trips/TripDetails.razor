@@ -57,16 +57,64 @@ else
                         <div class="fw-semibold">Trip timeline</div>
                         <div class="small text-secondary">Trip legs are listed on the left. Scroll the grid to see each day, hour, and the events on each leg. Select a leg or event to edit it.</div>
                     </div>
-                    <div class="d-flex gap-2">
-                        @if (CanEditContent)
-                        {
-                            <button class="btn btn-sm btn-outline-primary" @onclick="OpenCreateLegModal">Add leg</button>
-                            <button class="btn btn-sm btn-outline-primary" @onclick="OpenCreateItemModal">Add event</button>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        @{
+                            var navDates = _timeline?.TripDates ?? (IReadOnlyList<DateOnly>)Array.Empty<DateOnly>();
+                            var navCurrent = _timeline?.CurrentDate;
                         }
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Step timeline by day">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    title="Previous day" aria-label="Go to previous day"
+                                    disabled="@(_timeline is null || _timeline.AtTripStart)"
+                                    @onclick="GoToPreviousDayAsync">
+                                <span aria-hidden="true">&lsaquo;</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary"
+                                    title="Next day" aria-label="Go to next day"
+                                    disabled="@(_timeline is null || _timeline.AtTripEnd)"
+                                    @onclick="GoToNextDayAsync">
+                                <span aria-hidden="true">&rsaquo;</span>
+                            </button>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown" aria-expanded="false"
+                                    aria-label="Jump to a date in the trip"
+                                    disabled="@(navDates.Count == 0)">
+                                Jump to date@(navCurrent is { } jc ? $": {jc:ddd M/d}" : "")
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end tp-jump-menu">
+                                <li><h6 class="dropdown-header">Shortcuts</h6></li>
+                                <li><button type="button" class="dropdown-item" @onclick="GoToTripStartAsync">Trip start</button></li>
+                                @if (_timeline?.TodayInRange == true)
+                                {
+                                    <li><button type="button" class="dropdown-item" @onclick="GoToTodayAsync">Today</button></li>
+                                }
+                                <li><button type="button" class="dropdown-item" @onclick="GoToTripEndAsync">Trip end</button></li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li><h6 class="dropdown-header">Dates</h6></li>
+                                @foreach (var date in navDates)
+                                {
+                                    var jumpDate = date;
+                                    var isActive = navCurrent == jumpDate;
+                                    <li>
+                                        <button type="button"
+                                                class="dropdown-item d-flex justify-content-between align-items-center @(isActive ? "active" : null)"
+                                                @onclick="() => JumpToDateAsync(jumpDate)">
+                                            <span>@jumpDate.ToString("ddd, MMM d")</span>
+                                            @if (isActive)
+                                            {
+                                                <span class="ms-2" aria-hidden="true">&#10003;</span>
+                                            }
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
-                    <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" />
+                    <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" OnAddLegRequested="OpenCreateLegModal" OnLoaded="HandleTimelineLoaded" />
                 </div>
             </div>
         </div>
@@ -435,4 +483,36 @@ else
         _initialItemStart = selection.StartLocal;
         _activeModal = ActiveModal.CreateItem;
     }
+
+    private async Task JumpToDateAsync(DateOnly date)
+    {
+        if (_timeline is not null) await _timeline.ScrollToDateAsync(date);
+    }
+
+    private async Task GoToNextDayAsync()
+    {
+        if (_timeline is not null) await _timeline.GoToNextDayAsync();
+    }
+
+    private async Task GoToPreviousDayAsync()
+    {
+        if (_timeline is not null) await _timeline.GoToPreviousDayAsync();
+    }
+
+    private async Task GoToTripStartAsync()
+    {
+        if (_timeline is not null) await _timeline.GoToTripStartAsync();
+    }
+
+    private async Task GoToTripEndAsync()
+    {
+        if (_timeline is not null) await _timeline.GoToTripEndAsync();
+    }
+
+    private async Task GoToTodayAsync()
+    {
+        if (_timeline is not null) await _timeline.GoToTodayAsync();
+    }
+
+    private void HandleTimelineLoaded() => StateHasChanged();
 }

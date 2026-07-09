@@ -36,6 +36,16 @@
             // Defer one frame so the grid has laid out before we measure label widths.
             window.requestAnimationFrame(run);
         },
+        // Scrolls the timeline horizontally so a chosen day's left edge aligns to the
+        // start of the scroll track. offsetX is the target scrollLeft in pixels.
+        scrollToDate: function (scrollEl, offsetX) {
+            if (!scrollEl) return;
+            const max = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth);
+            const left = Math.min(Math.max(offsetX || 0, 0), max);
+            const reduceMotion = window.matchMedia
+                && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            scrollEl.scrollTo({ left: left, behavior: reduceMotion ? 'auto' : 'smooth' });
+        },
         dispose: function (scrollEl) {
             if (!scrollEl || !scrollEl.__ttlSticky) return;
             const state = scrollEl.__ttlSticky;

@@ -136,6 +136,20 @@ else
                         }
                     </div>
                 }
+
+                @if (CanEdit)
+                {
+                    <div class="ttl-leg-footer">
+                        <button type="button"
+                                class="ttl-leg-add ttl-leg-add-footer"
+                                title="Add a trip leg"
+                                aria-label="Add a trip leg"
+                                @onclick="AddLegFromFooterAsync">
+                            <span aria-hidden="true">+</span> Add leg
+                        </button>
+                    </div>
+                    <div class="ttl-footer-spacer" style="width:@(TrackWidthPx)px"></div>
+                }
             </div>
         </div>
     </div>
@@ -147,8 +161,11 @@ else
     [Parameter] public EventCallback<Guid> OnLegSelected { get; set; }
     [Parameter] public EventCallback<Guid> OnItemSelected { get; set; }
     [Parameter] public EventCallback<TimelineSlotSelection> OnLegSlotSelected { get; set; }
+    [Parameter] public EventCallback OnAddLegRequested { get; set; }
+    [Parameter] public EventCallback OnLoaded { get; set; }
 
     public sealed record TimelineSlotSelection(Guid TripLegId, DateTime StartLocal);
+
 
     private const int SlotWidthPx = 26;
     private const int LabelWidthPx = 220;
@@ -201,7 +218,107 @@ else
             _days = Math.Max(1, _end.DayNumber - _start.DayNumber + 1);
         }
         StateHasChanged();
+        // Notify the host so header controls that depend on this component's data
+        // (e.g. the Jump-to-date list) re-render once the timeline has loaded.
+        await OnLoaded.InvokeAsync();
     }
+
+    // ── Date navigation ────────────────────────────────────────────────
+    private DateOnly? _currentDate;
+
+    /// <summary>Every date in the trip range, start to end inclusive. Empty until loaded.</summary>
+    public IReadOnlyList<DateOnly> TripDates
+    {
+        get
+        {
+            if (_timeline is null)
+            {
+                return Array.Empty<DateOnly>();
+            }
+            var dates = new List<DateOnly>(_days);
+            for (var d = 0; d < _days; d++)
+            {
+                dates.Add(_start.AddDays(d));
+            }
+            return dates;
+        }
+    }
+
+    /// <summary>The date the timeline is currently positioned on, or null before any navigation.</summary>
+    public DateOnly? CurrentDate => _currentDate;
+
+    /// <summary>True when today's local date falls within the trip range.</summary>
+    public bool TodayInRange
+    {
+        get
+        {
+            if (_timeline is null)
+            {
+                return false;
+            }
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            return today >= _start && today <= _end;
+        }
+    }
+
+    // The effective focus defaults to the trip start (initial scroll position) until the user navigates.
+    private DateOnly EffectiveCurrent => _currentDate ?? _start;
+
+    /// <summary>True when the timeline is positioned on (or before) the first trip day.</summary>
+    public bool AtTripStart => _timeline is null || EffectiveCurrent <= _start;
+
+    /// <summary>True when the timeline is positioned on (or after) the last trip day.</summary>
+    public bool AtTripEnd => _timeline is null || EffectiveCurrent >= _end;
+
+    /// <summary>Scrolls the timeline so the given day's left edge aligns to the start of the scroll track.</summary>
+    public async Task ScrollToDateAsync(DateOnly date)
+    {
+        if (_timeline is null || !HasGrid || _disposed)
+        {
+            return;
+        }
+        var clamped = date < _start ? _start : date > _end ? _end : date;
+        _currentDate = clamped;
+        var dayIndex = clamped.DayNumber - _start.DayNumber;
+        var offsetX = dayIndex * SlotsPerDay * SlotWidthPx;
+        StateHasChanged();
+        try
+        {
+            await JS.InvokeVoidAsync("tripTimeline.scrollToDate", _scrollEl, offsetX);
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+
+    public Task GoToNextDayAsync()
+    {
+        if (_timeline is null)
+        {
+            return Task.CompletedTask;
+        }
+        var target = EffectiveCurrent.AddDays(1);
+        return target <= _end ? ScrollToDateAsync(target) : Task.CompletedTask;
+    }
+
+    public Task GoToPreviousDayAsync()
+    {
+        if (_timeline is null)
+        {
+            return Task.CompletedTask;
+        }
+        var target = EffectiveCurrent.AddDays(-1);
+        return target >= _start ? ScrollToDateAsync(target) : Task.CompletedTask;
+    }
+
+    public Task GoToTripStartAsync() => ScrollToDateAsync(_start);
+
+    public Task GoToTripEndAsync() => ScrollToDateAsync(_end);
+
+    public Task GoToTodayAsync()
+        => TodayInRange ? ScrollToDateAsync(DateOnly.FromDateTime(DateTime.Now)) : Task.CompletedTask;
+
+    private async Task AddLegFromFooterAsync() => await OnAddLegRequested.InvokeAsync();
+
 
     private (int Left, int Width) ComputeSpan(DateTime localStart, DateTime? localEnd)
     {
@@ -335,6 +452,14 @@ else
         "orange" => "#c96f34",
         "red" => "#b42318",
         "purple" => "#7c3aed",
+        "pink" => "#ec4899",
+        "indigo" => "#4f46e5",
+        "cyan" => "#06b6d4",
+        "lime" => "#84cc16",
+        "amber" => "#f59e0b",
+        "brown" => "#92400e",
+        "magenta" => "#c026d3",
+        "navy" => "#1e3a8a",
         _ => "#64748b"
     };
 }

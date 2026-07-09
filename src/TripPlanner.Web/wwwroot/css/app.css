@@ -184,6 +184,69 @@ body {
     outline-offset: 1px;
 }
 
+/* 014: Legs-column footer "Add leg" action */
+.ttl-leg-footer {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--tp-surface-raised, #fff);
+    border-right: 2px solid var(--ttl-line);
+    border-bottom: 1px solid var(--ttl-line);
+    padding: .5rem .6rem;
+    display: flex;
+}
+
+.ttl-leg-add-footer {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .3rem;
+    padding: .35rem .4rem;
+}
+
+.ttl-footer-spacer {
+    border-bottom: 1px solid var(--ttl-line);
+    background: var(--tp-surface-raised, #fff);
+}
+
+/* 014: Jump-to-date navigation menu */
+.tp-jump-menu {
+    max-height: 20rem;
+    overflow-y: auto;
+}
+
+/* Themed modals: keep the dialog surface distinct from the page/backdrop,
+   with a clearly visible border (especially in dark mode) and a strong shadow. */
+.modal {
+    --bs-modal-bg: var(--tp-surface-raised);
+    --bs-modal-color: var(--tp-text);
+    --bs-modal-border-color: color-mix(in srgb, var(--tp-brand) 45%, var(--tp-border));
+    --bs-modal-header-border-color: var(--tp-border);
+    --bs-modal-footer-border-color: var(--tp-border);
+}
+
+.modal-content {
+    border-width: 1px;
+    box-shadow: 0 1.75rem 4rem rgba(0, 0, 0, .45);
+}
+
+[data-bs-theme="dark"] .modal-content {
+    border-color: color-mix(in srgb, var(--tp-brand) 60%, var(--tp-border));
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--tp-brand) 30%, transparent),
+        0 2rem 4.5rem rgba(0, 0, 0, .7);
+}
+
+/* Deepen the backdrop so the dialog reads as a distinct layer above the page. */
+.modal-backdrop.show {
+    --bs-backdrop-opacity: .6;
+}
+
+[data-bs-theme="dark"] .modal-backdrop.show {
+    --bs-backdrop-opacity: .72;
+}
+
 .ttl-lane {
     position: relative;
     min-height: var(--ttl-row-h);
