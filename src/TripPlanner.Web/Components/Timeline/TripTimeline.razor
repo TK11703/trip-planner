@@ -86,6 +86,9 @@ else
                                 </button>
                             }
                         </div>
+                        <div class="ttl-leg-estimate small text-secondary">
+                            <span>Estimated total: @leg.EstimatedCostTotal.ToString("C")</span>
+                        </div>
                     </div>
                     <div class="ttl-lane @(CanEdit ? "ttl-lane-clickable" : null)" style="width:@(TrackWidthPx)px; min-height:@(legRowHeight)rem" @onclick="args => OnLaneClickAsync(leg, args)">
                         @laneGrid

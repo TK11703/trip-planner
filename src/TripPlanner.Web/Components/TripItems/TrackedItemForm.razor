@@ -120,6 +120,15 @@
         <InputTextArea id="item-notes" class="form-control" rows="3" maxlength="2000" @bind-Value="_model.Notes" />
         <ValidationMessage For="@(() => _model.Notes)" />
     </div>
+    <div class="mb-2">
+        <label class="form-label" for="item-estimated-cost">Estimated cost</label>
+        <div class="input-group">
+            <span class="input-group-text">$</span>
+            <InputNumber id="item-estimated-cost" class="form-control" step="0.01" min="0" @bind-Value="_model.EstimatedCost" placeholder="Optional" />
+        </div>
+        <div class="form-text">Optional estimate, not an actual amount. Leave blank if unknown.</div>
+        <ValidationMessage For="@(() => _model.EstimatedCost)" />
+    </div>
     @if (!string.IsNullOrWhiteSpace(_error))
     {
         <div class="alert alert-danger py-2 small">@_error</div>
@@ -142,6 +151,7 @@
         public string DisplayColor { get; set; } = TrackedItemColors.Default;
         [StringLength(255, ErrorMessage = "Confirmation/Reservation Code must be 255 characters or fewer.")] public string? ConfirmationCode { get; set; }
         [StringLength(2000, ErrorMessage = "Notes must be 2,000 characters or fewer.")] public string? Notes { get; set; }
+        [Range(0, 9999999999.99, ErrorMessage = "Estimated cost cannot be negative.")] public decimal? EstimatedCost { get; set; }
     }
 
     [Parameter] public Guid TripId { get; set; }
@@ -243,7 +253,8 @@
             EndTimeZoneId = Item.EndTimeZoneId ?? Item.StartTimeZoneId,
             DisplayColor = TrackedItemColors.Normalize(Item.DisplayColor),
             ConfirmationCode = Item.ConfirmationCode,
-            Notes = Item.Notes
+            Notes = Item.Notes,
+            EstimatedCost = Item.EstimatedCost
         };
         _loadedItemId = Item.TrackedItemId;
         _tzInitialized = true;
@@ -325,7 +336,8 @@
                 _model.EndLocal is null ? null : _model.EndTimeZoneId,
                 _model.DisplayColor,
                 _model.ConfirmationCode,
-                _model.Notes);
+                _model.Notes,
+                _model.EstimatedCost);
             if (Item is null)
             {
                 await TripApi.CreateItemAsync(TripId, request);
@@ -345,7 +357,8 @@
                     request.EndTimeZoneId,
                     request.DisplayColor,
                     request.ConfirmationCode,
-                    request.Notes));
+                    request.Notes,
+                    request.EstimatedCost));
             }
             await OnSaved.InvokeAsync();
         }

@@ -53,13 +53,19 @@ public static class GetTripDetailEndpoint
         var legs = await itemReads.GetLegsAsync(ownerId, tripId, cancellationToken);
         var items = await itemReads.GetTrackedItemsAsync(ownerId, tripId, cancellationToken);
         var sharedPeople = await sharing.GetSharesAsync(tripId, cancellationToken);
+        // Trip estimated total = sum of leg-assigned item estimated costs (matches the sum of the
+        // per-leg estimated totals shown on the timeline). Items with no estimate are excluded.
+        var estimatedCostTotal = items
+            .Where(i => i.TripLegId is not null && i.EstimatedCost is not null)
+            .Sum(i => i.EstimatedCost!.Value);
         var withChildren = detail with
         {
             Legs = legs,
             TrackedItems = items,
             AccessLevel = access.AccessLevel,
             IsOwner = access.IsOwner(),
-            SharedPeople = sharedPeople
+            SharedPeople = sharedPeople,
+            EstimatedCostTotal = estimatedCostTotal
         };
         await audit.RecordAsync(callerId, AuditOperations.TripRead, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
         return TypedResults.Ok(withChildren);

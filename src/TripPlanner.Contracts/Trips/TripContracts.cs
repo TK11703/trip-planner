@@ -66,7 +66,8 @@ public sealed record TripDetail(
     IReadOnlyList<TrackedItemDto> TrackedItems,
     TripAccessLevel AccessLevel = TripAccessLevel.Owner,
     bool IsOwner = true,
-    IReadOnlyList<TripShareMember>? SharedPeople = null);
+    IReadOnlyList<TripShareMember>? SharedPeople = null,
+    decimal EstimatedCostTotal = 0m);
 
 public sealed record TripLegDto(
     Guid TripLegId,
@@ -99,4 +100,5 @@ public sealed record TrackedItemDto(
     string DisplayColor,
     string? ConfirmationCode,
     string? Notes,
-    int SortOrder);
+    int SortOrder,
+    decimal? EstimatedCost = null);

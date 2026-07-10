@@ -32,5 +32,5 @@ public static class TrackedItemColors
     public static string Normalize(string? color) => IsValid(color) ? color!.Trim().ToLowerInvariant() : Default;
 }
 
-public sealed record CreateTrackedItemRequest(Guid TripLegId, string ItemType, string Title, string? Location, DateTime StartLocal, string StartTimeZoneId, DateTime? EndLocal, string? EndTimeZoneId, string DisplayColor, string? ConfirmationCode, string? Notes);
-public sealed record UpdateTrackedItemRequest(Guid TripLegId, string ItemType, string Title, string? Location, DateTime StartLocal, string StartTimeZoneId, DateTime? EndLocal, string? EndTimeZoneId, string DisplayColor, string? ConfirmationCode, string? Notes);
+public sealed record CreateTrackedItemRequest(Guid TripLegId, string ItemType, string Title, string? Location, DateTime StartLocal, string StartTimeZoneId, DateTime? EndLocal, string? EndTimeZoneId, string DisplayColor, string? ConfirmationCode, string? Notes, decimal? EstimatedCost = null);
+public sealed record UpdateTrackedItemRequest(Guid TripLegId, string ItemType, string Title, string? Location, DateTime StartLocal, string StartTimeZoneId, DateTime? EndLocal, string? EndTimeZoneId, string DisplayColor, string? ConfirmationCode, string? Notes, decimal? EstimatedCost = null);

@@ -142,6 +142,17 @@ else
                 <ul class="list-group list-group-flush small">
                     <li class="list-group-item d-flex justify-content-between"><span>Legs</span><span>@_trip.Legs.Count</span></li>
                     <li class="list-group-item d-flex justify-content-between"><span>Events</span><span>@_trip.TrackedItems.Count</span></li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Estimated total</span>
+                        @if (_trip.EstimatedCostTotal > 0)
+                        {
+                            <span>@_trip.EstimatedCostTotal.ToString("C")</span>
+                        }
+                        else
+                        {
+                            <span class="text-secondary">No estimates yet</span>
+                        }
+                    </li>
                 </ul>
             </div>
         </div>

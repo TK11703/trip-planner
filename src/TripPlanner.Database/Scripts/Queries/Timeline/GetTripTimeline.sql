@@ -35,7 +35,8 @@ SELECT
     end_time_zone_id                                AS "EndTimeZoneId",
     ends_at                                         AS "EndsAt",
     display_color                                   AS "DisplayColor",
-    sort_order                                      AS "SortOrder"
+    sort_order                                      AS "SortOrder",
+    estimated_cost                                  AS "EstimatedCost"
 FROM tracked_items
 WHERE owner_user_id = @OwnerUserId AND trip_id = @TripId
 ORDER BY starts_at, sort_order, title, tracked_item_id;

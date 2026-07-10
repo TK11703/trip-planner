@@ -9,6 +9,7 @@ public sealed class TrackedItemValidator
 {
     private const int ConfirmationCodeMaxLength = 255;
     private const int NotesMaxLength = 2000;
+    private const decimal EstimatedCostMax = 9_999_999_999.99m;
 
     private readonly ITimezoneIdValidator _timezones;
 
@@ -18,12 +19,12 @@ public sealed class TrackedItemValidator
     }
 
     public ValidationResult Validate(CreateTrackedItemRequest request, TripDetail trip)
-        => ValidateCore(request.TripLegId, request.ItemType, request.Title, request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId, request.DisplayColor, request.ConfirmationCode, request.Notes, trip);
+        => ValidateCore(request.TripLegId, request.ItemType, request.Title, request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId, request.DisplayColor, request.ConfirmationCode, request.Notes, request.EstimatedCost, trip);
 
     public ValidationResult Validate(UpdateTrackedItemRequest request, TripDetail trip)
-        => ValidateCore(request.TripLegId, request.ItemType, request.Title, request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId, request.DisplayColor, request.ConfirmationCode, request.Notes, trip);
+        => ValidateCore(request.TripLegId, request.ItemType, request.Title, request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId, request.DisplayColor, request.ConfirmationCode, request.Notes, request.EstimatedCost, trip);
 
-    private ValidationResult ValidateCore(Guid tripLegId, string itemType, string title, DateTime startLocal, string startTimeZoneId, DateTime? endLocal, string? endTimeZoneId, string displayColor, string? confirmationCode, string? notes, TripDetail trip)
+    private ValidationResult ValidateCore(Guid tripLegId, string itemType, string title, DateTime startLocal, string startTimeZoneId, DateTime? endLocal, string? endTimeZoneId, string displayColor, string? confirmationCode, string? notes, decimal? estimatedCost, TripDetail trip)
     {
         if (string.IsNullOrWhiteSpace(itemType) || !TrackedItemTypes.All.Contains(itemType))
             return ValidationResult.Fail("Item type must be one of: event, reservation, activity, reminder.", "itemType");
@@ -58,6 +59,15 @@ public sealed class TrackedItemValidator
             return ValidationResult.Fail($"Confirmation/Reservation Code must be {ConfirmationCodeMaxLength} characters or fewer.", "confirmationCode");
         if (notes is not null && notes.Length > NotesMaxLength)
             return ValidationResult.Fail($"Notes must be {NotesMaxLength} characters or fewer.", "notes");
+        if (estimatedCost is { } cost)
+        {
+            if (cost < 0)
+                return ValidationResult.Fail("Estimated cost cannot be negative.", "estimatedCost");
+            if (cost > EstimatedCostMax)
+                return ValidationResult.Fail("Estimated cost is too large.", "estimatedCost");
+            if (decimal.Round(cost, 2) != cost)
+                return ValidationResult.Fail("Enter an estimated cost with up to two decimal places.", "estimatedCost");
+        }
         if (trip.Legs.Count == 0)
             return ValidationResult.Fail("Add a trip leg before adding an event, then relate the event to that leg.", "tripLegId");
         if (tripLegId == Guid.Empty)

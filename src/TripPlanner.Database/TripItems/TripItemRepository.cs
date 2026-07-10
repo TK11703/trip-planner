@@ -105,7 +105,7 @@ public sealed class TripItemRepository : ITripItemRepository
                 ? ToInstant(endLocal, request.EndTimeZoneId ?? request.StartTimeZoneId)
                 : (DateTimeOffset?)null,
             DisplayColor = TrackedItemColors.Normalize(request.DisplayColor),
-            request.ConfirmationCode, request.Notes,
+            request.ConfirmationCode, request.Notes, request.EstimatedCost,
             SortOrder = 0, NowUtc = nowUtc
         }, cancellationToken: ct));
         return rows == 0 ? null : id;
@@ -124,7 +124,7 @@ public sealed class TripItemRepository : ITripItemRepository
                 ? ToInstant(endLocal, request.EndTimeZoneId ?? request.StartTimeZoneId)
                 : (DateTimeOffset?)null,
             DisplayColor = TrackedItemColors.Normalize(request.DisplayColor),
-            request.ConfirmationCode, request.Notes,
+            request.ConfirmationCode, request.Notes, request.EstimatedCost,
             SortOrder = 0
         }, cancellationToken: ct));
     }

@@ -20,7 +20,8 @@ public sealed record TimelineLeg(
     string EndTimeZoneId,
     string? EndTimeZoneLabel,
     int SortOrder,
-    IReadOnlyList<TimelineItem> Items);
+    IReadOnlyList<TimelineItem> Items,
+    decimal EstimatedCostTotal = 0m);
 
 public sealed record TimelineItem(
     Guid TrackedItemId,
@@ -37,4 +38,5 @@ public sealed record TimelineItem(
     string DisplayColor,
     bool StartsOutsideLeg,
     bool EndsOutsideLeg,
-    int SortOrder);
+    int SortOrder,
+    decimal? EstimatedCost = null);

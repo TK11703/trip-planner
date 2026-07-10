@@ -48,6 +48,10 @@ public sealed class TimelineRepository : ITimelineRepository
                     .ToArray()
                 : Array.Empty<TimelineItem>();
 
+            var legEstimatedTotal = legItems
+                .Where(i => i.EstimatedCost is not null)
+                .Sum(i => i.EstimatedCost!.Value);
+
             legs.Add(new TimelineLeg(
                 leg.TripLegId,
                 leg.Title,
@@ -60,7 +64,8 @@ public sealed class TimelineRepository : ITimelineRepository
                 leg.EndTimeZoneId,
                 leg.EndTimeZoneId,
                 leg.SortOrder,
-                legItems));
+                legItems,
+                legEstimatedTotal));
         }
 
         var unassigned = itemRows
@@ -103,7 +108,8 @@ public sealed class TimelineRepository : ITimelineRepository
             TrackedItemColors.Normalize(item.DisplayColor),
             startsOutside,
             endsOutside,
-            item.SortOrder);
+            item.SortOrder,
+            item.EstimatedCost);
     }
 
     private sealed record LegRow(
@@ -132,5 +138,6 @@ public sealed class TimelineRepository : ITimelineRepository
         string? EndTimeZoneId,
         DateTimeOffset? EndsAt,
         string? DisplayColor,
-        int SortOrder);
+        int SortOrder,
+        decimal? EstimatedCost);
 }
