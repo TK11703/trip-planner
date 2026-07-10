@@ -45,8 +45,8 @@ body {
 }
 
 .ttl-scroll {
-    overflow: auto;
-    max-height: 34rem;
+    overflow-x: auto;
+    overflow-y: visible;
     border: 1px solid var(--ttl-line);
     border-radius: .5rem;
     background: var(--tp-surface-raised, #fff);
@@ -330,7 +330,6 @@ body {
 }
 
 @media (max-width: 576px) {
-    .ttl-scroll { max-height: 26rem; }
     .ttl { --ttl-label-w: 168px; }
     .ttl-leg-meta { flex-wrap: wrap; gap: .25rem; }
     .ttl-leg-add { font-size: .68rem; padding: .18rem .35rem; }
