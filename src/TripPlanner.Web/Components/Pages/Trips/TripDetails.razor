@@ -58,6 +58,12 @@ else
                         <div class="small text-secondary">Trip legs are listed on the left. Scroll the grid to see each day, hour, and the events on each leg. Select a leg or event to edit it.</div>
                     </div>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                @onclick="OpenMapModal" disabled="@(!CanOpenMap)"
+                                title="@(CanOpenMap ? "View all trip locations on a map" : "Add a location to an event to view the map")"
+                                aria-label="View all trip locations on a map">
+                            View map
+                        </button>
                         @{
                             var navDates = _timeline?.TripDates ?? (IReadOnlyList<DateOnly>)Array.Empty<DateOnly>();
                             var navCurrent = _timeline?.CurrentDate;
@@ -212,6 +218,11 @@ else
         <ShareTripModal TripId="@TripId" OnClose="CloseShareModal" OnChanged="ReloadAsync" />
     }
 
+    @if (_showMapModal)
+    {
+        <TripPlanner.Web.Components.Trips.TripMapModal TripId="@TripId" OnClose="CloseMapModal" OnOpenEvent="HandleMapOpenEventAsync" />
+    }
+
     @if (_activeModal is not ActiveModal.None)
     {
         <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true">
@@ -285,6 +296,7 @@ else
     private TripTimeline? _timeline;
     private ActiveModal _activeModal = ActiveModal.None;
     private bool _showShareModal;
+    private bool _showMapModal;
     private TripPlanner.Web.Components.Trips.TripForm.TripFormModel _tripEditModel = new();
     private TripLegDto? _editingLeg;
     private TrackedItemDto? _editingItem;
@@ -295,8 +307,20 @@ else
     private string? _deleteError;
 
     private bool CanEditContent => _trip is not null && (_trip.IsOwner || _trip.AccessLevel == TripAccessLevel.Collaborator);
+    private bool CanOpenMap => _trip is not null && _trip.TrackedItems.Any(i => IsLocationMappable(i.Location));
     private string AccessLevelLabel => _trip?.AccessLevel == TripAccessLevel.Collaborator ? "Collaborator" : "Viewer";
     private string AccessBadgeClass => _trip?.AccessLevel == TripAccessLevel.Collaborator ? "text-bg-success" : "text-bg-secondary";
+
+    // Matches the globe's rule: a location is map-capable when non-empty, has a letter/digit, and is <=200 chars.
+    private static bool IsLocationMappable(string? location)
+    {
+        if (string.IsNullOrWhiteSpace(location))
+        {
+            return false;
+        }
+        var trimmed = location.Trim();
+        return trimmed.Length <= 200 && trimmed.Any(char.IsLetterOrDigit);
+    }
 
     private static string AccessBadge(TripAccessLevel level) => level switch
     {
@@ -398,6 +422,25 @@ else
     private void OpenShareModal() => _showShareModal = true;
 
     private void CloseShareModal() => _showShareModal = false;
+
+    private void OpenMapModal() => _showMapModal = true;
+
+    private void CloseMapModal() => _showMapModal = false;
+
+    private async Task HandleMapOpenEventAsync(Guid trackedItemId)
+    {
+        var item = _trip?.TrackedItems.FirstOrDefault(i => i.TrackedItemId == trackedItemId);
+        if (item is null)
+        {
+            return;
+        }
+        _showMapModal = false;
+        if (CanEditContent)
+        {
+            OpenEditItemModal(item);
+        }
+        await Task.CompletedTask;
+    }
 
     private void OpenCreateLegModal()
     {

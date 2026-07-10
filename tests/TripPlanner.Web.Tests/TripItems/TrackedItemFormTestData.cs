@@ -1,6 +1,7 @@
 using TripPlanner.Contracts.Timeline;
 using TripPlanner.Contracts.TripItems;
 using TripPlanner.Contracts.Trips;
+using TripPlanner.Web.Features.Maps;
 using TripPlanner.Web.Features.Trips;
 
 namespace TripPlanner.Web.Tests.TripItems;
@@ -69,4 +70,14 @@ internal sealed class FormStubTripApiClient : ITripApiClient
     public Task<TripShareMember> UpdateShareAccessAsync(Guid tripId, string userId, UpdateTripShareAccessRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     public Task RemoveShareAsync(Guid tripId, string userId, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<TripPlanner.Contracts.Places.PlaceSuggestion>> SuggestPlacesAsync(string query, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<TripPlanner.Contracts.Places.PlaceSuggestion>>(Array.Empty<TripPlanner.Contracts.Places.PlaceSuggestion>());
+    public Task<TripMapResponse> GetTripMapAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult(new TripMapResponse(Array.Empty<TripMapLocation>()));
+}
+
+/// <summary>Test map-preference provider returning a fixed provider (defaults to Bing).</summary>
+internal sealed class StubMapPreferenceProvider : IMapPreferenceProvider
+{
+    private readonly string _provider;
+    public StubMapPreferenceProvider(string provider = "Bing") => _provider = provider;
+    public ValueTask<string> GetProviderAsync(CancellationToken ct = default) => ValueTask.FromResult(_provider);
+    public void Invalidate() { }
 }

@@ -27,6 +27,7 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
             Normalize(displayName) ?? BuildDisplayName(firstName, lastName),
             Normalize(email),
             "UTC",
+            MapProviders.Bing,
             IsComplete: !string.IsNullOrWhiteSpace(displayName ?? BuildDisplayName(firstName, lastName)) && !string.IsNullOrWhiteSpace(email),
             NotificationPreferences.Default,
             new PersonalizationPreferences(null, null, null, null),
@@ -52,6 +53,7 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
             DisplayName = displayName,
             Email = Normalize(request.Email),
             TimeZoneId = request.TimeZoneId,
+            MapProvider = MapProviders.Normalize(request.MapProvider),
             IsComplete = !string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(request.Email),
             NotificationPreferences = MergePreferences(request.NotificationPreferences, nowUtc),
             PersonalizationPreferences = new PersonalizationPreferences(

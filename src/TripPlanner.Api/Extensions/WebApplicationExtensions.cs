@@ -1,5 +1,6 @@
 using TripPlanner.Api.Features.Trips;
 using TripPlanner.Api.Features.TripItems;
+using TripPlanner.Api.Features.TripMaps;
 using TripPlanner.Api.Features.TripSharing;
 using TripPlanner.Api.Features.ThemePreferences;
 using TripPlanner.Api.Features.UserProfiles;
@@ -39,6 +40,7 @@ public static class WebApplicationExtensions
 
         app.MapTripEndpoints();
         app.MapTripItemEndpoints();
+        app.MapTripMapEndpoints();
         app.MapTripSharingEndpoints();
         app.MapThemePreferenceEndpoints();
         app.MapUserProfileEndpoints();

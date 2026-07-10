@@ -16,6 +16,7 @@ public class ProfileEditTests : TestContext
         var client = new RecordingProfileApiClient(ProfileTestData.CompleteProfile());
         Services.AddSingleton<IProfileApiClient>(client);
         Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
+        Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider, TripPlanner.Web.Features.Maps.MapPreferenceProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
         var cut = RenderComponent<ProfilePage>();
 

@@ -15,6 +15,7 @@ public class TrackedItemFormLocationMapTests : TestContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton<ITripApiClient>(new FormStubTripApiClient());
+        Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider>(new StubMapPreferenceProvider());
         Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
     }
 

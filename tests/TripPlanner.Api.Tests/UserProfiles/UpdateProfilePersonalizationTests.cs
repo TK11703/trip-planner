@@ -18,6 +18,7 @@ public class UpdateProfilePersonalizationTests
             "Avery Traveler",
             "avery@example.test",
             "UTC",
+            MapProviders.Bing,
             NotificationPreferences.Default,
             new PersonalizationPreferences("museums", "SEA", "slow travel", "quiet rooms")));
         savedResponse.EnsureSuccessStatusCode();
@@ -30,6 +31,7 @@ public class UpdateProfilePersonalizationTests
             "Avery Traveler",
             "avery@example.test",
             "UTC",
+            MapProviders.Bing,
             NotificationPreferences.Default,
             new PersonalizationPreferences(" ", null, "", null)));
         clearedResponse.EnsureSuccessStatusCode();

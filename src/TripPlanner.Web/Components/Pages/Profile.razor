@@ -2,8 +2,10 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
+@using TripPlanner.Contracts.Profile
 @using TripPlanner.Web.Features.Timezones
 @inject IProfileApiClient ProfileApi
+@inject TripPlanner.Web.Features.Maps.IMapPreferenceProvider MapPreference
 @inject ITimezoneOptionsProvider TimezoneOptions
 
 <PageTitle>Profile</PageTitle>
@@ -63,6 +65,14 @@ else if (_model is not null)
                     }
                 </InputSelect>
                 <ValidationMessage For="@(() => _model.TimeZoneId)" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="mapProvider">Default map</label>
+                <InputSelect id="mapProvider" class="form-select" @bind-Value="_model.MapProvider">
+                    <option value="@MapProviders.Bing">Bing Maps</option>
+                    <option value="@MapProviders.Google">Google Maps</option>
+                </InputSelect>
+                <div class="form-text">Used when you open an event location on a map.</div>
             </div>
         </div>
 
@@ -161,12 +171,14 @@ else if (_model is not null)
                 _model.DisplayName,
                 _model.Email,
                 _model.TimeZoneId,
+                MapProviders.Normalize(_model.MapProvider),
                 new NotificationPreferences(_model.NotificationCategories
                     .Select(c => new NotificationCategoryPreference(c.Category, c.DisplayName, c.InAppEnabled, c.EmailEnabled))
                     .ToArray()),
                 new PersonalizationPreferences(_model.TravelInterests, _model.HomeAirport, _model.PreferredTravelStyle, _model.AccessibilityNotes));
 
             var saved = await ProfileApi.SaveAsync(request);
+            MapPreference.Invalidate();
             ApplyProfile(saved);
             _saveMessage = "Profile saved. Notification changes apply to future notifications.";
         }
@@ -190,6 +202,7 @@ else if (_model is not null)
             DisplayName = profile.DisplayName,
             Email = profile.Email,
             TimeZoneId = profile.TimeZoneId,
+            MapProvider = MapProviders.Normalize(profile.MapProvider),
             NotificationCategories = profile.NotificationPreferences.Categories
                 .Select(c => new CategoryPreferenceModel
                 {
@@ -234,6 +247,7 @@ else if (_model is not null)
         public string? Email { get; set; }
         [Required(ErrorMessage = "Timezone is required.")]
         public string TimeZoneId { get; set; } = "UTC";
+        public string MapProvider { get; set; } = MapProviders.Bing;
         public List<CategoryPreferenceModel> NotificationCategories { get; set; } = new();
         public string? TravelInterests { get; set; }
         public string? HomeAirport { get; set; }

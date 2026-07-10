@@ -1,0 +1,122 @@
+@using TripPlanner.Contracts.Trips
+@inject ITripApiClient TripApi
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5">Trip map</h2>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAsync"></button>
+            </div>
+            <div class="modal-body">
+                @if (_loading)
+                {
+                    <div class="text-secondary">Loading map…</div>
+                }
+                else if (_locations.Count == 0)
+                {
+                    <div class="alert alert-info mb-0" role="status">
+                        We couldn't place any of this trip's locations on the map yet. Add an address to an event, or check back once locations can be resolved.
+                    </div>
+                }
+                else
+                {
+                    <div class="tp-map-canvas" @ref="_mapElement" aria-label="Map of trip locations"></div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop show"></div>
+
+@code {
+    [Parameter] public Guid TripId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpenEvent { get; set; }
+
+    private bool _loading = true;
+    private IReadOnlyList<TripMapLocation> _locations = Array.Empty<TripMapLocation>();
+    private ElementReference _mapElement;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<TripMapModal>? _selfRef;
+    private string? _mapHandle;
+    private bool _rendered;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await TripApi.GetTripMapAsync(TripId);
+            _locations = response.Locations;
+        }
+        catch
+        {
+            _locations = Array.Empty<TripMapLocation>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Initialize the Leaflet map once, after the canvas element exists.
+        if (_rendered || _loading || _locations.Count == 0)
+        {
+            return;
+        }
+        _rendered = true;
+
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/tripMap.js");
+        _selfRef = DotNetObjectReference.Create(this);
+        var points = _locations.Select(l => new
+        {
+            trackedItemId = l.TrackedItemId,
+            title = l.Title,
+            location = l.Location,
+            latitude = l.Latitude,
+            longitude = l.Longitude
+        }).ToArray();
+        _mapHandle = await _module.InvokeAsync<string>("init", _mapElement, points, _selfRef);
+    }
+
+    [JSInvokable]
+    public async Task OnMarkerActivated(Guid trackedItemId)
+    {
+        if (OnOpenEvent.HasDelegate)
+        {
+            await OnOpenEvent.InvokeAsync(trackedItemId);
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        if (OnClose.HasDelegate)
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null && _mapHandle is not null)
+            {
+                await _module.InvokeVoidAsync("dispose", _mapHandle);
+            }
+            if (_module is not null)
+            {
+                await _module.DisposeAsync();
+            }
+        }
+        catch
+        {
+            // Circuit may already be gone during teardown; ignore.
+        }
+        _selfRef?.Dispose();
+    }
+}

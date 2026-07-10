@@ -9,6 +9,7 @@ public sealed record UserProfileResponse(
     string? DisplayName,
     string? Email,
     string TimeZoneId,
+    string MapProvider,
     bool IsComplete,
     NotificationPreferences NotificationPreferences,
     PersonalizationPreferences PersonalizationPreferences,
@@ -22,8 +23,23 @@ public sealed record UpdateUserProfileRequest(
     string? DisplayName,
     string? Email,
     string TimeZoneId,
+    string MapProvider,
     NotificationPreferences NotificationPreferences,
     PersonalizationPreferences PersonalizationPreferences);
+
+/// <summary>
+/// The mapping tool used when opening a single event location. Persisted per user; defaults to Bing.
+/// </summary>
+public static class MapProviders
+{
+    public const string Bing = "Bing";
+    public const string Google = "Google";
+    public const string Default = Bing;
+
+    /// <summary>Normalizes any input to a known provider, defaulting to Bing (never throws).</summary>
+    public static string Normalize(string? value) =>
+        string.Equals(value, Google, StringComparison.OrdinalIgnoreCase) ? Google : Bing;
+}
 
 /// <summary>
 /// A person's consolidated notification preferences, one entry per user-controllable category.

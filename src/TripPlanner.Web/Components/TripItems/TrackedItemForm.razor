@@ -1,5 +1,7 @@
 @using System.ComponentModel.DataAnnotations
+@using TripPlanner.Contracts.Profile
 @inject ITripApiClient TripApi
+@inject TripPlanner.Web.Features.Maps.IMapPreferenceProvider MapPreference
 @inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
 @implements IDisposable
 
@@ -158,11 +160,6 @@
         <ValidationMessage For="@(() => _model.ConfirmationCode)" />
     </div>
     <div class="mb-2">
-        <label class="form-label" for="item-notes">Notes</label>
-        <InputTextArea id="item-notes" class="form-control" rows="3" maxlength="2000" @bind-Value="_model.Notes" />
-        <ValidationMessage For="@(() => _model.Notes)" />
-    </div>
-    <div class="mb-2">
         <label class="form-label" for="item-estimated-cost">Estimated cost</label>
         <div class="input-group">
             <span class="input-group-text">$</span>
@@ -170,6 +167,11 @@
         </div>
         <div class="form-text">Optional estimate, not an actual amount. Leave blank if unknown.</div>
         <ValidationMessage For="@(() => _model.EstimatedCost)" />
+    </div>
+    <div class="mb-2">
+        <label class="form-label" for="item-notes">Notes</label>
+        <InputTextArea id="item-notes" class="form-control" rows="3" maxlength="2000" @bind-Value="_model.Notes" />
+        <ValidationMessage For="@(() => _model.Notes)" />
     </div>
     @if (!string.IsNullOrWhiteSpace(_error))
     {
@@ -242,8 +244,20 @@
     // True when the current location value is a plausibly map-capable place/address.
     private bool IsLocationMappable => LocationIsMapCapable(_model.Location);
 
-    // A Bing Maps search URL for the entered location, used as the globe action's destination.
-    private string MapUrl => $"https://www.bing.com/maps?q={Uri.EscapeDataString((_model.Location ?? string.Empty).Trim())}";
+    // The user's default mapping tool, loaded from their profile (defaults to Bing).
+    private string _mapProvider = MapProviders.Bing;
+
+    // A map search URL for the entered location, targeting the user's preferred provider.
+    private string MapUrl
+    {
+        get
+        {
+            var query = Uri.EscapeDataString((_model.Location ?? string.Empty).Trim());
+            return string.Equals(_mapProvider, MapProviders.Google, StringComparison.OrdinalIgnoreCase)
+                ? $"https://www.google.com/maps/search/?api=1&query={query}"
+                : $"https://www.bing.com/maps?q={query}";
+        }
+    }
 
     private static bool LocationIsMapCapable(string? location)
     {
@@ -261,8 +275,11 @@
     private bool _showSuggestions;
     private CancellationTokenSource? _placeCts;
 
-    // Debounced address lookup: each keystroke cancels the previous pending request and, after a
-    // short pause, asks the API for suggestions. Failures degrade to no suggestions silently.
+    // Debounced address lookup: each keystroke supersedes the previous pending request. The
+    // debounce delay is cancellable (handled locally), but the HTTP call itself is NOT cancelled —
+    // a superseded request is allowed to finish and its result is discarded via the token check.
+    // Cancelling the in-flight request would surface a benign TaskCanceledException through the
+    // authenticated HTTP pipeline that the debugger reports as user-unhandled.
     private async Task OnLocationInput(ChangeEventArgs e)
     {
         var text = e.Value?.ToString() ?? string.Empty;
@@ -284,7 +301,7 @@
         try
         {
             await Task.Delay(300, token);
-            var results = await TripApi.SuggestPlacesAsync(query, token);
+            var results = await TripApi.SuggestPlacesAsync(query);
             if (token.IsCancellationRequested)
             {
                 return;
@@ -295,7 +312,7 @@
         }
         catch (OperationCanceledException)
         {
-            // Superseded by a newer keystroke or the form closed; ignore.
+            // Debounce superseded by a newer keystroke or the form closed; ignore.
         }
         catch
         {
@@ -340,6 +357,11 @@
         "navy" => "#1e3a8a",
         _ => "#64748b"
     };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _mapProvider = await MapPreference.GetProviderAsync();
+    }
 
     protected override void OnParametersSet()
     {

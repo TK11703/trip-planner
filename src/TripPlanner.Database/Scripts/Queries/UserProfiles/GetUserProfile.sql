@@ -5,6 +5,7 @@ SELECT
     display_name AS DisplayName,
     email AS Email,
     time_zone_id AS TimeZoneId,
+    map_provider AS MapProvider,
     travel_interests AS TravelInterests,
     home_airport AS HomeAirport,
     preferred_travel_style AS PreferredTravelStyle,

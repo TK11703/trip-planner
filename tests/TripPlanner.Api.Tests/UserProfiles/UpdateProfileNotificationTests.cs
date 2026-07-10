@@ -21,6 +21,7 @@ public class UpdateProfileNotificationTests
             "Avery Traveler",
             "avery@example.test",
             "UTC",
+            MapProviders.Bing,
             new NotificationPreferences(new[]
             {
                 new NotificationCategoryPreference(NotificationCategories.ItineraryChanges, "Itinerary changes", true, false),
@@ -51,6 +52,7 @@ public class UpdateProfileNotificationTests
             "Avery Traveler",
             null,
             "UTC",
+            MapProviders.Bing,
             new NotificationPreferences(new[]
             {
                 new NotificationCategoryPreference(NotificationCategories.ItineraryChanges, "Itinerary changes", true, true)

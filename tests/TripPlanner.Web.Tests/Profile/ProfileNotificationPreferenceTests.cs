@@ -23,6 +23,7 @@ public class ProfileNotificationPreferenceTests : TestContext
         var profile = ProfileTestData.CompleteProfile(preferences);
         Services.AddSingleton<IProfileApiClient>(new RecordingProfileApiClient(profile));
         Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
+        Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider, TripPlanner.Web.Features.Maps.MapPreferenceProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
         var cut = RenderComponent<ProfilePage>();
@@ -38,6 +39,7 @@ public class ProfileNotificationPreferenceTests : TestContext
     {
         Services.AddSingleton<IProfileApiClient>(new ThrowingProfileApiClient(ProfileTestData.CompleteProfile()));
         Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
+        Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider, TripPlanner.Web.Features.Maps.MapPreferenceProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
         var cut = RenderComponent<ProfilePage>();
 

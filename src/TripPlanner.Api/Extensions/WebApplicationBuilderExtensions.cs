@@ -80,13 +80,15 @@ public static class WebApplicationBuilderExtensions
         });
         builder.Services.AddScoped<IUserDirectoryLookup, GraphUserDirectoryLookup>();
 
-        // Azure Maps address/place typeahead. The subscription key is environment-driven
-        // (AzureMaps:SubscriptionKey) and the lookup degrades to empty results when unset.
+        // Azure Maps address/place typeahead + geocoding. The subscription key is environment-driven
+        // (AzureMaps:SubscriptionKey) and both capabilities degrade gracefully when it is unset.
         builder.Services.AddHttpClient(AzureMapsPlaceSuggestionLookup.HttpClientName, client =>
         {
             client.BaseAddress = new Uri("https://atlas.microsoft.com/");
         });
-        builder.Services.AddScoped<IPlaceSuggestionLookup, AzureMapsPlaceSuggestionLookup>();
+        builder.Services.AddScoped<AzureMapsPlaceSuggestionLookup>();
+        builder.Services.AddScoped<IPlaceSuggestionLookup>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
+        builder.Services.AddScoped<IPlaceGeocoder>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
 
         builder.Services.AddSingleton<DatabaseInitializer>();
 

@@ -31,6 +31,7 @@ internal sealed class RecordingProfileApiClient : IProfileApiClient
             DisplayName = request.DisplayName,
             Email = request.Email,
             TimeZoneId = request.TimeZoneId,
+            MapProvider = MapProviders.Normalize(request.MapProvider),
             NotificationPreferences = request.NotificationPreferences,
             PersonalizationPreferences = request.PersonalizationPreferences,
             IsComplete = !string.IsNullOrWhiteSpace(request.DisplayName) && !string.IsNullOrWhiteSpace(request.Email)
@@ -64,6 +65,7 @@ internal static class ProfileTestData
             "Avery Traveler",
             "avery@example.test",
             "UTC",
+            MapProviders.Bing,
             true,
             notifications ?? NotificationPreferences.Default,
             personalization ?? new PersonalizationPreferences(null, null, null, null),

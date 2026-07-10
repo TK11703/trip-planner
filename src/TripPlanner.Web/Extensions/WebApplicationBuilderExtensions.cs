@@ -6,6 +6,7 @@ using TripPlanner.Web.Features.Profile;
 using TripPlanner.Web.Features.Trips;
 using TripPlanner.Web.Features.Theme;
 using TripPlanner.Web.Features.Timezones;
+using TripPlanner.Web.Features.Maps;
 using TripPlanner.Web.Features.Notifications;
 
 namespace TripPlanner.Web.Extensions;
@@ -29,6 +30,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton<IMotivationalFactRotation, MotivationalFactRotation>();
         builder.Services.AddScoped<ITripPlannerApiTokenProvider, MicrosoftIdentityTripPlannerApiTokenProvider>();
         builder.Services.AddTransient<AuthenticatedApiTokenHandler>();
+        builder.Services.AddScoped<IMapPreferenceProvider, MapPreferenceProvider>();
 
         // HTTP client to the authenticated Minimal API resolved via Aspire service discovery.
         builder.Services.AddHttpClient<ITripApiClient, TripApiClient>(client =>

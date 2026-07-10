@@ -27,6 +27,8 @@ public interface ITripApiClient
 
     Task<TripTimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default);
 
+    Task<TripMapResponse> GetTripMapAsync(Guid tripId, CancellationToken ct = default);
+
     Task<IReadOnlyList<TripShareMember>> GetSharesAsync(Guid tripId, CancellationToken ct = default);
     Task<IReadOnlyList<DirectoryUserResult>> SearchDirectoryUsersAsync(Guid tripId, string query, CancellationToken ct = default);
     Task<TripShareMember> UpsertShareAsync(Guid tripId, UpsertTripShareRequest request, CancellationToken ct = default);
@@ -108,6 +110,14 @@ public sealed class TripApiClient : ITripApiClient
         var resp = await _http.GetAsync($"/api/trips/{tripId}/timeline", ct);
         if (!resp.IsSuccessStatusCode) return null;
         return await resp.Content.ReadFromJsonAsync<TripTimelineResponse>(cancellationToken: ct);
+    }
+
+    public async Task<TripMapResponse> GetTripMapAsync(Guid tripId, CancellationToken ct = default)
+    {
+        var resp = await _http.GetAsync($"/api/trips/{tripId}/map", ct);
+        if (!resp.IsSuccessStatusCode) return new TripMapResponse(Array.Empty<TripMapLocation>());
+        var result = await resp.Content.ReadFromJsonAsync<TripMapResponse>(cancellationToken: ct);
+        return result ?? new TripMapResponse(Array.Empty<TripMapLocation>());
     }
 
     public async Task<IReadOnlyList<TripShareMember>> GetSharesAsync(Guid tripId, CancellationToken ct = default)

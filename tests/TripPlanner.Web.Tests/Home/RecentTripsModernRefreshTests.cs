@@ -47,5 +47,6 @@ public class RecentTripsModernRefreshTests : TestContext
         public Task<TripShareMember> UpdateShareAccessAsync(Guid tripId, string userId, UpdateTripShareAccessRequest request, CancellationToken ct = default) => Task.FromResult(new TripShareMember(userId, null, null, request.AccessLevel, DateTimeOffset.UtcNow));
         public Task RemoveShareAsync(Guid tripId, string userId, CancellationToken ct = default) => Task.CompletedTask;
         public Task<IReadOnlyList<TripPlanner.Contracts.Places.PlaceSuggestion>> SuggestPlacesAsync(string query, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<TripPlanner.Contracts.Places.PlaceSuggestion>>(Array.Empty<TripPlanner.Contracts.Places.PlaceSuggestion>());
+        public Task<TripPlanner.Contracts.Trips.TripMapResponse> GetTripMapAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult(new TripPlanner.Contracts.Trips.TripMapResponse(Array.Empty<TripPlanner.Contracts.Trips.TripMapLocation>()));
     }
 }
