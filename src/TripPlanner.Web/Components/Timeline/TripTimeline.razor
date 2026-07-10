@@ -108,6 +108,7 @@ else
                                     title="@ItemTooltip(item, localStart, localEnd, outside)"
                                     @onclick="() => SelectItemAsync(item.TrackedItemId)"
                                     @onclick:stopPropagation="true">
+                                <TrackedItemIcon Type="@item.ItemType" CssClass="ttl-item-type-icon" />
                                 <span class="ttl-item-title text-truncate">@item.Title</span>
                             </button>
                         }
@@ -134,6 +135,7 @@ else
                                     style="left:@(span.Left)px; width:@(span.Width)px; top:@(Rem(ItemTopRem(lane)))rem; --tp-item:@SwatchColor(item.DisplayColor)"
                                     title="Unassigned event — select to relate it to a trip leg"
                                     @onclick="() => SelectItemAsync(item.TrackedItemId)">
+                                <TrackedItemIcon Type="@item.ItemType" CssClass="ttl-item-type-icon" />
                                 <span class="ttl-item-title text-truncate">@item.Title</span>
                             </button>
                         }
@@ -166,6 +168,7 @@ else
     [Parameter] public EventCallback<TimelineSlotSelection> OnLegSlotSelected { get; set; }
     [Parameter] public EventCallback OnAddLegRequested { get; set; }
     [Parameter] public EventCallback OnLoaded { get; set; }
+    [Parameter] public EventCallback<DateOnly> OnActiveDateChanged { get; set; }
 
     public sealed record TimelineSlotSelection(Guid TripLegId, DateTime StartLocal);
 
@@ -190,6 +193,7 @@ else
     private int _days;
     private ElementReference _scrollEl;
     private bool _disposed;
+    private DotNetObjectReference<TripTimeline>? _selfRef;
 
     private bool HasGrid => _timeline is not null && (_timeline.Legs.Count > 0 || _timeline.UnassignedItems.Count > 0);
 
@@ -205,10 +209,33 @@ else
         }
         try
         {
-            await JS.InvokeVoidAsync("tripTimeline.init", _scrollEl);
+            _selfRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("tripTimeline.init", _scrollEl, _selfRef);
         }
         catch (JSDisconnectedException) { }
         catch (TaskCanceledException) { }
+    }
+
+    /// <summary>
+    /// Invoked from <c>tripTimeline.js</c> when free scrolling settles: maps the centered day
+    /// index to a date within the trip range and records it as the active date.
+    /// </summary>
+    [JSInvokable]
+    public void SetCenteredDayIndex(int dayIndex)
+    {
+        if (_timeline is null || !HasGrid || _disposed)
+        {
+            return;
+        }
+        var clampedIndex = Math.Clamp(dayIndex, 0, _days - 1);
+        var date = _start.AddDays(clampedIndex);
+        if (_currentDate == date)
+        {
+            return;
+        }
+        _currentDate = date;
+        StateHasChanged();
+        _ = OnActiveDateChanged.InvokeAsync(date);
     }
 
     public async Task RefreshAsync()
@@ -285,6 +312,7 @@ else
         var dayIndex = clamped.DayNumber - _start.DayNumber;
         var offsetX = dayIndex * SlotsPerDay * SlotWidthPx;
         StateHasChanged();
+        await OnActiveDateChanged.InvokeAsync(clamped);
         try
         {
             await JS.InvokeVoidAsync("tripTimeline.scrollToDate", _scrollEl, offsetX);
@@ -400,7 +428,13 @@ else
     private async Task SelectItemAsync(Guid trackedItemId) => await OnItemSelected.InvokeAsync(trackedItemId);
 
     private async Task AddEventToLegAsync(TimelineLeg leg)
-        => await OnLegSlotSelected.InvokeAsync(new TimelineSlotSelection(leg.TripLegId, leg.StartLocal));
+    {
+        // Default the new event to the day the timeline is currently centered on (the active
+        // date), keeping the leg's start time-of-day as a sensible default time.
+        var timeOfDay = TimeOnly.FromDateTime(leg.StartLocal);
+        var startLocal = EffectiveCurrent.ToDateTime(timeOfDay);
+        await OnLegSlotSelected.InvokeAsync(new TimelineSlotSelection(leg.TripLegId, startLocal));
+    }
 
     private async Task OnLaneClickAsync(TimelineLeg leg, MouseEventArgs args)
     {
@@ -421,6 +455,11 @@ else
         catch (JSDisconnectedException) { }
         catch (TaskCanceledException) { }
         catch (InvalidOperationException) { }
+        finally
+        {
+            _selfRef?.Dispose();
+            _selfRef = null;
+        }
     }
 
     private static string FormatHour(int hour) => hour switch

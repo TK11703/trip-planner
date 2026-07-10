@@ -1,6 +1,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject ITripApiClient TripApi
 @inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
+@implements IDisposable
 
 <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName">
     <DataAnnotationsValidator />
@@ -24,12 +25,15 @@
     <div class="row g-2 mb-2">
         <div class="col-5">
             <label class="form-label">Type</label>
-            <InputSelect class="form-select" @bind-Value="_model.ItemType">
-                <option value="activity">Activity</option>
-                <option value="reservation">Reservation</option>
-                <option value="event">Event</option>
-                <option value="reminder">Reminder</option>
-            </InputSelect>
+            <div class="input-group">
+                <span class="input-group-text tp-type-icon-addon"><TrackedItemIcon Type="@_model.ItemType" /></span>
+                <InputSelect class="form-select" @bind-Value="_model.ItemType">
+                    <option value="activity">Activity</option>
+                    <option value="reservation">Reservation</option>
+                    <option value="event">Event</option>
+                    <option value="reminder">Reminder</option>
+                </InputSelect>
+            </div>
         </div>
         <div class="col-7">
             <label class="form-label">Title</label>
@@ -37,9 +41,47 @@
             <ValidationMessage For="@(() => _model.Title)" />
         </div>
     </div>
-    <div class="mb-2">
-        <label class="form-label">Location</label>
-        <InputText class="form-control" @bind-Value="_model.Location" />
+    <div class="mb-2 position-relative">
+        <label class="form-label" for="item-location">Location <span class="text-secondary fw-normal">(address)</span></label>
+        <div class="input-group">
+            <InputText id="item-location" class="form-control" autocomplete="off" placeholder="Start typing an address…"
+                       @bind-Value="_model.Location" @oninput="OnLocationInput" @onfocusout="OnLocationBlur" />
+            @if (IsLocationMappable)
+            {
+                <a class="btn btn-outline-secondary tp-location-map" href="@MapUrl" target="_blank" rel="noopener noreferrer"
+                   title="Open location in a map" aria-label="Open location in a map">
+                    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false">
+                        <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.5-6.923c-.67.204-1.335.82-1.887 1.855A7.97 7.97 0 0 0 5.145 4.16 13.6 13.6 0 0 0 7.5 4.16V1.077zM4.249 3.539c.142-.384.304-.744.481-1.078a6.7 6.7 0 0 1 .597-.933A7.01 7.01 0 0 0 3.051 3.05c.362.184.763.349 1.198.49zM3.509 7.5c.036-1.07.188-2.087.436-3.008a9.124 9.124 0 0 1-1.565-.667A6.964 6.964 0 0 0 1.018 7.5h2.49zm1.4-2.741a12.35 12.35 0 0 0-.4 2.741H7.5V5.091c-.91-.03-1.783-.145-2.591-.332zM8.5 5.09V7.5h2.99a12.35 12.35 0 0 0-.399-2.741c-.808.187-1.681.301-2.591.332zM4.51 8.5c.035.987.176 1.914.399 2.741A13.6 13.6 0 0 1 7.5 10.91V8.5H4.51zm3.99 0v2.409c.91.03 1.783.145 2.591.332.223-.827.364-1.754.4-2.741H8.5zm-3.282 3.696c.12.312.252.604.395.872.552 1.035 1.218 1.65 1.887 1.855V11.91c-.81.03-1.577.13-2.282.287zm.11 2.276a6.696 6.696 0 0 1-.598-.933 8.853 8.853 0 0 1-.481-1.079 8.38 8.38 0 0 0-1.198.49 7.01 7.01 0 0 0 2.276 1.522zm-1.383-2.964A13.36 13.36 0 0 1 3.508 8.5h-2.49a6.963 6.963 0 0 0 1.362 3.675c.47-.258.995-.482 1.565-.667zm6.728 2.964a7.009 7.009 0 0 0 2.275-1.521 8.376 8.376 0 0 0-1.197-.49 8.853 8.853 0 0 1-.481 1.078 6.688 6.688 0 0 1-.597.933zM8.5 11.909v3.014c.67-.204 1.335-.82 1.887-1.855.143-.268.276-.56.395-.872A12.63 12.63 0 0 0 8.5 11.91zm3.555-.401c.57.185 1.095.409 1.565.667A6.963 6.963 0 0 0 14.982 8.5h-2.49a13.36 13.36 0 0 1-.437 3.008zM14.982 7.5a6.963 6.963 0 0 0-1.362-3.675c-.47.258-.995.482-1.565.667.248.92.4 1.938.437 3.008h2.49zM11.27 2.461c.177.334.339.694.482 1.078a8.368 8.368 0 0 0 1.196-.49 7.01 7.01 0 0 0-2.275-1.52c.218.283.418.597.597.932zm-.488 1.343a7.765 7.765 0 0 0-.395-.872C9.835 1.897 9.17 1.282 8.5 1.077V4.09c.81-.03 1.577-.13 2.282-.287z" />
+                    </svg>
+                </a>
+            }
+            else
+            {
+                <button type="button" class="btn btn-outline-secondary tp-location-map" disabled
+                        title="Enter a place or address to open it in a map" aria-label="Open location in a map" aria-disabled="true">
+                    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false">
+                        <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.5-6.923c-.67.204-1.335.82-1.887 1.855A7.97 7.97 0 0 0 5.145 4.16 13.6 13.6 0 0 0 7.5 4.16V1.077zM4.249 3.539c.142-.384.304-.744.481-1.078a6.7 6.7 0 0 1 .597-.933A7.01 7.01 0 0 0 3.051 3.05c.362.184.763.349 1.198.49zM3.509 7.5c.036-1.07.188-2.087.436-3.008a9.124 9.124 0 0 1-1.565-.667A6.964 6.964 0 0 0 1.018 7.5h2.49zm1.4-2.741a12.35 12.35 0 0 0-.4 2.741H7.5V5.091c-.91-.03-1.783-.145-2.591-.332zM8.5 5.09V7.5h2.99a12.35 12.35 0 0 0-.399-2.741c-.808.187-1.681.301-2.591.332zM4.51 8.5c.035.987.176 1.914.399 2.741A13.6 13.6 0 0 1 7.5 10.91V8.5H4.51zm3.99 0v2.409c.91.03 1.783.145 2.591.332.223-.827.364-1.754.4-2.741H8.5zm-3.282 3.696c.12.312.252.604.395.872.552 1.035 1.218 1.65 1.887 1.855V11.91c-.81.03-1.577.13-2.282.287zm.11 2.276a6.696 6.696 0 0 1-.598-.933 8.853 8.853 0 0 1-.481-1.079 8.38 8.38 0 0 0-1.198.49 7.01 7.01 0 0 0 2.276 1.522zm-1.383-2.964A13.36 13.36 0 0 1 3.508 8.5h-2.49a6.963 6.963 0 0 0 1.362 3.675c.47-.258.995-.482 1.565-.667zm6.728 2.964a7.009 7.009 0 0 0 2.275-1.521 8.376 8.376 0 0 0-1.197-.49 8.853 8.853 0 0 1-.481 1.078 6.688 6.688 0 0 1-.597.933zM8.5 11.909v3.014c.67-.204 1.335-.82 1.887-1.855.143-.268.276-.56.395-.872A12.63 12.63 0 0 0 8.5 11.91zm3.555-.401c.57.185 1.095.409 1.565.667A6.963 6.963 0 0 0 14.982 8.5h-2.49a13.36 13.36 0 0 1-.437 3.008zM14.982 7.5a6.963 6.963 0 0 0-1.362-3.675c-.47.258-.995.482-1.565.667.248.92.4 1.938.437 3.008h2.49zM11.27 2.461c.177.334.339.694.482 1.078a8.368 8.368 0 0 0 1.196-.49 7.01 7.01 0 0 0-2.275-1.52c.218.283.418.597.597.932zm-.488 1.343a7.765 7.765 0 0 0-.395-.872C9.835 1.897 9.17 1.282 8.5 1.077V4.09c.81-.03 1.577-.13 2.282-.287z" />
+                    </svg>
+                </button>
+            }
+        </div>
+        @if (_showSuggestions && _placeSuggestions.Count > 0)
+        {
+            <ul class="list-group tp-place-suggestions shadow-sm" role="listbox" aria-label="Address suggestions">
+                @foreach (var suggestion in _placeSuggestions)
+                {
+                    <li>
+                        <button type="button" class="list-group-item list-group-item-action text-start"
+                                role="option"
+                                @onmousedown:preventDefault="true"
+                                @onclick="() => SelectSuggestion(suggestion.Description)">
+                            @suggestion.Description
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+        <ValidationMessage For="@(() => _model.Location)" />
     </div>
     <div class="row g-2 mb-2">
         <div class="col-md-6">
@@ -47,7 +89,7 @@
                 <label class="form-label mb-0">Start</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyStartFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.StartLocal" />
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.StartLocal" @bind-Value:after="OnStartChanged" />
             @if (_confirmStartCopy)
             {
                 <div class="alert alert-warning py-1 px-2 small mt-1 mb-0 d-flex justify-content-between align-items-center">
@@ -73,7 +115,7 @@
                 <label class="form-label mb-0">End</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyEndFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndLocal" />
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndLocal" @bind-Value:after="OnEndChangedManually" />
             @if (_confirmEndCopy)
             {
                 <div class="alert alert-warning py-1 px-2 small mt-1 mb-0 d-flex justify-content-between align-items-center">
@@ -137,7 +179,7 @@
 </EditForm>
 
 @code {
-    private sealed class ItemModel
+    private sealed class ItemModel : IValidatableObject
     {
         [Required(ErrorMessage = "Select the trip leg this event belongs to.")]
         public Guid? TripLegId { get; set; }
@@ -152,6 +194,25 @@
         [StringLength(255, ErrorMessage = "Confirmation/Reservation Code must be 255 characters or fewer.")] public string? ConfirmationCode { get; set; }
         [StringLength(2000, ErrorMessage = "Notes must be 2,000 characters or fewer.")] public string? Notes { get; set; }
         [Range(0, 9999999999.99, ErrorMessage = "Estimated cost cannot be negative.")] public decimal? EstimatedCost { get; set; }
+
+        // Location is optional, but when entered it must be a plausibly map-capable value so
+        // the globe action can open it on a map.
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (string.IsNullOrWhiteSpace(Location))
+            {
+                yield break;
+            }
+            var trimmed = Location.Trim();
+            if (trimmed.Length > 200)
+            {
+                yield return new ValidationResult("Location must be 200 characters or fewer.", new[] { nameof(Location) });
+            }
+            else if (!trimmed.Any(char.IsLetterOrDigit))
+            {
+                yield return new ValidationResult("Enter a place or address that can be shown on a map.", new[] { nameof(Location) });
+            }
+        }
     }
 
     [Parameter] public Guid TripId { get; set; }
@@ -169,11 +230,95 @@
     private bool _tzInitialized;
     private bool _confirmStartCopy;
     private bool _confirmEndCopy;
+    // True once the traveler (or an explicit copy/edit) has set the end directly, after which
+    // the end no longer auto-follows the start.
+    private bool _endManuallySet;
 
     private bool IsEdit => Item is not null;
     private string FormName => IsEdit ? $"tracked-item-edit-{Item!.TrackedItemId}" : "tracked-item-create";
 
     private TripLegDto? SelectedLeg => _model.TripLegId is { } id ? Legs.FirstOrDefault(l => l.TripLegId == id) : null;
+
+    // True when the current location value is a plausibly map-capable place/address.
+    private bool IsLocationMappable => LocationIsMapCapable(_model.Location);
+
+    // A Bing Maps search URL for the entered location, used as the globe action's destination.
+    private string MapUrl => $"https://www.bing.com/maps?q={Uri.EscapeDataString((_model.Location ?? string.Empty).Trim())}";
+
+    private static bool LocationIsMapCapable(string? location)
+    {
+        if (string.IsNullOrWhiteSpace(location))
+        {
+            return false;
+        }
+        var trimmed = location.Trim();
+        return trimmed.Length <= 200 && trimmed.Any(char.IsLetterOrDigit);
+    }
+
+    // ── Address typeahead ──────────────────────────────────────────────
+    private const int MinPlaceQueryLength = 3;
+    private List<PlaceSuggestion> _placeSuggestions = new();
+    private bool _showSuggestions;
+    private CancellationTokenSource? _placeCts;
+
+    // Debounced address lookup: each keystroke cancels the previous pending request and, after a
+    // short pause, asks the API for suggestions. Failures degrade to no suggestions silently.
+    private async Task OnLocationInput(ChangeEventArgs e)
+    {
+        var text = e.Value?.ToString() ?? string.Empty;
+        _model.Location = text;
+
+        _placeCts?.Cancel();
+        _placeCts?.Dispose();
+        _placeCts = new CancellationTokenSource();
+        var token = _placeCts.Token;
+
+        var query = text.Trim();
+        if (query.Length < MinPlaceQueryLength)
+        {
+            _placeSuggestions.Clear();
+            _showSuggestions = false;
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(300, token);
+            var results = await TripApi.SuggestPlacesAsync(query, token);
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+            _placeSuggestions = results.ToList();
+            _showSuggestions = _placeSuggestions.Count > 0;
+            StateHasChanged();
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer keystroke or the form closed; ignore.
+        }
+        catch
+        {
+            _showSuggestions = false;
+        }
+    }
+
+    private void SelectSuggestion(string description)
+    {
+        _model.Location = description;
+        _placeSuggestions.Clear();
+        _showSuggestions = false;
+    }
+
+    // Hide the suggestions when focus leaves the field. Suggestion buttons prevent the default
+    // mousedown blur, so a click selects the item before this runs.
+    private void OnLocationBlur() => _showSuggestions = false;
+
+    public void Dispose()
+    {
+        _placeCts?.Cancel();
+        _placeCts?.Dispose();
+    }
 
     private static string SwatchColor(string color) => color.ToLowerInvariant() switch
     {
@@ -206,6 +351,7 @@
                 _loadedItemId = null;
                 _appliedInitial = false;
                 _tzInitialized = false;
+                _endManuallySet = false;
             }
 
             if (!_appliedInitial)
@@ -258,7 +404,22 @@
         };
         _loadedItemId = Item.TrackedItemId;
         _tzInitialized = true;
+        // An existing event's saved end is authoritative and must not auto-follow start edits.
+        _endManuallySet = true;
     }
+
+    // When the traveler changes the start, the end reacts to one hour after the new start,
+    // unless the end has already been set directly.
+    private void OnStartChanged()
+    {
+        if (!_endManuallySet)
+        {
+            _model.EndLocal = _model.StartLocal.AddHours(1);
+        }
+    }
+
+    // A direct edit of the end stops the automatic one-hour-after-start adjustment.
+    private void OnEndChangedManually() => _endManuallySet = true;
 
     private void RequestCopyStartFromLeg()
     {
@@ -312,6 +473,7 @@
         _model.EndLocal = leg.EndLocal;
         _model.EndTimeZoneId = leg.EndTimeZoneId;
         _confirmEndCopy = false;
+        _endManuallySet = true;
     }
 
     private async Task SubmitAsync()
@@ -343,6 +505,7 @@
                 await TripApi.CreateItemAsync(TripId, request);
                 _model = new ItemModel { TripLegId = Legs.Count > 0 ? Legs[0].TripLegId : null };
                 _tzInitialized = false;
+                _endManuallySet = false;
             }
             else
             {

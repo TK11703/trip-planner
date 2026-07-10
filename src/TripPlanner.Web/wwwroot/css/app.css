@@ -312,6 +312,51 @@ body {
     font-size: .72rem;
     font-weight: 600;
     white-space: nowrap;
+    min-width: 0;
+}
+
+/* Type icon shown before the event title on each timeline item. */
+.ttl-item-type-icon {
+    flex: 0 0 auto;
+    margin-right: .25rem;
+    font-size: .8rem;
+    opacity: .95;
+}
+
+/* Type icon adornment next to the event form's Type selector. */
+.tp-type-icon-addon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tp-type-icon-addon .tp-item-icon {
+    font-size: 1rem;
+}
+
+/* Globe button that opens the entered location in a map. */
+.tp-location-map {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Address typeahead suggestions dropdown under the location input. */
+.tp-place-suggestions {
+    position: absolute;
+    z-index: 1000;
+    left: 0;
+    right: 0;
+    margin-top: .1rem;
+    max-height: 15rem;
+    overflow-y: auto;
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+.tp-place-suggestions .list-group-item-action {
+    cursor: pointer;
 }
 
 .tp-color-swatch {

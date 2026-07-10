@@ -114,7 +114,7 @@ else
                     </div>
                 </div>
                 <div class="card-body">
-                    <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" OnAddLegRequested="OpenCreateLegModal" OnLoaded="HandleTimelineLoaded" />
+                    <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" OnAddLegRequested="OpenCreateLegModal" OnLoaded="HandleTimelineLoaded" OnActiveDateChanged="HandleActiveDateChanged" />
                 </div>
             </div>
         </div>
@@ -415,7 +415,10 @@ else
     {
         _editingItem = null;
         _initialItemLegId = null;
-        _initialItemStart = null;
+        // Default a new event to the timeline's active (centered) date when available.
+        _initialItemStart = _timeline?.CurrentDate is { } activeDate
+            ? activeDate.ToDateTime(new TimeOnly(9, 0))
+            : null;
         _activeModal = ActiveModal.CreateItem;
     }
 
@@ -526,4 +529,6 @@ else
     }
 
     private void HandleTimelineLoaded() => StateHasChanged();
+
+    private void HandleActiveDateChanged(DateOnly activeDate) => StateHasChanged();
 }

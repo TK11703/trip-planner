@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using TripPlanner.Contracts.Errors;
+using TripPlanner.Contracts.Places;
 using TripPlanner.Contracts.Timeline;
 using TripPlanner.Contracts.TripItems;
 using TripPlanner.Contracts.Trips;
@@ -31,6 +32,8 @@ public interface ITripApiClient
     Task<TripShareMember> UpsertShareAsync(Guid tripId, UpsertTripShareRequest request, CancellationToken ct = default);
     Task<TripShareMember> UpdateShareAccessAsync(Guid tripId, string userId, UpdateTripShareAccessRequest request, CancellationToken ct = default);
     Task RemoveShareAsync(Guid tripId, string userId, CancellationToken ct = default);
+
+    Task<IReadOnlyList<PlaceSuggestion>> SuggestPlacesAsync(string query, CancellationToken ct = default);
 }
 
 public sealed class TripApiClient : ITripApiClient
@@ -137,6 +140,14 @@ public sealed class TripApiClient : ITripApiClient
 
     public async Task RemoveShareAsync(Guid tripId, string userId, CancellationToken ct = default)
         => await EnsureSuccessAsync(await _http.DeleteAsync($"/api/trips/{tripId}/shares/{Uri.EscapeDataString(userId)}", ct), ct);
+
+    public async Task<IReadOnlyList<PlaceSuggestion>> SuggestPlacesAsync(string query, CancellationToken ct = default)
+    {
+        var resp = await _http.GetAsync($"/api/places/suggest?q={Uri.EscapeDataString(query)}", ct);
+        if (!resp.IsSuccessStatusCode) return Array.Empty<PlaceSuggestion>();
+        var result = await resp.Content.ReadFromJsonAsync<PlaceSuggestion[]>(cancellationToken: ct);
+        return result ?? Array.Empty<PlaceSuggestion>();
+    }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
     {

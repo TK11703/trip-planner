@@ -23,6 +23,7 @@ using TripPlanner.Api.Features.ThemePreferences;
 using TripPlanner.Api.Features.UserProfiles;
 using TripPlanner.Api.Features.Timezones;
 using TripPlanner.Api.Features.Notifications;
+using TripPlanner.Api.Features.Places;
 using TripPlanner.Database.UserProfiles;
 using TripPlanner.Database.Notifications;
 
@@ -78,6 +79,14 @@ public static class WebApplicationBuilderExtensions
             client.BaseAddress = new Uri("https://graph.microsoft.com/");
         });
         builder.Services.AddScoped<IUserDirectoryLookup, GraphUserDirectoryLookup>();
+
+        // Azure Maps address/place typeahead. The subscription key is environment-driven
+        // (AzureMaps:SubscriptionKey) and the lookup degrades to empty results when unset.
+        builder.Services.AddHttpClient(AzureMapsPlaceSuggestionLookup.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri("https://atlas.microsoft.com/");
+        });
+        builder.Services.AddScoped<IPlaceSuggestionLookup, AzureMapsPlaceSuggestionLookup>();
 
         builder.Services.AddSingleton<DatabaseInitializer>();
 

@@ -65,5 +65,6 @@ public class PublicPageTests : TestContext
         public Task<TripShareMember> UpsertShareAsync(Guid tripId, UpsertTripShareRequest request, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }
         public Task<TripShareMember> UpdateShareAccessAsync(Guid tripId, string userId, UpdateTripShareAccessRequest request, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }
         public Task RemoveShareAsync(Guid tripId, string userId, CancellationToken ct = default) { WasCalled = true; throw new NotSupportedException(); }
+        public Task<IReadOnlyList<TripPlanner.Contracts.Places.PlaceSuggestion>> SuggestPlacesAsync(string query, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<TripPlanner.Contracts.Places.PlaceSuggestion>>(Array.Empty<TripPlanner.Contracts.Places.PlaceSuggestion>());
     }
 }

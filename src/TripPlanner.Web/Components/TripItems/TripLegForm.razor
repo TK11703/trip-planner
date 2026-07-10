@@ -9,6 +9,10 @@
         <InputText id="leg-title" class="form-control" @bind-Value="_model.Title" />
         <ValidationMessage For="@(() => _model.Title)" />
     </div>
+    <div class="alert alert-info py-2 small mb-3" role="note">
+        A trip leg is a single travel segment from one place to another. Fill in where you're leaving and arriving, along with the start/end dates, times, and time zones.
+        <div class="mt-1 fst-italic">Example: Leaving Washington DC on 8/1/2026 at 8:35 AM EST and arriving in Honolulu on 8/1/2026 at 2:55 PM HST.</div>
+    </div>
     <div class="row g-2 mb-2">
         <div class="col-6">
             <label class="form-label">Origin</label>
