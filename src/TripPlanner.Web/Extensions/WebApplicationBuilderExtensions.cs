@@ -26,6 +26,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<ThemeStateService>();
         builder.Services.AddScoped<AccountThemeInitializer>();
         builder.Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
+        builder.Services.AddSingleton<IMotivationalFactRotation, MotivationalFactRotation>();
         builder.Services.AddScoped<ITripPlannerApiTokenProvider, MicrosoftIdentityTripPlannerApiTokenProvider>();
         builder.Services.AddTransient<AuthenticatedApiTokenHandler>();
 

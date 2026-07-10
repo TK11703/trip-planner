@@ -1,9 +1,11 @@
 @* Non-interactive supporting content: curated travel planning motivation for empty/sparse Trips states. *@
+@using Microsoft.Extensions.DependencyInjection
+@inject IServiceProvider ServiceProvider
 
 <section class="motivational-facts @(Secondary ? "motivational-facts-secondary" : string.Empty)" aria-label="Travel planning tips">
     <h3 class="h6 text-secondary text-uppercase mb-3">Travel planning tips</h3>
     <ul class="list-unstyled row g-3 mb-0">
-        @foreach (var fact in MotivationalTravelFacts.All)
+        @foreach (var fact in _facts)
         {
             <li class="col-12 col-md-6 col-xl-4">
                 <div class="h-100 p-3 rounded border bg-body-tertiary">
@@ -19,4 +21,26 @@
     /// <summary>When true, renders the facts as visually secondary supporting content beside real trip cards.</summary>
     [Parameter]
     public bool Secondary { get; set; }
+
+    /// <summary>
+    /// Optional explicit request count used to pick the rotating fact window. When null, the shared
+    /// <see cref="IMotivationalFactRotation"/> counter supplies it (falling back to 0 when unavailable).
+    /// </summary>
+    [Parameter]
+    public int? RequestCount { get; set; }
+
+    /// <summary>Number of facts to show from the rotating window.</summary>
+    [Parameter]
+    public int Count { get; set; } = MotivationalTravelFacts.DisplayCount;
+
+    private IReadOnlyList<MotivationalTravelFacts.Fact> _facts = Array.Empty<MotivationalTravelFacts.Fact>();
+
+    protected override void OnInitialized()
+    {
+        var requestCount = RequestCount
+            ?? ServiceProvider.GetService<IMotivationalFactRotation>()?.Next()
+            ?? 0;
+
+        _facts = MotivationalTravelFacts.Select(requestCount, Count);
+    }
 }

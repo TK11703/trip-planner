@@ -13,6 +13,9 @@ public static class MotivationalTravelFacts
     /// </summary>
     public const int SparseTripThreshold = 3;
 
+    /// <summary>Number of facts rendered in a single rotating window.</summary>
+    public const int DisplayCount = 6;
+
     /// <summary>A short, non-interactive piece of trip-planning motivation.</summary>
     /// <param name="Title">Short lead-in label.</param>
     /// <param name="Body">One concise sentence tied to practical trip planning (kept under 140 characters).</param>
@@ -99,5 +102,36 @@ public static class MotivationalTravelFacts
         }
 
         return response.Page <= 1 && response.TotalCount <= SparseTripThreshold;
+    }
+
+    /// <summary>
+    /// Selects a rotating window of facts based on the supplied request count and each fact's index
+    /// placement. The window starts at <paramref name="requestCount"/> (wrapped into range) and takes
+    /// up to <paramref name="count"/> facts, wrapping around the end of the list so every fact is
+    /// eventually shown across successive requests. Deterministic for a given request count.
+    /// </summary>
+    /// <param name="requestCount">Zero-based count of requests seen so far; drives the window offset.</param>
+    /// <param name="count">Maximum number of facts to return (clamped to the available fact count).</param>
+    public static IReadOnlyList<Fact> Select(int requestCount, int count = DisplayCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+
+        var total = All.Count;
+        if (total == 0 || count == 0)
+        {
+            return Array.Empty<Fact>();
+        }
+
+        var take = Math.Min(count, total);
+        // Normalize so negative request counts still map into range via index placement.
+        var offset = ((requestCount % total) + total) % total;
+
+        var selected = new Fact[take];
+        for (var i = 0; i < take; i++)
+        {
+            selected[i] = All[(offset + i) % total];
+        }
+
+        return selected;
     }
 }
