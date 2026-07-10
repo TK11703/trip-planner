@@ -1,0 +1,52 @@
+@page "/trips/{TripId:guid}/print"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@layout PrintLayout
+@using TripPlanner.Web.Components.Trips
+@using TripPlanner.Web.Features.Trips
+@inject ITripApiClient TripApi
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Print trip</PageTitle>
+
+@if (_loading)
+{
+    <TripAccessState State="TripAccessState.TripAccessStateKind.Loading" />
+}
+else if (_trip is null)
+{
+    <TripAccessState State="TripAccessState.TripAccessStateKind.NotFoundOrDenied" />
+}
+else
+{
+    <div class="tp-print-actions d-print-none d-flex flex-wrap gap-2 mb-3">
+        <button type="button" class="btn btn-primary" @onclick="PrintAsync">Print</button>
+        <a class="btn btn-outline-secondary" href="@BackHref">Back to trip</a>
+    </div>
+
+    <TripPrintDocument Trip="_printable!" />
+}
+
+@code {
+    [Parameter] public Guid TripId { get; set; }
+
+    private bool _loading = true;
+    private TripDetail? _trip;
+    private PrintableTrip? _printable;
+
+    private string BackHref => $"/trips/{TripId}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _trip = await TripApi.GetDetailAsync(TripId);
+        _printable = _trip is null ? null : TripPrintFormatting.BuildPrintableTrip(_trip);
+        _loading = false;
+    }
+
+    private async Task PrintAsync()
+    {
+        await JS.InvokeVoidAsync("tripPrint.print");
+    }
+}

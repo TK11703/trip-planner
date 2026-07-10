@@ -1,0 +1,98 @@
+@using TripPlanner.Web.Features.Trips
+
+@* Presentational, read-only rendering of a trip for printing. Metadata block first,
+   then a single itinerary table with legs as full-width row dividers and events as rows. *@
+<article class="tp-print-doc">
+    <header class="tp-print-meta">
+        <h1 class="tp-print-title">@Trip.Name</h1>
+        <p class="tp-print-dates">@Trip.DateRangeText</p>
+        @if (!string.IsNullOrWhiteSpace(Trip.Description))
+        {
+            <p class="tp-print-description">@Trip.Description</p>
+        }
+        <p class="tp-print-total"><span class="tp-print-label">Estimated total:</span> @Trip.EstimatedCostText</p>
+    </header>
+
+    @if (!Trip.HasContent)
+    {
+        <p class="tp-print-empty">This trip has no legs or events yet.</p>
+    }
+    else
+    {
+        <table class="tp-print-table">
+            <caption class="tp-print-caption">Itinerary</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Type</th>
+                    <th scope="col">Title</th>
+                    <th scope="col">Location</th>
+                    <th scope="col">Start</th>
+                    <th scope="col">End</th>
+                    <th scope="col">Confirmation</th>
+                    <th scope="col">Est. Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var leg in Trip.Legs)
+                {
+                    <tr class="tp-print-leg">
+                        <th scope="colgroup" colspan="@ColumnCount">
+                            <span class="tp-print-leg-title">@leg.Title</span>
+                            @if (!string.IsNullOrWhiteSpace(leg.RouteText))
+                            {
+                                <span class="tp-print-leg-route">@leg.RouteText</span>
+                            }
+                            <span class="tp-print-leg-when">@leg.StartText &ndash; @leg.EndText</span>
+                        </th>
+                    </tr>
+                    @if (leg.Events.Count == 0)
+                    {
+                        <tr class="tp-print-leg-empty">
+                            <td colspan="@ColumnCount">No events for this leg.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var ev in leg.Events)
+                        {
+                            @RenderEventRow(ev)
+                        }
+                    }
+                }
+
+                @if (Trip.UnassignedEvents.Count > 0)
+                {
+                    <tr class="tp-print-leg">
+                        <th scope="colgroup" colspan="@ColumnCount">
+                            <span class="tp-print-leg-title">Unassigned</span>
+                        </th>
+                    </tr>
+                    @foreach (var ev in Trip.UnassignedEvents)
+                    {
+                        @RenderEventRow(ev)
+                    }
+                }
+            </tbody>
+        </table>
+    }
+</article>
+
+@code {
+    /// <summary>The projected trip to render.</summary>
+    [Parameter, EditorRequired] public PrintableTrip Trip { get; set; } = default!;
+
+    private const int ColumnCount = 7;
+
+    private RenderFragment RenderEventRow(PrintableEvent ev) => __builder =>
+    {
+        <tr class="tp-print-event">
+            <td>@ev.TypeText</td>
+            <td>@ev.Title</td>
+            <td>@ev.Location</td>
+            <td>@ev.StartText</td>
+            <td>@ev.EndText</td>
+            <td>@ev.ConfirmationCode</td>
+            <td>@ev.EstimatedCostText</td>
+        </tr>
+    };
+}

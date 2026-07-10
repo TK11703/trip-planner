@@ -932,3 +932,128 @@ body {
 }
 
 
+
+/* ===== Printable trip view (feature 020) ===== */
+.tp-print-shell {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+.tp-print-doc {
+    color: #111;
+}
+
+.tp-print-meta {
+    margin-bottom: 1rem;
+}
+
+.tp-print-title {
+    margin-bottom: .25rem;
+}
+
+.tp-print-dates {
+    font-weight: 600;
+    margin-bottom: .25rem;
+}
+
+.tp-print-description {
+    margin-bottom: .5rem;
+}
+
+.tp-print-total .tp-print-label {
+    font-weight: 600;
+}
+
+.tp-print-empty {
+    margin-top: 1rem;
+    font-style: italic;
+}
+
+.tp-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .9rem;
+}
+
+.tp-print-caption {
+    text-align: left;
+    font-weight: 600;
+    padding: .25rem 0;
+}
+
+.tp-print-table th,
+.tp-print-table td {
+    border: 1px solid #bbb;
+    padding: .35rem .5rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.tp-print-table thead th {
+    background: #f0f0f0;
+}
+
+.tp-print-leg > th {
+    background: #e2e8f0;
+    font-weight: 700;
+}
+
+.tp-print-leg-title {
+    margin-right: .75rem;
+}
+
+.tp-print-leg-route {
+    margin-right: .75rem;
+    font-weight: 500;
+}
+
+.tp-print-leg-when {
+    font-weight: 400;
+    color: #333;
+}
+
+.tp-print-notes {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+@media print {
+    /* Hide the on-screen actions and any residual app chrome from the printout. */
+    .tp-print-actions,
+    .d-print-none {
+        display: none !important;
+    }
+
+    .tp-print-shell {
+        max-width: none;
+        padding: 0;
+    }
+
+    /* Repeat table headers on every printed page and reduce awkward breaks. */
+    .tp-print-table thead {
+        display: table-header-group;
+    }
+
+    .tp-print-event,
+    .tp-print-leg {
+        break-inside: avoid;
+    }
+
+    /* Ink-friendly, high-contrast output regardless of the on-screen theme. */
+    .tp-print-doc {
+        color: #000;
+    }
+
+    .tp-print-table thead th {
+        background: #eee !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .tp-print-leg > th {
+        background: #ddd !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}

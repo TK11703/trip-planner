@@ -29,6 +29,7 @@ else
             <a class="btn btn-outline-secondary" href="/trips">All trips</a>
             @if (_trip.IsOwner)
             {
+                <a class="btn btn-outline-secondary" href="@($"/trips/{TripId}/print")">Print</a>
                 <button class="btn btn-outline-primary" @onclick="OpenShareModal">Share</button>
             }
             @if (CanEditContent)
