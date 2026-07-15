@@ -1,0 +1,153 @@
+@page "/inbox/drafts"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using TripPlanner.Contracts.EmailIngestion
+@using TripPlanner.Web.Features.EmailIngestion
+@inject IEmailIngestionApiClient EmailIngestionApi
+@inject NavigationManager Nav
+
+<PageTitle>Review parsed events</PageTitle>
+
+<section class="inbox-drafts-page">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h1 class="mb-0">Review parsed events</h1>
+        <a class="btn btn-outline-secondary btn-sm" href="/inbox/history">Inbox history</a>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-secondary">Loading drafts...</div>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="alert alert-warning" role="alert">@_loadError</div>
+    }
+    else if (_drafts.Count == 0)
+    {
+        <div class="alert alert-info" role="status">No events are waiting for review. Forward a booking confirmation email to your trip inbox to get started.</div>
+    }
+    else
+    {
+        <ul class="list-unstyled">
+            @foreach (var draft in _drafts)
+            {
+                <li class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold mb-1">@(draft.Title ?? draft.EventType ?? "Untitled event")</div>
+                                @if (!string.IsNullOrWhiteSpace(draft.EventType))
+                                {
+                                    <span class="badge text-bg-secondary me-1">@draft.EventType</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(draft.Location))
+                                {
+                                    <div class="small text-secondary mt-1">📍 @draft.Location</div>
+                                }
+                                @if (draft.StartLocal is DateTime start)
+                                {
+                                    <div class="small text-secondary mt-1">
+                                        🕐 @start.ToString("MM/dd/yyyy HH:mm") @draft.StartTimeZoneId
+                                        @if (draft.EndLocal is DateTime end)
+                                        {
+                                            <text> – @end.ToString("MM/dd/yyyy HH:mm") @draft.EndTimeZoneId</text>
+                                        }
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(draft.ConfirmationCode))
+                                {
+                                    <div class="small text-secondary mt-1">Confirmation: @draft.ConfirmationCode</div>
+                                }
+                                <div class="small text-secondary mt-1">
+                                    Confidence: @draft.Confidence.ToString("P0")
+                                </div>
+                                @if (draft.TripId is null)
+                                {
+                                    <div class="alert alert-warning mt-2 py-1 px-2 small" role="alert">
+                                        Assign this event to a trip before confirming.
+                                    </div>
+                                }
+                            </div>
+                            <div class="d-flex flex-column gap-2 align-items-end">
+                                <button class="btn btn-sm btn-success"
+                                        @onclick="() => ConfirmAsync(draft.ParsedEventDraftId)"
+                                        disabled="@(_isBusy || draft.TripId is null || draft.TripLegId is null || draft.StartLocal is null)">
+                                    Confirm
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        @onclick="() => DiscardAsync(draft.ParsedEventDraftId)"
+                                        disabled="@_isBusy">
+                                    Discard
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _loadError;
+    private List<ParsedEventDraftDto> _drafts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        try
+        {
+            var items = await EmailIngestionApi.GetDraftsAsync();
+            _drafts = items.ToList();
+        }
+        catch
+        {
+            _loadError = "We couldn't load your draft events. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ConfirmAsync(Guid draftId)
+    {
+        _isBusy = true;
+        try
+        {
+            var result = await EmailIngestionApi.ConfirmDraftAsync(draftId);
+            if (result is not null)
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task DiscardAsync(Guid draftId)
+    {
+        _isBusy = true;
+        try
+        {
+            if (await EmailIngestionApi.DiscardDraftAsync(draftId))
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+}
