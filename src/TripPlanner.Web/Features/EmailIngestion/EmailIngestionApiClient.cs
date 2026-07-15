@@ -23,7 +23,7 @@ public sealed class EmailIngestionApiClient : IEmailIngestionApiClient
         var response = await _http.GetAsync("/api/email-ingestion/drafts", ct);
         if (!response.IsSuccessStatusCode) return Array.Empty<ParsedEventDraftDto>();
         var payload = await response.Content.ReadFromJsonAsync<ParsedEventDraftListResponse>(cancellationToken: ct);
-        return payload?.Items ?? (IReadOnlyList<ParsedEventDraftDto>)Array.Empty<ParsedEventDraftDto>();
+        return payload?.Items ?? Array.Empty<ParsedEventDraftDto>();
     }
 
     public async Task<ParsedEventDraftDto?> UpdateDraftAsync(Guid draftId, UpdateParsedEventDraftRequest request, CancellationToken ct = default)

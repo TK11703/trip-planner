@@ -90,7 +90,7 @@ public sealed class EmailIngestionBackgroundService : BackgroundService
                         TargetType: NotificationTargetType.Person,
                         RelatedTripId: draft.TripId,
                         Title: "New trip event ready to review",
-                        Message: $"\"{email.Subject}\" was parsed. Review and confirm the extracted event.",
+                        Message: "A booking confirmation email was parsed. Review and confirm the extracted event.",
                         SourceEventKey: $"email-parsed:{email.InboxEmailId}"), ct);
                 }
             }

@@ -21,7 +21,7 @@ public sealed class InboxHistoryApiClient : IInboxHistoryApiClient
         var response = await _http.GetAsync("/api/email-ingestion/inbox", ct);
         if (!response.IsSuccessStatusCode) return Array.Empty<InboxEmailDto>();
         var payload = await response.Content.ReadFromJsonAsync<InboxEmailListResponse>(cancellationToken: ct);
-        return payload?.Items ?? (IReadOnlyList<InboxEmailDto>)Array.Empty<InboxEmailDto>();
+        return payload?.Items ?? Array.Empty<InboxEmailDto>();
     }
 
     public async Task<bool> ReprocessEmailAsync(Guid inboxEmailId, CancellationToken ct = default)

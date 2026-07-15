@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
-using TripPlanner.Api.Features.EmailIngestion;
+using Microsoft.Extensions.Logging;
 using TripPlanner.Api.Security;
 using TripPlanner.Database.EmailIngestion;
 
@@ -34,8 +34,10 @@ public static class ReceiveEmailWebhookEndpoint
         ICurrentUser currentUser,
         IInboxEmailRepository emailRepository,
         EmailDeduplicationService dedup,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger(nameof(ReceiveEmailWebhookEndpoint));
         using var reader = new StreamReader(context.Request.Body);
         var body = await reader.ReadToEndAsync(cancellationToken);
 
@@ -73,10 +75,16 @@ public static class ReceiveEmailWebhookEndpoint
             var subject = data.TryGetProperty("subject", out var s) ? s.GetString() ?? string.Empty : string.Empty;
             var bodyText = data.TryGetProperty("bodyPlainText", out var bt) ? bt.GetString() ?? string.Empty : string.Empty;
             var bodyHtml = data.TryGetProperty("bodyHtml", out var bh) ? bh.GetString() : null;
-            var receivedAt = ev.TryGetProperty("eventTime", out var ts)
-                && DateTimeOffset.TryParse(ts.GetString(), out var dto)
-                    ? dto
-                    : DateTimeOffset.UtcNow;
+            DateTimeOffset receivedAt;
+            if (ev.TryGetProperty("eventTime", out var ts) && DateTimeOffset.TryParse(ts.GetString(), out var dto))
+            {
+                receivedAt = dto;
+            }
+            else
+            {
+                logger.LogWarning("Event Grid event for email from '{Sender}' is missing a valid eventTime; falling back to UtcNow.", sender);
+                receivedAt = DateTimeOffset.UtcNow;
+            }
 
             var userId = currentUser.TryGetUserId() ?? string.Empty;
             if (string.IsNullOrEmpty(userId)) continue;
