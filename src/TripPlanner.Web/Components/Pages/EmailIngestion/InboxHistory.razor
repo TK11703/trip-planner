@@ -1,0 +1,122 @@
+@page "/inbox/history"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using TripPlanner.Contracts.EmailIngestion
+@using TripPlanner.Web.Features.InboxHistory
+@inject IInboxHistoryApiClient InboxHistoryApi
+
+<PageTitle>Inbox history</PageTitle>
+
+<section class="inbox-history-page">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h1 class="mb-0">Inbox history</h1>
+        <a class="btn btn-outline-primary btn-sm" href="/inbox/drafts">Review pending drafts</a>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-secondary">Loading inbox history...</div>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="alert alert-warning" role="alert">@_loadError</div>
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="alert alert-info" role="status">No emails have been received yet.</div>
+    }
+    else
+    {
+        <table class="table table-sm" aria-label="Inbox email history">
+            <thead>
+                <tr>
+                    <th scope="col">Subject</th>
+                    <th scope="col">From</th>
+                    <th scope="col">Received</th>
+                    <th scope="col">Status</th>
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.Subject</td>
+                        <td>@item.Sender</td>
+                        <td>@item.ReceivedAt.ToLocalTime().ToString("g")</td>
+                        <td>
+                            <span class="badge @StatusBadgeClass(item.ParseStatus)" aria-label="@item.ParseStatus.ToString()">
+                                @item.ParseStatus
+                            </span>
+                        </td>
+                        <td>
+                            @if (item.ParseStatus == ParseStatus.Failed || item.ParseStatus == ParseStatus.Unsupported)
+                            {
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        @onclick="() => ReprocessAsync(item.InboxEmailId)"
+                                        disabled="@_isBusy">
+                                    Re-process
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _loadError;
+    private List<InboxEmailDto> _items = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        try
+        {
+            var items = await InboxHistoryApi.GetHistoryAsync();
+            _items = items.ToList();
+        }
+        catch
+        {
+            _loadError = "We couldn't load your inbox history. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ReprocessAsync(Guid inboxEmailId)
+    {
+        _isBusy = true;
+        try
+        {
+            if (await InboxHistoryApi.ReprocessEmailAsync(inboxEmailId))
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private static string StatusBadgeClass(ParseStatus status) => status switch
+    {
+        ParseStatus.Parsed => "text-bg-success",
+        ParseStatus.Failed => "text-bg-danger",
+        ParseStatus.Unsupported => "text-bg-warning",
+        _ => "text-bg-secondary"
+    };
+}

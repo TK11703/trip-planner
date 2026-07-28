@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
+using TripPlanner.Api.Features.EmailIngestion;
 using TripPlanner.Contracts.Errors;
 
 namespace TripPlanner.Api.Extensions;
@@ -68,6 +69,7 @@ public static class AuthenticationExtensions
                 }
             });
             options.DefaultPolicy = options.GetPolicy(AuthenticatedUserPolicy)!;
+            options.AddEmailIngestionPolicies();
         });
 
         return builder;

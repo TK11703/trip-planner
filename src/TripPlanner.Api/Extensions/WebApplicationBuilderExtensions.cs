@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Identity.Web;
+using Azure.AI.OpenAI;
 using Azure.Core;
 using Azure.Identity;
+using TripPlanner.Api.Features.EmailIngestion;
 using TripPlanner.Api.Security;
 using TripPlanner.Database.Connections;
 using TripPlanner.Database.Sql;
@@ -26,6 +28,7 @@ using TripPlanner.Api.Features.Notifications;
 using TripPlanner.Api.Features.Places;
 using TripPlanner.Database.UserProfiles;
 using TripPlanner.Database.Notifications;
+using TripPlanner.Database.EmailIngestion;
 
 namespace TripPlanner.Api.Extensions;
 
@@ -92,6 +95,15 @@ public static class WebApplicationBuilderExtensions
 
         builder.Services.AddSingleton<DatabaseInitializer>();
 
+        // Email ingestion: repositories, deduplication, parser (Azure OpenAI via managed identity),
+        // and the background processing service.
+        builder.Services.AddScoped<IInboxEmailRepository, InboxEmailRepository>();
+        builder.Services.AddScoped<IParsedEventDraftRepository, ParsedEventDraftRepository>();
+        builder.Services.AddSingleton<EmailDeduplicationService>();
+        builder.Services.AddSingleton<AzureOpenAIClient>(_ => CreateOpenAIClient(builder.Configuration));
+        builder.Services.AddScoped<EmailParserService>();
+        builder.Services.AddHostedService<EmailIngestionBackgroundService>();
+
         return builder;
     }
 
@@ -116,5 +128,14 @@ public static class WebApplicationBuilderExtensions
             options.TenantId = tenantId;
         }
         return new DefaultAzureCredential(options);
+    }
+
+    private static AzureOpenAIClient CreateOpenAIClient(IConfiguration configuration)
+    {
+        // AzureOpenAI:Endpoint must be set; credential uses DefaultAzureCredential —
+        // managed identity when hosted in Azure Container Apps, developer sign-in locally.
+        var endpoint = configuration["AzureOpenAI:Endpoint"]
+            ?? throw new InvalidOperationException("AzureOpenAI:Endpoint configuration is required for email parsing.");
+        return new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential());
     }
 }

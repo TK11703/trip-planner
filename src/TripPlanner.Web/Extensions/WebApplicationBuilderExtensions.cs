@@ -8,6 +8,8 @@ using TripPlanner.Web.Features.Theme;
 using TripPlanner.Web.Features.Timezones;
 using TripPlanner.Web.Features.Maps;
 using TripPlanner.Web.Features.Notifications;
+using TripPlanner.Web.Features.EmailIngestion;
+using TripPlanner.Web.Features.InboxHistory;
 
 namespace TripPlanner.Web.Extensions;
 
@@ -52,6 +54,18 @@ public static class WebApplicationBuilderExtensions
         .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
 
         builder.Services.AddHttpClient<INotificationApiClient, NotificationApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https+http://api");
+        })
+        .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
+
+        builder.Services.AddHttpClient<IEmailIngestionApiClient, EmailIngestionApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https+http://api");
+        })
+        .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
+
+        builder.Services.AddHttpClient<IInboxHistoryApiClient, InboxHistoryApiClient>(client =>
         {
             client.BaseAddress = new Uri("https+http://api");
         })
