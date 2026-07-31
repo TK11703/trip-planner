@@ -9,18 +9,44 @@
         <InputText id="leg-title" class="form-control" @bind-Value="_model.Title" />
         <ValidationMessage For="@(() => _model.Title)" />
     </div>
+    <fieldset class="mb-2">
+        <legend class="form-label fs-6 mb-1">Leg type</legend>
+        <InputRadioGroup @bind-Value="_model.Kind">
+            <div class="form-check form-check-inline">
+                <InputRadio class="form-check-input" id="leg-kind-travel" Value="LegKind.Travel" />
+                <label class="form-check-label" for="leg-kind-travel">Travel</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputRadio class="form-check-input" id="leg-kind-stay" Value="LegKind.Stay" />
+                <label class="form-check-label" for="leg-kind-stay">Stay</label>
+            </div>
+        </InputRadioGroup>
+    </fieldset>
     <div class="alert alert-info py-2 small mb-3" role="note">
-        A trip leg is a single travel segment from one place to another. Fill in where you're leaving and arriving, along with the start/end dates, times, and time zones.
-        <div class="mt-1 fst-italic">Example: Leaving <span class="badge text-bg-secondary">ORIGIN</span> Washington DC on <span class="badge text-bg-secondary">START</span> 8/1/2026 at 8:35 AM EST and arriving in <span class="badge text-bg-secondary">DESTINATION</span> Honolulu on <span class="badge text-bg-secondary">END</span> 8/1/2026 at 2:55 PM HST.</div>
+        @if (_model.Kind == LegKind.Travel)
+        {
+            <text>A travel leg is a single segment from one place to another. Fill in where you're leaving and arriving, along with the start/end dates, times, and time zones.</text>
+            <div class="mt-1 fst-italic">Example: Leaving <span class="badge text-bg-secondary">ORIGIN</span> Washington DC on <span class="badge text-bg-secondary">START</span> 8/1/2026 at 8:35 AM EST and arriving in <span class="badge text-bg-secondary">DESTINATION</span> Honolulu on <span class="badge text-bg-secondary">END</span> 8/1/2026 at 2:55 PM HST.</div>
+        }
+        else
+        {
+            <text>A stay leg is time spent at a single location. Fill in where you're staying, along with the start/end dates, times, and time zones.</text>
+            <div class="mt-1 fst-italic">Example: Staying in <span class="badge text-bg-secondary">DESTINATION</span> Honolulu from <span class="badge text-bg-secondary">START</span> 8/1/2026 at 3:00 PM HST until <span class="badge text-bg-secondary">END</span> 8/5/2026 at 10:00 AM HST.</div>
+        }
     </div>
     <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="form-label">Origin</label>
-            <InputText class="form-control" @bind-Value="_model.Origin" />
-        </div>
-        <div class="col-6">
-            <label class="form-label">Destination</label>
-            <InputText class="form-control" @bind-Value="_model.Destination" />
+        @if (_model.Kind == LegKind.Travel)
+        {
+            <div class="col-6">
+                <label class="form-label" for="leg-origin">Origin</label>
+                <InputText id="leg-origin" class="form-control" @bind-Value="_model.Origin" />
+                <ValidationMessage For="@(() => _model.Origin)" />
+            </div>
+        }
+        <div class="@(_model.Kind == LegKind.Travel ? "col-6" : "col-12")">
+            <label class="form-label" for="leg-destination">Destination</label>
+            <InputText id="leg-destination" class="form-control" @bind-Value="_model.Destination" />
+            <ValidationMessage For="@(() => _model.Destination)" />
         </div>
     </div>
     <div class="row g-2 mb-2">
@@ -69,9 +95,12 @@
 </EditForm>
 
 @code {
-    private sealed class LegModel
+    public enum LegKind { Travel, Stay }
+
+    private sealed class LegModel : IValidatableObject
     {
         [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
+        public LegKind Kind { get; set; } = LegKind.Travel;
         public string? Origin { get; set; }
         public string? Destination { get; set; }
         public DateTime StartAt { get; set; } = DateTime.Now;
@@ -79,6 +108,21 @@
         [Required(ErrorMessage = "Start timezone is required.")] public string StartTimeZoneId { get; set; } = "UTC";
         [Required(ErrorMessage = "End timezone is required.")] public string EndTimeZoneId { get; set; } = "UTC";
         public string? Notes { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (Kind == LegKind.Travel && string.IsNullOrWhiteSpace(Origin))
+            {
+                yield return new ValidationResult("Origin is required for a travel leg.", new[] { nameof(Origin) });
+            }
+
+            if (string.IsNullOrWhiteSpace(Destination))
+            {
+                yield return new ValidationResult(
+                    Kind == LegKind.Travel ? "Destination is required for a travel leg." : "Destination is required for a stay.",
+                    new[] { nameof(Destination) });
+            }
+        }
     }
 
     [Parameter] public Guid TripId { get; set; }
@@ -115,6 +159,7 @@
         _model = new LegModel
         {
             Title = Leg.Title,
+            Kind = string.IsNullOrWhiteSpace(Leg.Origin) ? LegKind.Stay : LegKind.Travel,
             Origin = Leg.Origin,
             Destination = Leg.Destination,
             StartAt = Leg.StartLocal,
@@ -150,7 +195,7 @@
         {
             var request = new CreateTripLegRequest(
                 _model.Title.Trim(),
-                _model.Origin,
+                _model.Kind == LegKind.Stay ? null : _model.Origin,
                 _model.Destination,
                 _model.StartAt,
                 _model.StartTimeZoneId,
@@ -162,6 +207,7 @@
                 await TripApi.CreateLegAsync(TripId, request);
                 _model = new LegModel
                 {
+                    Kind = _model.Kind,
                     StartTimeZoneId = request.EndTimeZoneId,
                     EndTimeZoneId = request.EndTimeZoneId
                 };
