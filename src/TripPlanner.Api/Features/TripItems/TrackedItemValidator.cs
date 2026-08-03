@@ -72,8 +72,30 @@ public sealed class TrackedItemValidator
             return ValidationResult.Fail("Add a trip leg before adding an event, then relate the event to that leg.", "tripLegId");
         if (tripLegId == Guid.Empty)
             return ValidationResult.Fail("Select the trip leg this event belongs to.", "tripLegId");
-        if (trip.Legs.All(l => l.TripLegId != tripLegId))
+        var leg = trip.Legs.FirstOrDefault(l => l.TripLegId == tripLegId);
+        if (leg is null)
             return ValidationResult.Fail("The selected trip leg does not belong to this trip.", "tripLegId");
+
+        // An event has to happen while the traveler is on that leg, so both ends of the event are
+        // compared as instants against the leg's own travel window.
+        var legStartZone = _timezones.FindTimeZone(leg.StartTimeZoneId ?? string.Empty);
+        var legEndZone = _timezones.FindTimeZone(leg.EndTimeZoneId ?? string.Empty);
+        if (legStartZone is not null && legEndZone is not null)
+        {
+            var legStart = ToInstant(leg.StartLocal, legStartZone);
+            var legEnd = ToInstant(leg.EndLocal, legEndZone);
+
+            var start = ToInstant(startLocal, startTimeZone);
+            if (start < legStart || start > legEnd)
+                return ValidationResult.Fail("Start must fall within the selected trip leg's travel dates.", "startLocal");
+
+            if (endLocal is { } eventEnd && endTimeZone is not null)
+            {
+                var eventEndInstant = ToInstant(eventEnd, endTimeZone);
+                if (eventEndInstant < legStart || eventEndInstant > legEnd)
+                    return ValidationResult.Fail("End must fall within the selected trip leg's travel dates.", "endLocal");
+            }
+        }
         return ValidationResult.Success;
     }
 

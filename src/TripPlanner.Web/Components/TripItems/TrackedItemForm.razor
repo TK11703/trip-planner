@@ -15,7 +15,7 @@
     }
     <div class="mb-2">
         <label class="form-label" for="item-leg">Trip leg</label>
-        <InputSelect id="item-leg" class="form-select" @bind-Value="_model.TripLegId">
+        <InputSelect id="item-leg" class="form-select" @bind-Value="_model.TripLegId" @bind-Value:after="OnLegChanged">
             <option value="">Select a trip leg</option>
             @foreach (var leg in Legs)
             {
@@ -91,7 +91,12 @@
                 <label class="form-label mb-0">Start</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyStartFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.StartLocal" @bind-Value:after="OnStartChanged" />
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" @bind-Value="_model.StartLocal" @bind-Value:after="OnStartChanged" />
+            <ValidationMessage For="@(() => _model.StartLocal)" />
+            @if (SelectedLeg is not null)
+            {
+                <div class="form-text">Must fall within the trip leg: @LegWindowHint(_model.StartTimeZoneId)</div>
+            }
             @if (_confirmStartCopy)
             {
                 <div class="alert alert-warning py-1 px-2 small mt-1 mb-0 d-flex justify-content-between align-items-center">
@@ -117,7 +122,12 @@
                 <label class="form-label mb-0">End</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyEndFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndLocal" @bind-Value:after="OnEndChangedManually" />
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" @bind-Value="_model.EndLocal" @bind-Value:after="OnEndChangedManually" />
+            <ValidationMessage For="@(() => _model.EndLocal)" />
+            @if (SelectedLeg is not null)
+            {
+                <div class="form-text">Must fall within the trip leg: @LegWindowHint(EndTimeZoneId)</div>
+            }
             @if (_confirmEndCopy)
             {
                 <div class="alert alert-warning py-1 px-2 small mt-1 mb-0 d-flex justify-content-between align-items-center">
@@ -197,10 +207,33 @@
         [StringLength(2000, ErrorMessage = "Notes must be 2,000 characters or fewer.")] public string? Notes { get; set; }
         [Range(0, 9999999999.99, ErrorMessage = "Estimated cost cannot be negative.")] public decimal? EstimatedCost { get; set; }
 
+        // Travel window of the selected trip leg, as UTC instants. Set by the form whenever the
+        // leg selection changes so the range rules below can compare across timezones.
+        public DateTimeOffset? LegStartUtc { get; set; }
+        public DateTimeOffset? LegEndUtc { get; set; }
+
         // Location is optional, but when entered it must be a plausibly map-capable value so
         // the globe action can open it on a map.
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            if (LegStartUtc is { } legStart && LegEndUtc is { } legEnd)
+            {
+                if (ToInstant(StartLocal, StartTimeZoneId) is { } start && (start < legStart || start > legEnd))
+                {
+                    yield return new ValidationResult(
+                        $"Start must be between {FormatBound(legStart, StartTimeZoneId)} and {FormatBound(legEnd, StartTimeZoneId)}.",
+                        new[] { nameof(StartLocal) });
+                }
+
+                var endZoneId = string.IsNullOrWhiteSpace(EndTimeZoneId) ? StartTimeZoneId : EndTimeZoneId;
+                if (EndLocal is { } endLocal && ToInstant(endLocal, endZoneId) is { } end && (end < legStart || end > legEnd))
+                {
+                    yield return new ValidationResult(
+                        $"End must be between {FormatBound(legStart, endZoneId)} and {FormatBound(legEnd, endZoneId)}.",
+                        new[] { nameof(EndLocal) });
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(Location))
             {
                 yield break;
@@ -232,6 +265,9 @@
     private bool _tzInitialized;
     private bool _confirmStartCopy;
     private bool _confirmEndCopy;
+    // The leg whose travel window the entered dates were last pulled into, so a new event is only
+    // re-clamped when the traveler actually switches legs.
+    private Guid? _clampedLegId;
     // True once the traveler (or an explicit copy/edit) has set the end directly, after which
     // the end no longer auto-follows the start.
     private bool _endManuallySet;
@@ -240,6 +276,92 @@
     private string FormName => IsEdit ? $"tracked-item-edit-{Item!.TrackedItemId}" : "tracked-item-create";
 
     private TripLegDto? SelectedLeg => _model.TripLegId is { } id ? Legs.FirstOrDefault(l => l.TripLegId == id) : null;
+
+    // ── Trip leg travel window ─────────────────────────────────────────
+    // An event belongs to a leg, so its start and end are restricted to that leg's travel window.
+    // The bounds are carried as UTC instants and projected back into whichever timezone each
+    // field uses, so the picker's disabled range matches the rule the API enforces.
+    private const string PickerFormat = "yyyy-MM-ddTHH:mm:ss";
+
+    private string EndTimeZoneId => string.IsNullOrWhiteSpace(_model.EndTimeZoneId) ? _model.StartTimeZoneId : _model.EndTimeZoneId!;
+
+    private string? StartMin => FormatForPicker(_model.LegStartUtc, _model.StartTimeZoneId);
+    private string? StartMax => FormatForPicker(_model.LegEndUtc, _model.StartTimeZoneId);
+    private string? EndMin => FormatForPicker(_model.LegStartUtc, EndTimeZoneId);
+    private string? EndMax => FormatForPicker(_model.LegEndUtc, EndTimeZoneId);
+
+    private string LegWindowHint(string? timeZoneId)
+        => $"{FormatBound(_model.LegStartUtc, timeZoneId)} – {FormatBound(_model.LegEndUtc, timeZoneId)}";
+
+    private static DateTimeOffset? ToInstant(DateTime local, string? timeZoneId)
+    {
+        var zone = TripPlanner.Contracts.Common.TimezoneOptions.FindTimeZone(timeZoneId ?? string.Empty);
+        if (zone is null)
+        {
+            return null;
+        }
+        var unspecified = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+        return new DateTimeOffset(unspecified, zone.GetUtcOffset(unspecified)).ToUniversalTime();
+    }
+
+    private static DateTime? ToLocal(DateTimeOffset? instant, string? timeZoneId)
+    {
+        if (instant is not { } utc)
+        {
+            return null;
+        }
+        var zone = TripPlanner.Contracts.Common.TimezoneOptions.FindTimeZone(timeZoneId ?? string.Empty);
+        return zone is null ? null : TimeZoneInfo.ConvertTime(utc, zone).DateTime;
+    }
+
+    private static string? FormatForPicker(DateTimeOffset? instant, string? timeZoneId)
+        => ToLocal(instant, timeZoneId)?.ToString(PickerFormat, System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string FormatBound(DateTimeOffset? instant, string? timeZoneId)
+        => ToLocal(instant, timeZoneId)?.ToString("g") ?? "—";
+
+    private void SyncLegWindow()
+    {
+        var leg = SelectedLeg;
+        _model.LegStartUtc = leg is null ? null : ToInstant(leg.StartLocal, leg.StartTimeZoneId);
+        _model.LegEndUtc = leg is null ? null : ToInstant(leg.EndLocal, leg.EndTimeZoneId);
+    }
+
+    // Pull the entered start/end back inside the leg's window. Only applied to new events: an
+    // existing event's saved values stay untouched and are flagged by validation instead.
+    private void ClampToLegWindow()
+    {
+        if (_model.LegStartUtc is not { } legStart || _model.LegEndUtc is not { } legEnd)
+        {
+            return;
+        }
+
+        if (ToLocal(legStart, _model.StartTimeZoneId) is { } startMin && ToLocal(legEnd, _model.StartTimeZoneId) is { } startMax)
+        {
+            _model.StartLocal = Clamp(_model.StartLocal, startMin, startMax);
+        }
+
+        if (_model.EndLocal is { } end && ToLocal(legStart, EndTimeZoneId) is { } endMin && ToLocal(legEnd, EndTimeZoneId) is { } endMax)
+        {
+            _model.EndLocal = Clamp(end, endMin, endMax);
+        }
+    }
+
+    private static DateTime Clamp(DateTime value, DateTime min, DateTime max)
+        => value < min ? min : value > max ? max : value;
+
+    private void OnLegChanged()
+    {
+        if (SelectedLeg is { } leg)
+        {
+            _model.StartTimeZoneId = leg.StartTimeZoneId;
+            _model.EndTimeZoneId = leg.EndTimeZoneId;
+            _tzInitialized = true;
+        }
+        SyncLegWindow();
+        _clampedLegId = _model.TripLegId;
+        ClampToLegWindow();
+    }
 
     // True when the current location value is a plausibly map-capable place/address.
     private bool IsLocationMappable => LocationIsMapCapable(_model.Location);
@@ -374,6 +496,7 @@
                 _appliedInitial = false;
                 _tzInitialized = false;
                 _endManuallySet = false;
+                _clampedLegId = null;
             }
 
             if (!_appliedInitial)
@@ -400,6 +523,13 @@
                 _model.StartTimeZoneId = leg.StartTimeZoneId;
                 _model.EndTimeZoneId = leg.EndTimeZoneId;
                 _tzInitialized = true;
+            }
+
+            SyncLegWindow();
+            if (_clampedLegId != _model.TripLegId)
+            {
+                _clampedLegId = _model.TripLegId;
+                ClampToLegWindow();
             }
             return;
         }
@@ -428,15 +558,22 @@
         _tzInitialized = true;
         // An existing event's saved end is authoritative and must not auto-follow start edits.
         _endManuallySet = true;
+        _clampedLegId = _model.TripLegId;
+        SyncLegWindow();
     }
 
     // When the traveler changes the start, the end reacts to one hour after the new start,
-    // unless the end has already been set directly.
+    // unless the end has already been set directly. The reaction never leaves the leg's window.
     private void OnStartChanged()
     {
         if (!_endManuallySet)
         {
-            _model.EndLocal = _model.StartLocal.AddHours(1);
+            var candidate = _model.StartLocal.AddHours(1);
+            if (ToLocal(_model.LegEndUtc, EndTimeZoneId) is { } endMax && candidate > endMax)
+            {
+                candidate = endMax;
+            }
+            _model.EndLocal = candidate;
         }
     }
 
@@ -528,6 +665,7 @@
                 _model = new ItemModel { TripLegId = Legs.Count > 0 ? Legs[0].TripLegId : null };
                 _tzInitialized = false;
                 _endManuallySet = false;
+                _clampedLegId = null;
             }
             else
             {

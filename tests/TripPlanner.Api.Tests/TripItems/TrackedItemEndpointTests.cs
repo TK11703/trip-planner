@@ -130,4 +130,63 @@ public class TrackedItemEndpointTests
             Start, "UTC", Start.AddHours(2), "UTC", "teal", "ABC123", "Window seat"), TripWithLeg(tripId, legId));
         Assert.True(r.IsValid);
     }
+
+    [Fact]
+    public void Validator_RejectsStartBeforeLegStart()
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var v = NewValidator();
+        var r = v.Validate(new CreateTrackedItemRequest(legId, "activity", "Tour", null,
+            new DateTime(2026, 7, 10, 23, 0, 0), "UTC", null, null, "teal", null, null), TripWithLeg(tripId, legId));
+        Assert.False(r.IsValid);
+        Assert.Equal("startLocal", r.Error!.Details!["field"]);
+    }
+
+    [Fact]
+    public void Validator_RejectsStartAfterLegEnd()
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var v = NewValidator();
+        var r = v.Validate(new CreateTrackedItemRequest(legId, "activity", "Tour", null,
+            new DateTime(2026, 7, 12, 9, 0, 0), "UTC", null, null, "teal", null, null), TripWithLeg(tripId, legId));
+        Assert.False(r.IsValid);
+        Assert.Equal("startLocal", r.Error!.Details!["field"]);
+    }
+
+    [Fact]
+    public void Validator_RejectsEndAfterLegEnd()
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var v = NewValidator();
+        var r = v.Validate(new CreateTrackedItemRequest(legId, "activity", "Tour", null,
+            Start, "UTC", new DateTime(2026, 7, 12, 9, 0, 0), "UTC", "teal", null, null), TripWithLeg(tripId, legId));
+        Assert.False(r.IsValid);
+        Assert.Equal("endLocal", r.Error!.Details!["field"]);
+    }
+
+    [Fact]
+    public void Validator_AcceptsEventOnLegBoundaries()
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var v = NewValidator();
+        var r = v.Validate(new CreateTrackedItemRequest(legId, "activity", "Tour", null,
+            new DateTime(2026, 7, 11, 8, 0, 0), "UTC", new DateTime(2026, 7, 12, 8, 0, 0), "UTC", "teal", null, null), TripWithLeg(tripId, legId));
+        Assert.True(r.IsValid);
+    }
+
+    [Fact]
+    public void Validator_ComparesLegWindowAcrossTimezones()
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var v = NewValidator();
+        // 2026-07-11 05:00 America/Chicago is 10:00 UTC, inside the leg's 08:00–08:00 UTC window.
+        var r = v.Validate(new CreateTrackedItemRequest(legId, "activity", "Tour", null,
+            new DateTime(2026, 7, 11, 5, 0, 0), "America/Chicago", null, null, "teal", null, null), TripWithLeg(tripId, legId));
+        Assert.True(r.IsValid);
+    }
 }
