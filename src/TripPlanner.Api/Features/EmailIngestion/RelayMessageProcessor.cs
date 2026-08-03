@@ -23,22 +23,22 @@ public sealed class RelayMessageProcessor
 {
     private readonly IInboxEmailRepository _emails;
     private readonly IEmailAttachmentRepository _attachments;
-    private readonly IParsedEventDraftRepository _drafts;
+    private readonly IParsedItemDraftRepository _drafts;
     private readonly EmailSenderResolver _senderResolver;
     private readonly EmailAttachmentTextExtractor _extractor;
     private readonly EmailDeduplicationService _dedupe;
-    private readonly IEventRecognizer _parser;
+    private readonly IItemRecognizer _parser;
     private readonly INotificationService _notifications;
     private readonly ILogger<RelayMessageProcessor> _logger;
 
     public RelayMessageProcessor(
         IInboxEmailRepository emails,
         IEmailAttachmentRepository attachments,
-        IParsedEventDraftRepository drafts,
+        IParsedItemDraftRepository drafts,
         EmailSenderResolver senderResolver,
         EmailAttachmentTextExtractor extractor,
         EmailDeduplicationService dedupe,
-        IEventRecognizer parser,
+        IItemRecognizer parser,
         INotificationService notifications,
         ILogger<RelayMessageProcessor> logger)
     {
@@ -200,7 +200,7 @@ public sealed class RelayMessageProcessor
             var record = await _drafts.InsertAsync(draft, ct);
             if (record is not null)
             {
-                draftIds.Add(record.ParsedEventDraftId);
+                draftIds.Add(record.ParsedItemDraftId);
             }
         }
 
@@ -211,7 +211,7 @@ public sealed class RelayMessageProcessor
         {
             _logger.LogInformation("Inbox email {InboxEmailId} (traveler {UserId}) contained nothing recognizable.", inboxEmailId, userId);
             return new RelayIngestionResult(StatusCodes.Status200OK,
-                new IngestRelayMessageResponse(EmailIngestionOutcome.NoContent, inboxEmailId, [], "No trip event could be recognized."));
+                new IngestRelayMessageResponse(EmailIngestionOutcome.NoContent, inboxEmailId, [], "No trip item could be recognized."));
         }
 
         await _notifications.CreateAsync(new NewNotification(
@@ -220,8 +220,8 @@ public sealed class RelayMessageProcessor
             Kind: NotificationKind.Actionable,
             TargetType: NotificationTargetType.Person,
             RelatedTripId: null,
-            Title: draftIds.Count == 1 ? "New trip event ready to review" : $"{draftIds.Count} trip events ready to review",
-            Message: "A relayed email was processed. Review and confirm the extracted events.",
+            Title: draftIds.Count == 1 ? "New trip item ready to review" : $"{draftIds.Count} trip items ready to review",
+            Message: "A relayed email was processed. Review and confirm the extracted items.",
             SourceEventKey: $"email-parsed:{inboxEmailId}"), ct);
 
         _logger.LogInformation("Inbox email {InboxEmailId} (traveler {UserId}) produced {DraftCount} draft(s).", inboxEmailId, userId, draftIds.Count);

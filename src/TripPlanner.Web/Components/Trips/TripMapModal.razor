@@ -18,7 +18,7 @@
                 else if (_locations.Count == 0)
                 {
                     <div class="alert alert-info mb-0" role="status">
-                        We couldn't place any of this trip's locations on the map yet. Add an address to an event, or check back once locations can be resolved.
+                        We couldn't place any of this trip's locations on the map yet. Add an address to an item, or check back once locations can be resolved.
                     </div>
                 }
                 else
@@ -34,7 +34,7 @@
 @code {
     [Parameter] public Guid TripId { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
-    [Parameter] public EventCallback<Guid> OnOpenEvent { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpenItem { get; set; }
 
     private bool _loading = true;
     private IReadOnlyList<TripMapLocation> _locations = Array.Empty<TripMapLocation>();
@@ -86,9 +86,9 @@
     [JSInvokable]
     public async Task OnMarkerActivated(Guid trackedItemId)
     {
-        if (OnOpenEvent.HasDelegate)
+        if (OnOpenItem.HasDelegate)
         {
-            await OnOpenEvent.InvokeAsync(trackedItemId);
+            await OnOpenItem.InvokeAsync(trackedItemId);
         }
     }
 

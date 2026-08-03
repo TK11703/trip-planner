@@ -6,9 +6,9 @@ namespace TripPlanner.Web.Features.EmailIngestion;
 
 public interface IEmailIngestionApiClient
 {
-    Task<IReadOnlyList<ParsedEventDraftDto>> GetDraftsAsync(CancellationToken ct = default);
-    Task<ParsedEventDraftDto?> UpdateDraftAsync(Guid draftId, UpdateParsedEventDraftRequest request, CancellationToken ct = default);
-    Task<ConfirmParsedEventDraftResponse?> ConfirmDraftAsync(Guid draftId, CancellationToken ct = default);
+    Task<IReadOnlyList<ParsedItemDraftDto>> GetDraftsAsync(CancellationToken ct = default);
+    Task<ParsedItemDraftDto?> UpdateDraftAsync(Guid draftId, UpdateParsedItemDraftRequest request, CancellationToken ct = default);
+    Task<ConfirmParsedItemDraftResponse?> ConfirmDraftAsync(Guid draftId, CancellationToken ct = default);
     Task<bool> DiscardDraftAsync(Guid draftId, CancellationToken ct = default);
 }
 
@@ -18,26 +18,26 @@ public sealed class EmailIngestionApiClient : IEmailIngestionApiClient
 
     public EmailIngestionApiClient(HttpClient http) => _http = http;
 
-    public async Task<IReadOnlyList<ParsedEventDraftDto>> GetDraftsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ParsedItemDraftDto>> GetDraftsAsync(CancellationToken ct = default)
     {
         var response = await _http.GetAsync("/api/email-ingestion/drafts", ct);
-        if (!response.IsSuccessStatusCode) return Array.Empty<ParsedEventDraftDto>();
-        var payload = await response.Content.ReadFromJsonAsync<ParsedEventDraftListResponse>(cancellationToken: ct);
-        return payload?.Items ?? Array.Empty<ParsedEventDraftDto>();
+        if (!response.IsSuccessStatusCode) return Array.Empty<ParsedItemDraftDto>();
+        var payload = await response.Content.ReadFromJsonAsync<ParsedItemDraftListResponse>(cancellationToken: ct);
+        return payload?.Items ?? Array.Empty<ParsedItemDraftDto>();
     }
 
-    public async Task<ParsedEventDraftDto?> UpdateDraftAsync(Guid draftId, UpdateParsedEventDraftRequest request, CancellationToken ct = default)
+    public async Task<ParsedItemDraftDto?> UpdateDraftAsync(Guid draftId, UpdateParsedItemDraftRequest request, CancellationToken ct = default)
     {
         var response = await _http.PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request, ct);
         if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<ParsedEventDraftDto>(cancellationToken: ct);
+        return await response.Content.ReadFromJsonAsync<ParsedItemDraftDto>(cancellationToken: ct);
     }
 
-    public async Task<ConfirmParsedEventDraftResponse?> ConfirmDraftAsync(Guid draftId, CancellationToken ct = default)
+    public async Task<ConfirmParsedItemDraftResponse?> ConfirmDraftAsync(Guid draftId, CancellationToken ct = default)
     {
         var response = await _http.PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", content: null, ct);
         if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<ConfirmParsedEventDraftResponse>(cancellationToken: ct);
+        return await response.Content.ReadFromJsonAsync<ConfirmParsedItemDraftResponse>(cancellationToken: ct);
     }
 
     public async Task<bool> DiscardDraftAsync(Guid draftId, CancellationToken ct = default)

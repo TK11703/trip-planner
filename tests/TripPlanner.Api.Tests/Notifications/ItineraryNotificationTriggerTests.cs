@@ -43,7 +43,7 @@ public class ItineraryNotificationTriggerTests
         var service = new ItineraryNotificationService(notifications, sharing, profiles);
 
         // A collaborator performs the change; they are excluded, owner and the other viewer are notified.
-        await service.NotifyChangeAsync(TripId, ownerUserId: "owner-1", actorUserId: "editor-1", actorDisplayName: "Editor One", ItineraryChangeKind.TripEventUpdated, CancellationToken.None);
+        await service.NotifyChangeAsync(TripId, ownerUserId: "owner-1", actorUserId: "editor-1", actorDisplayName: "Editor One", ItineraryChangeKind.TripItemUpdated, CancellationToken.None);
 
         var recipients = notifications.Created.Select(n => n.RecipientUserId).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Contains("owner-1", recipients);

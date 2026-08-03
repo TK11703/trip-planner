@@ -54,7 +54,7 @@ public class TrackedItemFormReactiveEndTests : TestContext
     }
 
     [Fact]
-    public void EditingExistingEvent_StartChange_KeepsSavedEnd()
+    public void EditingExistingItem_StartChange_KeepsSavedEnd()
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
         var item = TrackedItemFormTestData.Item(leg.TripLegId, new DateTime(2026, 9, 5, 9, 0, 0), new DateTime(2026, 9, 5, 12, 0, 0));

@@ -8,11 +8,11 @@ public class TimelineFlowTests
     public void AddItems_AppearOnCalendar_MobileAndDesktop() { }
 
     [Fact(Skip = "Playwright; requires running AppHost.")]
-    public void AddEventFromLegRow_OpensFormWithLegPreselected() { }
+    public void AddItemFromLegRow_OpensFormWithLegPreselected() { }
 
     [Fact(Skip = "Playwright; requires running AppHost.")]
-    public void AddingEvent_UpdatesOnlySelectedLegEventCount() { }
+    public void AddingItem_UpdatesOnlySelectedLegItemCount() { }
 
     [Fact(Skip = "Playwright; requires running AppHost.")]
-    public void DarkMode_LegBandsRemainVisibleAndLaneStaysClickableBesideEvents() { }
+    public void DarkMode_LegBandsRemainVisibleAndLaneStaysClickableBesideItems() { }
 }

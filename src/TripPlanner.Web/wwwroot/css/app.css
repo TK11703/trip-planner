@@ -315,7 +315,7 @@ body {
     min-width: 0;
 }
 
-/* Type icon shown before the event title on each timeline item. */
+/* Type icon shown before the item title on each timeline item. */
 .ttl-item-type-icon {
     flex: 0 0 auto;
     margin-right: .25rem;
@@ -323,7 +323,7 @@ body {
     opacity: .95;
 }
 
-/* Type icon adornment next to the event form's Type selector. */
+/* Type icon adornment next to the item form's Type selector. */
 .tp-type-icon-addon {
     display: inline-flex;
     align-items: center;
@@ -1035,7 +1035,7 @@ body {
         display: table-header-group;
     }
 
-    .tp-print-event,
+    .tp-print-item,
     .tp-print-leg {
         break-inside: avoid;
     }

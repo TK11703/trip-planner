@@ -8,7 +8,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.Trips;
 
 // User Story 2 (P2): the printable document shows every detail — metadata, legs as
-// chronological row dividers, event columns, and combined datetime+TZ cells.
+// chronological row dividers, item columns, and combined datetime+TZ cells.
 public class TripPrintDocumentTests : TestContext
 {
     private IRenderedComponent<TripPrintDocument> Render(TripDetail trip) =>
@@ -31,16 +31,16 @@ public class TripPrintDocumentTests : TestContext
 
         var dividers = cut.FindAll("tr.tp-print-leg .tp-print-leg-title");
         Assert.Equal(new[] { "Arrival", "Departure" }, dividers.Select(d => d.TextContent.Trim()).ToArray());
-        // Divider spans all event columns.
+        // Divider spans all item columns.
         Assert.Equal("7", cut.Find("tr.tp-print-leg th").GetAttribute("colspan"));
     }
 
     [Fact]
-    public void RendersEventRowsWithCombinedDateTimeAndZone()
+    public void RendersItemRowsWithCombinedDateTimeAndZone()
     {
         var cut = Render(TripFixtures.Populated());
 
-        var rows = cut.FindAll("tr.tp-print-event");
+        var rows = cut.FindAll("tr.tp-print-item");
         Assert.NotEmpty(rows);
         Assert.Contains("07/14/2026 09:30 EDT", cut.Markup);
     }
@@ -50,8 +50,8 @@ public class TripPrintDocumentTests : TestContext
     {
         var cut = Render(TripFixtures.Populated());
 
-        // The "Walk" event has no location, end, confirmation, cost, or notes.
-        var walkRow = cut.FindAll("tr.tp-print-event")
+        // The "Walk" item has no location, end, confirmation, cost, or notes.
+        var walkRow = cut.FindAll("tr.tp-print-item")
             .First(r => r.QuerySelectorAll("td")[1].TextContent.Trim() == "Walk");
         var cells = walkRow.QuerySelectorAll("td");
         Assert.Equal(string.Empty, cells[2].TextContent.Trim()); // Location
@@ -65,6 +65,6 @@ public class TripPrintDocumentTests : TestContext
         var cut = Render(TripFixtures.Empty());
 
         Assert.Empty(cut.FindAll("table.tp-print-table"));
-        Assert.Contains("no legs or events", cut.Markup);
+        Assert.Contains("no legs or items", cut.Markup);
     }
 }

@@ -192,7 +192,7 @@ public sealed class RelayIngestionEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task IngestionNeverCreatesATripEvent()
+    public async Task IngestionNeverCreatesATripItem()
     {
         var client = CreateRelayClient();
 

@@ -144,7 +144,7 @@ public static class TripLegEndpoints
         {
             await audit.RecordAsync(callerId, AuditOperations.TripLegDelete, "trip-leg", tripLegId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
             return TypedResults.BadRequest(ApiError.ValidationFailed(
-                "This trip leg still has related events. Reassign or remove those events before deleting the leg.",
+                "This trip leg still has related items. Reassign or remove those items before deleting the leg.",
                 "tripLegId"));
         }
         var affected = await items.DeleteLegAsync(ownerId, tripId, tripLegId, ct);

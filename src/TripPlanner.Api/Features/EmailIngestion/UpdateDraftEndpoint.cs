@@ -15,15 +15,15 @@ public static class UpdateDraftEndpoint
         return group;
     }
 
-    private static async Task<Results<Ok<ParsedEventDraftDto>, NotFound>> HandleAsync(
+    private static async Task<Results<Ok<ParsedItemDraftDto>, NotFound>> HandleAsync(
         Guid id,
-        UpdateParsedEventDraftRequest request,
+        UpdateParsedItemDraftRequest request,
         ICurrentUser currentUser,
-        IParsedEventDraftRepository draftRepository,
+        IParsedItemDraftRepository draftRepository,
         CancellationToken cancellationToken)
     {
         var update = new DraftUpdate(
-            request.TripId, request.TripLegId, request.EventType, request.Title, request.Location,
+            request.TripId, request.TripLegId, request.ItemType, request.Title, request.Location,
             request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId,
             request.ConfirmationCode, request.Notes);
 

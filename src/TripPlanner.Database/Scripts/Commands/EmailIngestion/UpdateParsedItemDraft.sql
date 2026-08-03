@@ -1,7 +1,7 @@
-UPDATE parsed_event_drafts
+UPDATE parsed_item_drafts
 SET trip_id = @TripId,
     trip_leg_id = @TripLegId,
-    event_type = @EventType,
+    item_type = @ItemType,
     title = @Title,
     location = @Location,
     start_local = @StartLocal,
@@ -10,15 +10,15 @@ SET trip_id = @TripId,
     end_timezone_id = @EndTimeZoneId,
     confirmation_code = @ConfirmationCode,
     notes = @Notes
-WHERE parsed_event_draft_id = @ParsedEventDraftId
+WHERE parsed_item_draft_id = @ParsedItemDraftId
   AND user_id = @UserId
   AND review_status = 'pending_review'
-RETURNING parsed_event_draft_id AS ParsedEventDraftId,
+RETURNING parsed_item_draft_id AS ParsedItemDraftId,
           inbox_email_id AS InboxEmailId,
           user_id AS UserId,
           trip_id AS TripId,
           trip_leg_id AS TripLegId,
-          event_type AS EventType,
+          item_type AS ItemType,
           title AS Title,
           location AS Location,
           start_local AS StartLocal,

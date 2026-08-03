@@ -17,7 +17,7 @@ public static class DiscardDraftEndpoint
     private static async Task<Results<NoContent, NotFound>> HandleAsync(
         Guid id,
         ICurrentUser currentUser,
-        IParsedEventDraftRepository draftRepository,
+        IParsedItemDraftRepository draftRepository,
         CancellationToken cancellationToken)
     {
         var success = await draftRepository.SetReviewStatusAsync(id, currentUser.UserId, "discarded", cancellationToken);

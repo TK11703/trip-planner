@@ -1,7 +1,7 @@
 @using TripPlanner.Web.Features.Trips
 
 @* Presentational, read-only rendering of a trip for printing. Metadata block first,
-   then a single itinerary table with legs as full-width row dividers and events as rows. *@
+   then a single itinerary table with legs as full-width row dividers and items as rows. *@
 <article class="tp-print-doc">
     <header class="tp-print-meta">
         <h1 class="tp-print-title">@Trip.Name</h1>
@@ -15,7 +15,7 @@
 
     @if (!Trip.HasContent)
     {
-        <p class="tp-print-empty">This trip has no legs or events yet.</p>
+        <p class="tp-print-empty">This trip has no legs or items yet.</p>
     }
     else
     {
@@ -45,31 +45,31 @@
                             <span class="tp-print-leg-when">@leg.StartText &ndash; @leg.EndText</span>
                         </th>
                     </tr>
-                    @if (leg.Events.Count == 0)
+                    @if (leg.Items.Count == 0)
                     {
                         <tr class="tp-print-leg-empty">
-                            <td colspan="@ColumnCount">No events for this leg.</td>
+                            <td colspan="@ColumnCount">No items for this leg.</td>
                         </tr>
                     }
                     else
                     {
-                        @foreach (var ev in leg.Events)
+                        @foreach (var item in leg.Items)
                         {
-                            @RenderEventRow(ev)
+                            @RenderItemRow(item)
                         }
                     }
                 }
 
-                @if (Trip.UnassignedEvents.Count > 0)
+                @if (Trip.UnassignedItems.Count > 0)
                 {
                     <tr class="tp-print-leg">
                         <th scope="colgroup" colspan="@ColumnCount">
                             <span class="tp-print-leg-title">Unassigned</span>
                         </th>
                     </tr>
-                    @foreach (var ev in Trip.UnassignedEvents)
+                    @foreach (var item in Trip.UnassignedItems)
                     {
-                        @RenderEventRow(ev)
+                        @RenderItemRow(item)
                     }
                 }
             </tbody>
@@ -83,16 +83,16 @@
 
     private const int ColumnCount = 7;
 
-    private RenderFragment RenderEventRow(PrintableEvent ev) => __builder =>
+    private RenderFragment RenderItemRow(PrintableItem item) => __builder =>
     {
-        <tr class="tp-print-event">
-            <td>@ev.TypeText</td>
-            <td>@ev.Title</td>
-            <td>@ev.Location</td>
-            <td>@ev.StartText</td>
-            <td>@ev.EndText</td>
-            <td>@ev.ConfirmationCode</td>
-            <td>@ev.EstimatedCostText</td>
+        <tr class="tp-print-item">
+            <td>@item.TypeText</td>
+            <td>@item.Title</td>
+            <td>@item.Location</td>
+            <td>@item.StartText</td>
+            <td>@item.EndText</td>
+            <td>@item.ConfirmationCode</td>
+            <td>@item.EstimatedCostText</td>
         </tr>
     };
 }

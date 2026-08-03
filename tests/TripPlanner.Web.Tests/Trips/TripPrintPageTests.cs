@@ -58,7 +58,7 @@ public class TripPrintPageTests : TestContext
         cut.WaitForAssertion(() =>
         {
             Assert.Contains("Empty trip", cut.Markup);
-            Assert.Contains("no legs or events", cut.Markup);
+            Assert.Contains("no legs or items", cut.Markup);
         });
     }
 

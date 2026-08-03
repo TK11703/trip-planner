@@ -12,12 +12,12 @@ internal static class EmailIngestionMapping
         record.ReceivedAt,
         ParseParseStatus(record.ParseStatus));
 
-    public static ParsedEventDraftDto ToDto(this ParsedEventDraftRecord record) => new(
-        record.ParsedEventDraftId,
+    public static ParsedItemDraftDto ToDto(this ParsedItemDraftRecord record) => new(
+        record.ParsedItemDraftId,
         record.InboxEmailId,
         record.TripId,
         record.TripLegId,
-        record.EventType,
+        record.ItemType,
         record.Title,
         record.Location,
         record.StartLocal,

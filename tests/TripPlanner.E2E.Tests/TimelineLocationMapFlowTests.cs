@@ -2,7 +2,7 @@ using Xunit;
 
 namespace TripPlanner.E2E.Tests;
 
-// Feature 018: Timeline event entry experience — mappable, validated location.
+// Feature 018: Timeline item entry experience — mappable, validated location.
 // These mirror the repo's existing timeline E2E convention (Playwright, skipped without a
 // running AppHost).
 public class TimelineLocationMapFlowTests

@@ -17,5 +17,5 @@ public class TripLocationMapFlowTests
     public void ViewMap_DisabledWhenTripHasNoLocations() { }
 
     [Fact(Skip = "Playwright; requires running AppHost.")]
-    public void SelectingMarker_OpensEventDetails() { }
+    public void SelectingMarker_OpensItemDetails() { }
 }

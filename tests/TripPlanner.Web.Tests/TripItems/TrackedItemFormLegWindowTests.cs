@@ -7,7 +7,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.TripItems;
 
-// An event belongs to a trip leg, so its date pickers are bounded to that leg's travel window.
+// An item belongs to a trip leg, so its date pickers are bounded to that leg's travel window.
 public class TrackedItemFormLegWindowTests : TestContext
 {
     public TrackedItemFormLegWindowTests()
@@ -37,7 +37,7 @@ public class TrackedItemFormLegWindowTests : TestContext
     }
 
     [Fact]
-    public void NewEvent_StartOutsideLegWindow_IsPulledToTheLegStart()
+    public void NewItem_StartOutsideLegWindow_IsPulledToTheLegStart()
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
 

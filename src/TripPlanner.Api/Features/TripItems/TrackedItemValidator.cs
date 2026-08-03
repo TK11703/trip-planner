@@ -39,7 +39,7 @@ public sealed class TrackedItemValidator
         if (endLocal is not null)
         {
             if (string.IsNullOrWhiteSpace(endTimeZoneId))
-                return ValidationResult.Fail("Select an end timezone for the event end.", "endTimeZoneId");
+                return ValidationResult.Fail("Select an end timezone for the item end.", "endTimeZoneId");
             endTimeZone = _timezones.FindTimeZone(endTimeZoneId);
             if (endTimeZone is null)
                 return ValidationResult.Fail("Select a valid end timezone.", "endTimeZoneId");
@@ -54,7 +54,7 @@ public sealed class TrackedItemValidator
         }
 
         if (!TrackedItemColors.IsValid(displayColor))
-            return ValidationResult.Fail("Select a valid event color.", "displayColor");
+            return ValidationResult.Fail("Select a valid item color.", "displayColor");
         if (confirmationCode is not null && confirmationCode.Length > ConfirmationCodeMaxLength)
             return ValidationResult.Fail($"Confirmation/Reservation Code must be {ConfirmationCodeMaxLength} characters or fewer.", "confirmationCode");
         if (notes is not null && notes.Length > NotesMaxLength)
@@ -69,14 +69,14 @@ public sealed class TrackedItemValidator
                 return ValidationResult.Fail("Enter an estimated cost with up to two decimal places.", "estimatedCost");
         }
         if (trip.Legs.Count == 0)
-            return ValidationResult.Fail("Add a trip leg before adding an event, then relate the event to that leg.", "tripLegId");
+            return ValidationResult.Fail("Add a trip leg before adding an item, then relate the item to that leg.", "tripLegId");
         if (tripLegId == Guid.Empty)
-            return ValidationResult.Fail("Select the trip leg this event belongs to.", "tripLegId");
+            return ValidationResult.Fail("Select the trip leg this item belongs to.", "tripLegId");
         var leg = trip.Legs.FirstOrDefault(l => l.TripLegId == tripLegId);
         if (leg is null)
             return ValidationResult.Fail("The selected trip leg does not belong to this trip.", "tripLegId");
 
-        // An event has to happen while the traveler is on that leg, so both ends of the event are
+        // An item has to happen while the traveler is on that leg, so both ends of the item are
         // compared as instants against the leg's own travel window.
         var legStartZone = _timezones.FindTimeZone(leg.StartTimeZoneId ?? string.Empty);
         var legEndZone = _timezones.FindTimeZone(leg.EndTimeZoneId ?? string.Empty);
@@ -89,10 +89,10 @@ public sealed class TrackedItemValidator
             if (start < legStart || start > legEnd)
                 return ValidationResult.Fail("Start must fall within the selected trip leg's travel dates.", "startLocal");
 
-            if (endLocal is { } eventEnd && endTimeZone is not null)
+            if (endLocal is { } itemEnd && endTimeZone is not null)
             {
-                var eventEndInstant = ToInstant(eventEnd, endTimeZone);
-                if (eventEndInstant < legStart || eventEndInstant > legEnd)
+                var itemEndInstant = ToInstant(itemEnd, endTimeZone);
+                if (itemEndInstant < legStart || itemEndInstant > legEnd)
                     return ValidationResult.Fail("End must fall within the selected trip leg's travel dates.", "endLocal");
             }
         }

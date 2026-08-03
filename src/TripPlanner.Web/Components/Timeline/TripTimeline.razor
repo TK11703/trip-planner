@@ -14,7 +14,7 @@
 else if (_timeline.Legs.Count == 0 && _timeline.UnassignedItems.Count == 0)
 {
     <div class="border-dashed rounded p-4 text-center text-secondary">
-        No trip legs yet. Add a trip leg to start building your timeline, then relate events to it.
+        No trip legs yet. Add a trip leg to start building your timeline, then relate items to it.
         <button type="button"
                 class="ttl-leg-add"
                 title="Add a trip leg"
@@ -29,7 +29,7 @@ else
     @if (_timeline.UnassignedItems.Count > 0)
     {
         <div class="alert alert-warning py-2 small mb-2">
-            @_timeline.UnassignedItems.Count event(s) are not related to a trip leg. Select one below to assign it to a leg.
+            @UnassignedItemsLabel(_timeline.UnassignedItems.Count) Select one below to assign it to a leg.
         </div>
     }
     <div class="ttl" style="--ttl-slot-w:@(SlotWidthPx)px; --ttl-label-w:@(LabelWidthPx)px;">
@@ -80,16 +80,16 @@ else
                             <div class="small text-secondary">@leg.Origin @(string.IsNullOrWhiteSpace(leg.Origin) || string.IsNullOrWhiteSpace(leg.Destination) ? null : "→") @leg.Destination</div>
                         }
                         <div class="ttl-leg-meta">
-                            <span class="ttl-leg-count @(leg.Items.Count == 0 ? "ttl-leg-count-empty" : null)">@EventCountLabel(leg.Items.Count)</span>
+                            <span class="ttl-leg-count @(leg.Items.Count == 0 ? "ttl-leg-count-empty" : null)">@ItemCountLabel(leg.Items.Count)</span>
                             @if (CanEdit)
                             {
                                 <button type="button"
                                         class="ttl-leg-add"
-                                        title="Add an event to @leg.Title"
-                                        aria-label="Add an event to @leg.Title"
-                                        @onclick="() => AddEventToLegAsync(leg)"
+                                        title="Add an item to @leg.Title"
+                                        aria-label="Add an item to @leg.Title"
+                                        @onclick="() => AddItemToLegAsync(leg)"
                                         @onclick:stopPropagation="true">
-                                    <span aria-hidden="true">+</span> Add event
+                                    <span aria-hidden="true">+</span> Add item
                                 </button>
                             }
                         </div>
@@ -140,7 +140,7 @@ else
                             <button type="button"
                                     class="ttl-item is-outside"
                                     style="left:@(span.Left)px; width:@(span.Width)px; top:@(Rem(ItemTopRem(lane)))rem; --tp-item:@SwatchColor(item.DisplayColor)"
-                                    title="Unassigned event — select to relate it to a trip leg"
+                                    title="Unassigned item — select to relate it to a trip leg"
                                     @onclick="() => SelectItemAsync(item.TrackedItemId)">
                                 <TrackedItemIcon Type="@item.ItemType" CssClass="ttl-item-type-icon" />
                                 <span class="ttl-item-title text-truncate">@item.Title</span>
@@ -185,13 +185,13 @@ else
     private const int SlotMinutes = 30;
     private const int SlotsPerDay = 24 * 60 / SlotMinutes;
 
-    // Vertical stacking of overlapping events within a leg row (values in rem).
+    // Vertical stacking of overlapping items within a leg row (values in rem).
     private const double DefaultRowHeightRem = 3.75;
     private const double ItemLaneHeightRem = 1.6;
     private const double LaneGapRem = 0.3;
     private const double LanePadRem = 0.35;
     // Clickable buffer reserved below the last lane so a time slot can always be clicked
-    // to add another event, even when the lanes are full.
+    // to add another item, even when the lanes are full.
     private const double LaneBottomBufferRem = 1.4;
 
     private TripTimelineResponse? _timeline;
@@ -374,7 +374,7 @@ else
         return (startSlot * SlotWidthPx, Math.Max(SlotWidthPx, spanSlots * SlotWidthPx));
     }
 
-    // Greedy interval-graph lane assignment: overlapping events are pushed onto separate
+    // Greedy interval-graph lane assignment: overlapping items are pushed onto separate
     // vertical lanes so they stack instead of covering each other. Items arrive ordered by
     // start time from the timeline projection.
     private static IReadOnlyList<(TimelineItem Item, int Lane)> AssignLanes(IReadOnlyList<TimelineItem> items)
@@ -434,9 +434,9 @@ else
 
     private async Task SelectItemAsync(Guid trackedItemId) => await OnItemSelected.InvokeAsync(trackedItemId);
 
-    private async Task AddEventToLegAsync(TimelineLeg leg)
+    private async Task AddItemToLegAsync(TimelineLeg leg)
     {
-        // Default the new event to the day the timeline is currently centered on (the active
+        // Default the new item to the day the timeline is currently centered on (the active
         // date), keeping the leg's start time-of-day as a sensible default time.
         var timeOfDay = TimeOnly.FromDateTime(leg.StartLocal);
         var startLocal = EffectiveCurrent.ToDateTime(timeOfDay);
@@ -477,12 +477,16 @@ else
         _ => $"{hour - 12}p"
     };
 
-    private static string EventCountLabel(int count) => count switch
+    private static string ItemCountLabel(int count) => count switch
     {
-        0 => "0 events",
-        1 => "1 event",
-        _ => $"{count} events"
+        0 => "0 items",
+        1 => "1 item",
+        _ => $"{count} items"
     };
+
+    private static string UnassignedItemsLabel(int count) => count == 1
+        ? "1 item is not related to a trip leg."
+        : $"{count} items are not related to a trip leg.";
 
     private static string ItemTooltip(TimelineItem item, DateTime localStart, DateTime? localEnd, bool outside)
     {

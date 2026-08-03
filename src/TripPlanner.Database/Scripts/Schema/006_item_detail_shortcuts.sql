@@ -1,4 +1,4 @@
--- 008: event-level start/end local times and timezone selections, plus length
+-- 008: item-level start/end local times and timezone selections, plus length
 -- limits for confirmation/reservation code and notes. Existing rows are
 -- backfilled from their stored instants so start_local/start_time_zone_id can
 -- become NOT NULL while end_local/end_time_zone_id stay optional.

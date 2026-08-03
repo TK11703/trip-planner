@@ -15,13 +15,13 @@ public static class GetDraftListEndpoint
         return group;
     }
 
-    private static async Task<Ok<ParsedEventDraftListResponse>> HandleAsync(
+    private static async Task<Ok<ParsedItemDraftListResponse>> HandleAsync(
         ICurrentUser currentUser,
-        IParsedEventDraftRepository draftRepository,
+        IParsedItemDraftRepository draftRepository,
         CancellationToken cancellationToken)
     {
         var drafts = await draftRepository.GetPendingAsync(currentUser.UserId, cancellationToken);
         var items = drafts.Select(d => d.ToDto()).ToArray();
-        return TypedResults.Ok(new ParsedEventDraftListResponse(items));
+        return TypedResults.Ok(new ParsedItemDraftListResponse(items));
     }
 }

@@ -7,7 +7,7 @@ using TripPlanner.Web.Features.Trips;
 namespace TripPlanner.Web.Tests.TripItems;
 
 /// <summary>
-/// Shared helpers for the 018 event-form tests: DTO builders and a minimal
+/// Shared helpers for the 018 item-form tests: DTO builders and a minimal
 /// <see cref="ITripApiClient"/> stub (the form only calls the API on submit).
 /// </summary>
 internal static class TrackedItemFormTestData
@@ -34,7 +34,7 @@ internal static class TrackedItemFormTestData
             Guid.NewGuid(),
             tripLegId,
             itemType,
-            "Existing event",
+            "Existing item",
             location,
             start,
             "UTC",

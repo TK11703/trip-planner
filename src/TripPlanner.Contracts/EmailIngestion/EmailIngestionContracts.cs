@@ -8,13 +8,13 @@ public sealed record InboxEmailDto(
     DateTimeOffset ReceivedAt,
     ParseStatus ParseStatus);
 
-/// <summary>A structured event extracted from an inbox email, awaiting user review.</summary>
-public sealed record ParsedEventDraftDto(
-    Guid ParsedEventDraftId,
+/// <summary>A structured item extracted from an inbox email, awaiting user review.</summary>
+public sealed record ParsedItemDraftDto(
+    Guid ParsedItemDraftId,
     Guid InboxEmailId,
     Guid? TripId,
     Guid? TripLegId,
-    string? EventType,
+    string? ItemType,
     string? Title,
     string? Location,
     DateTime? StartLocal,
@@ -27,11 +27,11 @@ public sealed record ParsedEventDraftDto(
     ReviewStatus ReviewStatus,
     DateTimeOffset CreatedAt);
 
-/// <summary>Request to update editable fields of a parsed event draft.</summary>
-public sealed record UpdateParsedEventDraftRequest(
+/// <summary>Request to update editable fields of a parsed item draft.</summary>
+public sealed record UpdateParsedItemDraftRequest(
     Guid? TripId,
     Guid? TripLegId,
-    string? EventType,
+    string? ItemType,
     string? Title,
     string? Location,
     DateTime? StartLocal,
@@ -41,14 +41,14 @@ public sealed record UpdateParsedEventDraftRequest(
     string? ConfirmationCode,
     string? Notes);
 
-/// <summary>Response returned after confirming a draft (the promoted event id).</summary>
-public sealed record ConfirmParsedEventDraftResponse(Guid TrackedItemId, Guid TripId, Guid TripLegId);
+/// <summary>Response returned after confirming a draft (the promoted item id).</summary>
+public sealed record ConfirmParsedItemDraftResponse(Guid TrackedItemId, Guid TripId, Guid TripLegId);
 
 /// <summary>A page of inbox emails.</summary>
 public sealed record InboxEmailListResponse(IReadOnlyList<InboxEmailDto> Items);
 
 /// <summary>A page of pending drafts.</summary>
-public sealed record ParsedEventDraftListResponse(IReadOnlyList<ParsedEventDraftDto> Items);
+public sealed record ParsedItemDraftListResponse(IReadOnlyList<ParsedItemDraftDto> Items);
 
 /// <summary>A file delivered alongside a relayed email.</summary>
 public sealed record RelayEmailAttachment(string FileName, string ContentType, string ContentBase64);

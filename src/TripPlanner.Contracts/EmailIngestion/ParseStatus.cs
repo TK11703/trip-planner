@@ -12,6 +12,6 @@ public enum ParseStatus
     /// <summary>Recognition was unavailable or returned unusable output.</summary>
     Failed = 2,
 
-    /// <summary>Recognition ran but found nothing that resembles a trip event.</summary>
+    /// <summary>Recognition ran but found nothing that resembles a trip item.</summary>
     Unsupported = 3
 }

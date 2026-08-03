@@ -56,12 +56,12 @@ else
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div>
                         <div class="fw-semibold">Trip timeline</div>
-                        <div class="small text-secondary">Trip legs are listed on the left. Scroll the grid to see each day, hour, and the events on each leg. Select a leg or event to edit it.</div>
+                        <div class="small text-secondary">Trip legs are listed on the left. Scroll the grid to see each day, hour, and the items on each leg. Select a leg or item to edit it.</div>
                     </div>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 @onclick="OpenMapModal" disabled="@(!CanOpenMap)"
-                                title="@(CanOpenMap ? "View all trip locations on a map" : "Add a location to an event to view the map")"
+                                title="@(CanOpenMap ? "View all trip locations on a map" : "Add a location to an item to view the map")"
                                 aria-label="View all trip locations on a map">
                             View map
                         </button>
@@ -148,7 +148,7 @@ else
                 <div class="card-header">Itinerary summary</div>
                 <ul class="list-group list-group-flush small">
                     <li class="list-group-item d-flex justify-content-between"><span>Legs</span><span>@_trip.Legs.Count</span></li>
-                    <li class="list-group-item d-flex justify-content-between"><span>Events</span><span>@_trip.TrackedItems.Count</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Items</span><span>@_trip.TrackedItems.Count</span></li>
                     <li class="list-group-item d-flex justify-content-between">
                         <span>Estimated total</span>
                         @if (_trip.EstimatedCostTotal > 0)
@@ -221,7 +221,7 @@ else
 
     @if (_showMapModal)
     {
-        <TripPlanner.Web.Components.Trips.TripMapModal TripId="@TripId" OnClose="CloseMapModal" OnOpenEvent="HandleMapOpenEventAsync" />
+        <TripPlanner.Web.Components.Trips.TripMapModal TripId="@TripId" OnClose="CloseMapModal" OnOpenItem="HandleMapOpenItemAsync" />
     }
 
     @if (_activeModal is not ActiveModal.None)
@@ -238,7 +238,7 @@ else
                         {
                             case ActiveModal.EditTrip:
                                 <div class="alert alert-warning small" role="alert">
-                                    Changing trip dates can leave existing legs or events outside the trip range. Review the calendar after saving.
+                                    Changing trip dates can leave existing legs or items outside the trip range. Review the calendar after saving.
                                 </div>
                                 <TripForm Model="_tripEditModel" IsEdit="true" OnSubmit="HandleTripEditAsync" />
                                 break;
@@ -276,7 +276,7 @@ else
                         {
                             <div class="alert alert-danger small" role="alert">@_deleteError</div>
                         }
-                        <p class="mb-0">Are you sure you want to delete <strong>@_trip.Name</strong>? This permanently removes the trip and all of its legs, events, and shares. This can't be undone.</p>
+                        <p class="mb-0">Are you sure you want to delete <strong>@_trip.Name</strong>? This permanently removes the trip and all of its legs, items, and shares. This can't be undone.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" @onclick="CloseDeleteModal" disabled="@_isDeleting">Cancel</button>
@@ -352,8 +352,8 @@ else
         ActiveModal.EditTrip => "Edit trip",
         ActiveModal.CreateLeg => "Add leg",
         ActiveModal.EditLeg => "Edit leg",
-        ActiveModal.CreateItem => "Add event",
-        ActiveModal.EditItem => "Edit event",
+        ActiveModal.CreateItem => "Add item",
+        ActiveModal.EditItem => "Edit item",
         _ => string.Empty
     };
 
@@ -428,7 +428,7 @@ else
 
     private void CloseMapModal() => _showMapModal = false;
 
-    private async Task HandleMapOpenEventAsync(Guid trackedItemId)
+    private async Task HandleMapOpenItemAsync(Guid trackedItemId)
     {
         var item = _trip?.TrackedItems.FirstOrDefault(i => i.TrackedItemId == trackedItemId);
         if (item is null)
@@ -459,7 +459,7 @@ else
     {
         _editingItem = null;
         _initialItemLegId = null;
-        // Default a new event to the timeline's active (centered) date when available.
+        // Default a new item to the timeline's active (centered) date when available.
         _initialItemStart = _timeline?.CurrentDate is { } activeDate
             ? activeDate.ToDateTime(new TimeOnly(9, 0))
             : null;

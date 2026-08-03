@@ -6,5 +6,5 @@ namespace TripPlanner.Database.Tests.Timeline;
 public class TimelineQueryTests
 {
     [Fact(Skip = "Requires Docker/Testcontainers.")]
-    public void Timeline_OnlyIncludesOwnerScopedEvents() { }
+    public void Timeline_OnlyIncludesOwnerScopedItems() { }
 }

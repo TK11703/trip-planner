@@ -28,7 +28,7 @@ public sealed record UpdateUserProfileRequest(
     PersonalizationPreferences PersonalizationPreferences);
 
 /// <summary>
-/// The mapping tool used when opening a single event location. Persisted per user; defaults to Bing.
+    /// The mapping tool used when opening a single item location. Persisted per user; defaults to Bing.
 /// </summary>
 public static class MapProviders
 {

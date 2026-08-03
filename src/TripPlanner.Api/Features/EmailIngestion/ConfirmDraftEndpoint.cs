@@ -17,10 +17,10 @@ public static class ConfirmDraftEndpoint
         return group;
     }
 
-    private static async Task<Results<Ok<ConfirmParsedEventDraftResponse>, NotFound, BadRequest<string>>> HandleAsync(
+    private static async Task<Results<Ok<ConfirmParsedItemDraftResponse>, NotFound, BadRequest<string>>> HandleAsync(
         Guid id,
         ICurrentUser currentUser,
-        IParsedEventDraftRepository draftRepository,
+        IParsedItemDraftRepository draftRepository,
         ITripItemRepository tripItemRepository,
         CancellationToken cancellationToken)
     {
@@ -35,8 +35,8 @@ public static class ConfirmDraftEndpoint
 
         var request = new CreateTrackedItemRequest(
             TripLegId: draft.TripLegId.Value,
-            ItemType: NormalizeEventType(draft.EventType),
-            Title: draft.Title ?? draft.EventType ?? "Imported event",
+            ItemType: NormalizeItemType(draft.ItemType),
+            Title: draft.Title ?? draft.ItemType ?? "Imported item",
             Location: draft.Location,
             StartLocal: draft.StartLocal.Value,
             StartTimeZoneId: draft.StartTimeZoneId ?? "UTC",
@@ -55,10 +55,10 @@ public static class ConfirmDraftEndpoint
 
         await draftRepository.SetReviewStatusAsync(id, currentUser.UserId, "confirmed", cancellationToken);
 
-        return TypedResults.Ok(new ConfirmParsedEventDraftResponse(createdId.Value, draft.TripId.Value, draft.TripLegId.Value));
+        return TypedResults.Ok(new ConfirmParsedItemDraftResponse(createdId.Value, draft.TripId.Value, draft.TripLegId.Value));
     }
 
-    private static string NormalizeEventType(string? raw)
+    private static string NormalizeItemType(string? raw)
     {
         return raw?.ToLowerInvariant() switch
         {

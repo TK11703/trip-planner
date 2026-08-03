@@ -31,10 +31,10 @@ public class TripTimelineCssTests
     }
 
     [Fact]
-    public void EventBar_IsNotFullRowHeight()
+    public void ItemBar_IsNotFullRowHeight()
     {
         var body = Block(".ttl-item");
-        // Event bars use a fixed per-lane height so overlapping events can stack
+        // Item bars use a fixed per-lane height so overlapping items can stack
         // vertically instead of covering the whole row.
         Assert.Contains("height: var(--ttl-item-h", body);
         Assert.DoesNotContain("height: calc(var(--ttl-row-h) - .8rem)", body);

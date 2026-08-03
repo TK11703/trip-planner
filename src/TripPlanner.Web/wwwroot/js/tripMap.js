@@ -1,4 +1,4 @@
-// Built-in trip map interop. Renders trip event locations with Leaflet + OpenStreetMap tiles,
+// Built-in trip map interop. Renders trip item locations with Leaflet + OpenStreetMap tiles,
 // fits all markers on first launch, then leaves native pan/zoom enabled. Leaflet is loaded on
 // demand from the bundled assets under wwwroot/lib/leaflet so no map key reaches the browser.
 
@@ -65,7 +65,7 @@ function buildPopup(point, dotNetRef) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'btn btn-sm btn-link p-0 mt-1';
-        button.textContent = 'Open event';
+        button.textContent = 'Open item';
         button.addEventListener('click', () => dotNetRef.invokeMethodAsync('OnMarkerActivated', point.trackedItemId));
         container.appendChild(button);
     }

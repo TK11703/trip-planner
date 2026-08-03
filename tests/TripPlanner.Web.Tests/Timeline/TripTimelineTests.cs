@@ -78,18 +78,18 @@ public class TripTimelineTests : TestContext
             Array.Empty<TimelineItem>());
 
     [Fact]
-    public void LegRow_WithNoEvents_ShowsZeroCount()
+    public void LegRow_WithNoItems_ShowsZeroCount()
     {
         var response = Response(Leg("Paris", new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 2, 8, 0, 0)));
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
         var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
-        cut.WaitForAssertion(() => Assert.Contains("0 events", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("0 items", cut.Markup));
     }
 
     [Fact]
-    public void LegRow_WithOneEvent_ShowsSingularCount()
+    public void LegRow_WithOneItem_ShowsSingularCount()
     {
         var legId = Guid.NewGuid();
         var leg = new TimelineLeg(legId, "Paris", null, null,
@@ -101,12 +101,12 @@ public class TripTimelineTests : TestContext
 
         var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
-        cut.WaitForAssertion(() => Assert.Contains("1 event", cut.Markup));
-        Assert.DoesNotContain("1 events", cut.Markup);
+        cut.WaitForAssertion(() => Assert.Contains("1 item", cut.Markup));
+        Assert.DoesNotContain("1 items", cut.Markup);
     }
 
     [Fact]
-    public void LegRow_WithMultipleEvents_ShowsPluralCount()
+    public void LegRow_WithMultipleItems_ShowsPluralCount()
     {
         var legId = Guid.NewGuid();
         var leg = new TimelineLeg(legId, "Paris", null, null,
@@ -123,7 +123,7 @@ public class TripTimelineTests : TestContext
 
         var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
-        cut.WaitForAssertion(() => Assert.Contains("3 events", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("3 items", cut.Markup));
     }
 
     [Fact]
@@ -144,13 +144,13 @@ public class TripTimelineTests : TestContext
         {
             var counts = cut.FindAll(".ttl-leg-count");
             Assert.Equal(2, counts.Count);
-            Assert.Equal("1 event", counts[0].TextContent.Trim());
-            Assert.Equal("0 events", counts[1].TextContent.Trim());
+            Assert.Equal("1 item", counts[0].TextContent.Trim());
+            Assert.Equal("0 items", counts[1].TextContent.Trim());
         });
     }
 
     [Fact]
-    public void AddEventButton_EmitsSlotSelectionForThatLegWithLegStart()
+    public void AddItemButton_EmitsSlotSelectionForThatLegWithLegStart()
     {
         var legStart = new DateTime(2026, 9, 1, 8, 0, 0);
         var leg = Leg("Paris", legStart, new DateTime(2026, 9, 2, 8, 0, 0));
@@ -171,7 +171,7 @@ public class TripTimelineTests : TestContext
     }
 
     [Fact]
-    public void OverlappingEvents_StackOnSeparateLanes()
+    public void OverlappingItems_StackOnSeparateLanes()
     {
         var legId = Guid.NewGuid();
         // Timeshare Stay spans the afternoon; Dinner starts within it -> they overlap.
@@ -194,13 +194,13 @@ public class TripTimelineTests : TestContext
                 .Select(i => i.GetAttribute("style"))
                 .Select(ExtractTopRem)
                 .ToList();
-            // The two overlapping events must sit at different vertical offsets.
+            // The two overlapping items must sit at different vertical offsets.
             Assert.NotEqual(tops[0], tops[1]);
         });
     }
 
     [Fact]
-    public void OverlappingEvents_GrowLegRowHeight()
+    public void OverlappingItems_GrowLegRowHeight()
     {
         var legId = Guid.NewGuid();
         var stay = ItemWithEnd(legId, "Timeshare Stay", new DateTime(2026, 9, 1, 12, 0, 0), new DateTime(2026, 9, 1, 20, 0, 0));

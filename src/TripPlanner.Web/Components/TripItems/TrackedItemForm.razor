@@ -10,7 +10,7 @@
     @if (Legs.Count == 0)
     {
         <div class="alert alert-warning py-2 small mb-2">
-            Add a trip leg first. Every event must be related to a trip leg.
+            Add a trip leg first. Every item must be related to a trip leg.
         </div>
     }
     <div class="mb-2">
@@ -150,7 +150,7 @@
     </div>
     <div class="mb-2">
         <label class="form-label" for="item-color">Color</label>
-        <div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Event color">
+        <div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Item color">
             @foreach (var color in TrackedItemColors.All)
             {
                 var isSelected = string.Equals(_model.DisplayColor, color, StringComparison.OrdinalIgnoreCase);
@@ -193,7 +193,7 @@
 @code {
     private sealed class ItemModel : IValidatableObject
     {
-        [Required(ErrorMessage = "Select the trip leg this event belongs to.")]
+        [Required(ErrorMessage = "Select the trip leg this item belongs to.")]
         public Guid? TripLegId { get; set; }
         public string ItemType { get; set; } = "activity";
         [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
@@ -265,7 +265,7 @@
     private bool _tzInitialized;
     private bool _confirmStartCopy;
     private bool _confirmEndCopy;
-    // The leg whose travel window the entered dates were last pulled into, so a new event is only
+    // The leg whose travel window the entered dates were last pulled into, so a new item is only
     // re-clamped when the traveler actually switches legs.
     private Guid? _clampedLegId;
     // True once the traveler (or an explicit copy/edit) has set the end directly, after which
@@ -278,7 +278,7 @@
     private TripLegDto? SelectedLeg => _model.TripLegId is { } id ? Legs.FirstOrDefault(l => l.TripLegId == id) : null;
 
     // ── Trip leg travel window ─────────────────────────────────────────
-    // An event belongs to a leg, so its start and end are restricted to that leg's travel window.
+    // An item belongs to a leg, so its start and end are restricted to that leg's travel window.
     // The bounds are carried as UTC instants and projected back into whichever timezone each
     // field uses, so the picker's disabled range matches the rule the API enforces.
     private const string PickerFormat = "yyyy-MM-ddTHH:mm:ss";
@@ -327,8 +327,8 @@
         _model.LegEndUtc = leg is null ? null : ToInstant(leg.EndLocal, leg.EndTimeZoneId);
     }
 
-    // Pull the entered start/end back inside the leg's window. Only applied to new events: an
-    // existing event's saved values stay untouched and are flagged by validation instead.
+    // Pull the entered start/end back inside the leg's window. Only applied to new items: an
+    // existing item's saved values stay untouched and are flagged by validation instead.
     private void ClampToLegWindow()
     {
         if (_model.LegStartUtc is not { } legStart || _model.LegEndUtc is not { } legEnd)
@@ -556,7 +556,7 @@
         };
         _loadedItemId = Item.TrackedItemId;
         _tzInitialized = true;
-        // An existing event's saved end is authoritative and must not auto-follow start edits.
+        // An existing item's saved end is authoritative and must not auto-follow start edits.
         _endManuallySet = true;
         _clampedLegId = _model.TripLegId;
         SyncLegWindow();
@@ -642,7 +642,7 @@
         {
             if (_model.EndLocal is not null && string.IsNullOrWhiteSpace(_model.EndTimeZoneId))
             {
-                _error = "Select an end timezone for the event end, or clear the end date.";
+                _error = "Select an end timezone for the item end, or clear the end date.";
                 return;
             }
 

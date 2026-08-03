@@ -101,12 +101,12 @@ public static class WebApplicationBuilderExtensions
         // hosted service, timer, or mailbox client anywhere in the API.
         builder.Services.AddScoped<IInboxEmailRepository, InboxEmailRepository>();
         builder.Services.AddScoped<IEmailAttachmentRepository, EmailAttachmentRepository>();
-        builder.Services.AddScoped<IParsedEventDraftRepository, ParsedEventDraftRepository>();
+        builder.Services.AddScoped<IParsedItemDraftRepository, ParsedItemDraftRepository>();
         builder.Services.AddSingleton<EmailDeduplicationService>();
         builder.Services.AddSingleton<EmailAttachmentTextExtractor>();
         builder.Services.AddScoped<EmailSenderResolver>();
         builder.Services.AddSingleton<AzureOpenAIClient>(_ => CreateOpenAIClient(builder.Configuration));
-        builder.Services.AddScoped<IEventRecognizer, EmailParserService>();
+        builder.Services.AddScoped<IItemRecognizer, EmailParserService>();
         builder.Services.AddScoped<RelayMessageProcessor>();
 
         return builder;

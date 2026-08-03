@@ -168,7 +168,7 @@ public class TrackedItemEndpointTests
     }
 
     [Fact]
-    public void Validator_AcceptsEventOnLegBoundaries()
+    public void Validator_AcceptsItemOnLegBoundaries()
     {
         var tripId = Guid.NewGuid();
         var legId = Guid.NewGuid();

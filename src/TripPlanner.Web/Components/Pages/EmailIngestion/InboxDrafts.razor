@@ -6,11 +6,11 @@
 @inject IEmailIngestionApiClient EmailIngestionApi
 @inject NavigationManager Nav
 
-<PageTitle>Review parsed events</PageTitle>
+<PageTitle>Review parsed items</PageTitle>
 
 <section class="inbox-drafts-page">
     <div class="d-flex align-items-center justify-content-between mb-3">
-        <h1 class="mb-0">Review parsed events</h1>
+        <h1 class="mb-0">Review parsed items</h1>
         <a class="btn btn-outline-secondary btn-sm" href="/inbox/history">Inbox history</a>
     </div>
 
@@ -24,7 +24,7 @@
     }
     else if (_drafts.Count == 0)
     {
-        <div class="alert alert-info" role="status">No events are waiting for review. Forward a booking confirmation email to your trip inbox to get started.</div>
+        <div class="alert alert-info" role="status">No items are waiting for review. Forward a booking confirmation email to your trip inbox to get started.</div>
     }
     else
     {
@@ -35,10 +35,10 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start gap-3">
                             <div class="flex-grow-1">
-                                <div class="fw-semibold mb-1">@(draft.Title ?? draft.EventType ?? "Untitled event")</div>
-                                @if (!string.IsNullOrWhiteSpace(draft.EventType))
+                                <div class="fw-semibold mb-1">@(draft.Title ?? draft.ItemType ?? "Untitled item")</div>
+                                @if (!string.IsNullOrWhiteSpace(draft.ItemType))
                                 {
-                                    <span class="badge text-bg-secondary me-1">@draft.EventType</span>
+                                    <span class="badge text-bg-secondary me-1">@draft.ItemType</span>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(draft.Location))
                                 {
@@ -64,18 +64,18 @@
                                 @if (draft.TripId is null)
                                 {
                                     <div class="alert alert-warning mt-2 py-1 px-2 small" role="alert">
-                                        Assign this event to a trip before confirming.
+                                        Assign this item to a trip before confirming.
                                     </div>
                                 }
                             </div>
                             <div class="d-flex flex-column gap-2 align-items-end">
                                 <button class="btn btn-sm btn-success"
-                                        @onclick="() => ConfirmAsync(draft.ParsedEventDraftId)"
+                                        @onclick="() => ConfirmAsync(draft.ParsedItemDraftId)"
                                         disabled="@(_isBusy || draft.TripId is null || draft.TripLegId is null || draft.StartLocal is null)">
                                     Confirm
                                 </button>
                                 <button class="btn btn-sm btn-outline-danger"
-                                        @onclick="() => DiscardAsync(draft.ParsedEventDraftId)"
+                                        @onclick="() => DiscardAsync(draft.ParsedItemDraftId)"
                                         disabled="@_isBusy">
                                     Discard
                                 </button>
@@ -92,7 +92,7 @@
     private bool _isLoading = true;
     private bool _isBusy;
     private string? _loadError;
-    private List<ParsedEventDraftDto> _drafts = new();
+    private List<ParsedItemDraftDto> _drafts = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -110,7 +110,7 @@
         }
         catch
         {
-            _loadError = "We couldn't load your draft events. Please try again.";
+            _loadError = "We couldn't load your draft items. Please try again.";
         }
         finally
         {

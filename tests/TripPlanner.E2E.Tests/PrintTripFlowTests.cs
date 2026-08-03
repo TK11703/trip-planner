@@ -8,7 +8,7 @@ namespace TripPlanner.E2E.Tests;
 public class PrintTripFlowTests
 {
     [Fact(Skip = "Playwright; requires running AppHost.")]
-    public void OwnerClicksPrint_OpensChromeFreePrintPageWithLegsAndEvents() { }
+    public void OwnerClicksPrint_OpensChromeFreePrintPageWithLegsAndItems() { }
 
     [Fact(Skip = "Playwright; requires running AppHost.")]
     public void PrintPage_ShowsNoNavOrFooterChrome() { }

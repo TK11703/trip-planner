@@ -14,13 +14,13 @@ namespace TripPlanner.Web.Tests.EmailIngestion;
 /// </summary>
 public class InboxReviewPageTests : TestContext
 {
-    private static ParsedEventDraftDto Draft(Guid? tripId = null, Guid? legId = null, DateTime? start = null) =>
+    private static ParsedItemDraftDto Draft(Guid? tripId = null, Guid? legId = null, DateTime? start = null) =>
         new(Guid.NewGuid(), Guid.NewGuid(), tripId, legId, "flight", "Flight ABC123", "SEA",
             start, "America/Los_Angeles", null, null, "ABC123", null, 0.92,
             ReviewStatus.PendingReview, DateTimeOffset.UtcNow);
 
     [Fact]
-    public void DraftsPageListsPendingEventsForReview()
+    public void DraftsPageListsPendingItemsForReview()
     {
         var draft = Draft(Guid.NewGuid(), Guid.NewGuid(), new DateTime(2026, 8, 12, 9, 30, 0));
         Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([draft]));
@@ -45,7 +45,7 @@ public class InboxReviewPageTests : TestContext
 
         cut.WaitForAssertion(() =>
         {
-            Assert.Contains("Assign this event to a trip before confirming.", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Assign this item to a trip before confirming.", cut.Markup, StringComparison.Ordinal);
             var confirm = cut.FindAll("button").Single(b => b.TextContent.Contains("Confirm", StringComparison.Ordinal));
             Assert.True(confirm.HasAttribute("disabled"));
         });
@@ -62,7 +62,7 @@ public class InboxReviewPageTests : TestContext
 
         cut.FindAll("button").Single(b => b.TextContent.Contains("Discard", StringComparison.Ordinal)).Click();
 
-        cut.WaitForAssertion(() => Assert.Contains("No events are waiting for review", cut.Markup, StringComparison.Ordinal));
+        cut.WaitForAssertion(() => Assert.Contains("No items are waiting for review", cut.Markup, StringComparison.Ordinal));
         Assert.Single(client.Discarded);
     }
 
@@ -73,7 +73,7 @@ public class InboxReviewPageTests : TestContext
 
         var cut = RenderComponent<InboxDrafts>();
 
-        cut.WaitForAssertion(() => Assert.Contains("No events are waiting for review", cut.Markup, StringComparison.Ordinal));
+        cut.WaitForAssertion(() => Assert.Contains("No items are waiting for review", cut.Markup, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class InboxReviewPageTests : TestContext
     }
 
     [Fact]
-    public void OnlyMessagesThatDidNotYieldEventsOfferReprocessing()
+    public void OnlyMessagesThatDidNotYieldItemsOfferReprocessing()
     {
         var parsed = new InboxEmailDto(Guid.NewGuid(), "traveler@contoso.com", "Flight confirmation", DateTimeOffset.UtcNow, ParseStatus.Parsed);
         var failed = new InboxEmailDto(Guid.NewGuid(), "traveler@contoso.com", "Hotel booking", DateTimeOffset.UtcNow, ParseStatus.Failed);
@@ -112,28 +112,28 @@ public class InboxReviewPageTests : TestContext
         cut.WaitForAssertion(() => Assert.Equal(failed.InboxEmailId, Assert.Single(client.Reprocessed)));
     }
 
-    private sealed class StubEmailIngestionApiClient(IReadOnlyList<ParsedEventDraftDto> drafts) : IEmailIngestionApiClient
+    private sealed class StubEmailIngestionApiClient(IReadOnlyList<ParsedItemDraftDto> drafts) : IEmailIngestionApiClient
     {
-        private readonly List<ParsedEventDraftDto> _drafts = [.. drafts];
+        private readonly List<ParsedItemDraftDto> _drafts = [.. drafts];
 
         public List<Guid> Discarded { get; } = [];
 
-        public Task<IReadOnlyList<ParsedEventDraftDto>> GetDraftsAsync(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<ParsedEventDraftDto>>([.. _drafts]);
+        public Task<IReadOnlyList<ParsedItemDraftDto>> GetDraftsAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ParsedItemDraftDto>>([.. _drafts]);
 
-        public Task<ParsedEventDraftDto?> UpdateDraftAsync(Guid draftId, UpdateParsedEventDraftRequest request, CancellationToken ct = default)
-            => Task.FromResult<ParsedEventDraftDto?>(null);
+        public Task<ParsedItemDraftDto?> UpdateDraftAsync(Guid draftId, UpdateParsedItemDraftRequest request, CancellationToken ct = default)
+            => Task.FromResult<ParsedItemDraftDto?>(null);
 
-        public Task<ConfirmParsedEventDraftResponse?> ConfirmDraftAsync(Guid draftId, CancellationToken ct = default)
+        public Task<ConfirmParsedItemDraftResponse?> ConfirmDraftAsync(Guid draftId, CancellationToken ct = default)
         {
-            _drafts.RemoveAll(d => d.ParsedEventDraftId == draftId);
-            return Task.FromResult<ConfirmParsedEventDraftResponse?>(new ConfirmParsedEventDraftResponse(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
+            _drafts.RemoveAll(d => d.ParsedItemDraftId == draftId);
+            return Task.FromResult<ConfirmParsedItemDraftResponse?>(new ConfirmParsedItemDraftResponse(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
         }
 
         public Task<bool> DiscardDraftAsync(Guid draftId, CancellationToken ct = default)
         {
             Discarded.Add(draftId);
-            _drafts.RemoveAll(d => d.ParsedEventDraftId == draftId);
+            _drafts.RemoveAll(d => d.ParsedItemDraftId == draftId);
             return Task.FromResult(true);
         }
     }

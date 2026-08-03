@@ -12,9 +12,9 @@ public enum ItineraryChangeKind
     TripLegCreated,
     TripLegUpdated,
     TripLegDeleted,
-    TripEventCreated,
-    TripEventUpdated,
-    TripEventDeleted
+    TripItemCreated,
+    TripItemUpdated,
+    TripItemDeleted
 }
 
 /// <summary>
@@ -123,9 +123,9 @@ public sealed class ItineraryNotificationService : IItineraryNotificationService
         ItineraryChangeKind.TripLegCreated => "added a new leg to the trip",
         ItineraryChangeKind.TripLegUpdated => "updated a leg on the trip",
         ItineraryChangeKind.TripLegDeleted => "removed a leg from the trip",
-        ItineraryChangeKind.TripEventCreated => "added a new event to the trip",
-        ItineraryChangeKind.TripEventUpdated => "updated an event on the trip",
-        ItineraryChangeKind.TripEventDeleted => "removed an event from the trip",
+        ItineraryChangeKind.TripItemCreated => "added a new item to the trip",
+        ItineraryChangeKind.TripItemUpdated => "updated an item on the trip",
+        ItineraryChangeKind.TripItemDeleted => "removed an item from the trip",
         _ => "changed the trip"
     };
 

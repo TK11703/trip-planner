@@ -49,7 +49,7 @@ public static class GetTripMapEndpoint
             .Select(i => new { i.TrackedItemId, i.Title, Location = i.Location!.Trim() })
             .ToArray();
 
-        // Geocode each distinct location text once, then fan the coordinates back to each event.
+        // Geocode each distinct location text once, then fan the coordinates back to each item.
         var distinct = mappable
             .Select(i => i.Location)
             .Distinct(StringComparer.OrdinalIgnoreCase)

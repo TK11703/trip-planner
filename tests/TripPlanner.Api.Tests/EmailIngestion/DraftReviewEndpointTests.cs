@@ -9,7 +9,7 @@ namespace TripPlanner.Api.Tests.EmailIngestion;
 
 /// <summary>
 /// The review surface survived the move to relayed ingestion: drafts and inbox history stay
-/// private to the traveler who owns them, and a draft cannot become a timeline event until it is
+/// private to the traveler who owns them, and a draft cannot become a timeline item until it is
 /// pointed at a trip and a leg (FR-013 to FR-016).
 /// </summary>
 public sealed class DraftReviewEndpointTests : IDisposable
@@ -31,11 +31,11 @@ public sealed class DraftReviewEndpointTests : IDisposable
             userId, $"seed-{Guid.NewGuid()}", "traveler@contoso.com", "trips@contoso.com", "Booking",
             "body", null, DateTimeOffset.UtcNow, Guid.NewGuid().ToString(), InboxEmailParseStatus.Parsed));
 
-        var draft = await _factory.Drafts.InsertAsync(new NewParsedEventDraft(
+        var draft = await _factory.Drafts.InsertAsync(new NewParsedItemDraft(
             email!.InboxEmailId, userId, tripId, tripLegId, "flight", "Flight ABC123", "SEA",
             startLocal, "America/Los_Angeles", null, null, "ABC123", null, 0.9));
 
-        return draft!.ParsedEventDraftId;
+        return draft!.ParsedItemDraftId;
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class DraftReviewEndpointTests : IDisposable
         await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId);
         await SeedDraftAsync("someone-else");
 
-        var drafts = await CreateTravelerClient().GetFromJsonAsync<ParsedEventDraftListResponse>("/api/email-ingestion/drafts", Web);
+        var drafts = await CreateTravelerClient().GetFromJsonAsync<ParsedItemDraftListResponse>("/api/email-ingestion/drafts", Web);
 
         var only = Assert.Single(drafts!.Items);
         Assert.Equal("Flight ABC123", only.Title);
@@ -65,7 +65,7 @@ public sealed class DraftReviewEndpointTests : IDisposable
     public async Task AnotherTravelersDraftCannotBeEdited()
     {
         var draftId = await SeedDraftAsync("someone-else");
-        var request = new UpdateParsedEventDraftRequest(
+        var request = new UpdateParsedItemDraftRequest(
             Guid.NewGuid(), Guid.NewGuid(), "flight", "Hijacked", null, null, null, null, null, null, null);
 
         var response = await CreateTravelerClient().PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request);
@@ -95,7 +95,7 @@ public sealed class DraftReviewEndpointTests : IDisposable
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal("discarded", _factory.Drafts.Rows.Single().ReviewStatus);
-        Assert.Empty((await client.GetFromJsonAsync<ParsedEventDraftListResponse>("/api/email-ingestion/drafts", Web))!.Items);
+        Assert.Empty((await client.GetFromJsonAsync<ParsedItemDraftListResponse>("/api/email-ingestion/drafts", Web))!.Items);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public sealed class DraftReviewEndpointTests : IDisposable
         var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId);
         var tripId = Guid.NewGuid();
         var legId = Guid.NewGuid();
-        var request = new UpdateParsedEventDraftRequest(
+        var request = new UpdateParsedItemDraftRequest(
             tripId, legId, "flight", "Flight ABC123 (corrected)", "SEA Terminal A",
             new DateTime(2026, 8, 12, 10, 0, 0), "America/Los_Angeles", null, null, "ABC123", "Aisle seat");
 

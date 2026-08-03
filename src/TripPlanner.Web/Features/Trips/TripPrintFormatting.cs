@@ -79,8 +79,8 @@ public static class TripPrintFormatting
             .ThenBy(l => l.Title, StringComparer.Ordinal)
             .ToList();
 
-    /// <summary>Events in chronological order by start, tie-broken by sort order.</summary>
-    public static IReadOnlyList<TrackedItemDto> OrderEventsWithinLeg(IEnumerable<TrackedItemDto> items) =>
+    /// <summary>Items in chronological order by start, tie-broken by sort order.</summary>
+    public static IReadOnlyList<TrackedItemDto> OrderItemsWithinLeg(IEnumerable<TrackedItemDto> items) =>
         items
             .OrderBy(i => i.StartLocal)
             .ThenBy(i => i.SortOrder)
@@ -90,7 +90,7 @@ public static class TripPrintFormatting
     /// Partitions the trip's tracked items by owning leg. Items whose <c>TripLegId</c> is null or
     /// does not match any leg are returned separately as "unassigned".
     /// </summary>
-    public static (IReadOnlyDictionary<Guid, IReadOnlyList<TrackedItemDto>> ByLeg, IReadOnlyList<TrackedItemDto> Unassigned) GroupEventsByLeg(
+    public static (IReadOnlyDictionary<Guid, IReadOnlyList<TrackedItemDto>> ByLeg, IReadOnlyList<TrackedItemDto> Unassigned) GroupItemsByLeg(
         IEnumerable<TripLegDto> legs, IEnumerable<TrackedItemDto> items)
     {
         var legIds = legs.Select(l => l.TripLegId).ToHashSet();
@@ -117,15 +117,15 @@ public static class TripPrintFormatting
 
         var projected = byLeg.ToDictionary(
             kvp => kvp.Key,
-            kvp => (IReadOnlyList<TrackedItemDto>)OrderEventsWithinLeg(kvp.Value));
+            kvp => (IReadOnlyList<TrackedItemDto>)OrderItemsWithinLeg(kvp.Value));
 
-        return (projected, OrderEventsWithinLeg(unassigned));
+        return (projected, OrderItemsWithinLeg(unassigned));
     }
 
     /// <summary>Builds the full printable view model for a trip.</summary>
     public static PrintableTrip BuildPrintableTrip(TripDetail trip)
     {
-        var (byLeg, unassigned) = GroupEventsByLeg(trip.Legs, trip.TrackedItems);
+        var (byLeg, unassigned) = GroupItemsByLeg(trip.Legs, trip.TrackedItems);
 
         var legs = OrderLegsChronologically(trip.Legs)
             .Select(leg => new PrintableLeg(
@@ -134,9 +134,9 @@ public static class TripPrintFormatting
                 BuildRouteText(leg.Origin, leg.Destination),
                 FormatDateTimeWithZone(leg.StartLocal, leg.StartTimeZoneId),
                 FormatDateTimeWithZone(leg.EndLocal, leg.EndTimeZoneId),
-                byLeg.TryGetValue(leg.TripLegId, out var events)
-                    ? events.Select(ToPrintableEvent).ToList()
-                    : Array.Empty<PrintableEvent>()))
+                byLeg.TryGetValue(leg.TripLegId, out var legItems)
+                    ? legItems.Select(ToPrintableItem).ToList()
+                    : Array.Empty<PrintableItem>()))
             .ToList();
 
         var description = string.IsNullOrWhiteSpace(trip.Description) ? null : trip.Description;
@@ -147,10 +147,10 @@ public static class TripPrintFormatting
             description,
             trip.EstimatedCostTotal.ToString("C", CultureInfo.CurrentCulture),
             legs,
-            unassigned.Select(ToPrintableEvent).ToList());
+            unassigned.Select(ToPrintableItem).ToList());
     }
 
-    private static PrintableEvent ToPrintableEvent(TrackedItemDto item) => new(
+    private static PrintableItem ToPrintableItem(TrackedItemDto item) => new(
         CultureInfo.InvariantCulture.TextInfo.ToTitleCase(item.ItemType),
         item.Title,
         string.IsNullOrWhiteSpace(item.Location) ? null : item.Location,
@@ -179,23 +179,23 @@ public sealed record PrintableTrip(
     string? Description,
     string EstimatedCostText,
     IReadOnlyList<PrintableLeg> Legs,
-    IReadOnlyList<PrintableEvent> UnassignedEvents)
+    IReadOnlyList<PrintableItem> UnassignedItems)
 {
-    /// <summary>True when the trip has at least one leg or event to print.</summary>
-    public bool HasContent => Legs.Count > 0 || UnassignedEvents.Count > 0;
+    /// <summary>True when the trip has at least one leg or item to print.</summary>
+    public bool HasContent => Legs.Count > 0 || UnassignedItems.Count > 0;
 }
 
-/// <summary>A leg rendered as a chronological row-divider grouping its events.</summary>
+/// <summary>A leg rendered as a chronological row-divider grouping its items.</summary>
 public sealed record PrintableLeg(
     Guid TripLegId,
     string Title,
     string? RouteText,
     string StartText,
     string EndText,
-    IReadOnlyList<PrintableEvent> Events);
+    IReadOnlyList<PrintableItem> Items);
 
-/// <summary>An event row; one property per printed column.</summary>
-public sealed record PrintableEvent(
+/// <summary>An item row; one property per printed column.</summary>
+public sealed record PrintableItem(
     string TypeText,
     string Title,
     string? Location,

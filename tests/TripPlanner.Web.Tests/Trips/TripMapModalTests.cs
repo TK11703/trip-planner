@@ -45,21 +45,21 @@ public class TripMapModalTests : TestContext
     }
 
     [Fact]
-    public async Task OnMarkerActivated_InvokesOpenEventCallback()
+    public async Task OnMarkerActivated_InvokesOpenItemCallback()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        var eventId = Guid.NewGuid();
-        var map = new TripMapResponse(new[] { new TripMapLocation(eventId, "Louvre", "Paris", 48.86, 2.34) });
+        var itemId = Guid.NewGuid();
+        var map = new TripMapResponse(new[] { new TripMapLocation(itemId, "Louvre", "Paris", 48.86, 2.34) });
         Services.AddSingleton<ITripApiClient>(new MapStubTripApiClient(map));
 
         Guid? opened = null;
         var cut = RenderComponent<TripMapModal>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
-            .Add(x => x.OnOpenEvent, EventCallback.Factory.Create<Guid>(this, id => opened = id)));
+            .Add(x => x.OnOpenItem, EventCallback.Factory.Create<Guid>(this, id => opened = id)));
 
-        await cut.InvokeAsync(() => cut.Instance.OnMarkerActivated(eventId));
+        await cut.InvokeAsync(() => cut.Instance.OnMarkerActivated(itemId));
 
-        Assert.Equal(eventId, opened);
+        Assert.Equal(itemId, opened);
     }
 
     private sealed class MapStubTripApiClient : ITripApiClient

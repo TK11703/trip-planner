@@ -62,14 +62,14 @@ public class TripPrintFormattingTests
     }
 
     [Fact]
-    public void GroupEventsByLeg_PartitionsAndOrders()
+    public void GroupItemsByLeg_PartitionsAndOrders()
     {
         var leg = Leg("Leg", new DateTime(2026, 7, 14, 8, 0, 0));
         var second = Item(leg.TripLegId, "B", new DateTime(2026, 7, 14, 12, 0, 0), sortOrder: 0);
         var first = Item(leg.TripLegId, "A", new DateTime(2026, 7, 14, 9, 0, 0), sortOrder: 1);
         var orphan = Item(null, "Orphan", new DateTime(2026, 7, 14, 10, 0, 0));
 
-        var (byLeg, unassigned) = TripPrintFormatting.GroupEventsByLeg(new[] { leg }, new[] { second, first, orphan });
+        var (byLeg, unassigned) = TripPrintFormatting.GroupItemsByLeg(new[] { leg }, new[] { second, first, orphan });
 
         Assert.Equal(new[] { "A", "B" }, byLeg[leg.TripLegId].Select(i => i.Title).ToArray());
         Assert.Single(unassigned);
@@ -91,8 +91,8 @@ public class TripPrintFormattingTests
         Assert.True(printable.HasContent);
         var printedLeg = Assert.Single(printable.Legs);
         Assert.Equal("Seattle \u2192 Tokyo", printedLeg.RouteText);
-        Assert.Equal(new[] { "Walk", "Dinner" }, printedLeg.Events.Select(e => e.Title).ToArray());
-        var walk = printedLeg.Events[0];
+        Assert.Equal(new[] { "Walk", "Dinner" }, printedLeg.Items.Select(e => e.Title).ToArray());
+        var walk = printedLeg.Items[0];
         Assert.Null(walk.Location);
         Assert.Null(walk.EstimatedCostText);
         Assert.Null(walk.EndText);

@@ -32,7 +32,7 @@ public static class TripAccessExtensions
 {
     public static bool CanRead(this TripAccess access) => true;
 
-    /// <summary>Owner and collaborator can edit itinerary content (legs/events).</summary>
+    /// <summary>Owner and collaborator can edit itinerary content (legs/items).</summary>
     public static bool CanEditContent(this TripAccess access)
         => access.AccessLevel is TripAccessLevel.Owner or TripAccessLevel.Collaborator;
 

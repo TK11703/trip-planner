@@ -23,8 +23,8 @@ internal sealed class EmailIngestionApiFactory : TestApiFactory
 
     public InMemoryInboxEmailRepository Emails { get; } = new();
     public InMemoryEmailAttachmentRepository Attachments { get; } = new();
-    public InMemoryParsedEventDraftRepository Drafts { get; } = new();
-    public StubEventRecognizer Recognizer { get; } = new();
+    public InMemoryParsedItemDraftRepository Drafts { get; } = new();
+    public StubItemRecognizer Recognizer { get; } = new();
     public RecordingNotificationService Notifications { get; } = new();
     public StubProfileDirectory Profiles { get; } = new(TravelerUserId, TravelerEmail);
 
@@ -35,15 +35,15 @@ internal sealed class EmailIngestionApiFactory : TestApiFactory
         {
             services.RemoveAll<IInboxEmailRepository>();
             services.RemoveAll<IEmailAttachmentRepository>();
-            services.RemoveAll<IParsedEventDraftRepository>();
-            services.RemoveAll<IEventRecognizer>();
+            services.RemoveAll<IParsedItemDraftRepository>();
+            services.RemoveAll<IItemRecognizer>();
             services.RemoveAll<INotificationService>();
             services.RemoveAll<IUserProfileRepository>();
 
             services.AddSingleton<IInboxEmailRepository>(Emails);
             services.AddSingleton<IEmailAttachmentRepository>(Attachments);
-            services.AddSingleton<IParsedEventDraftRepository>(Drafts);
-            services.AddSingleton<IEventRecognizer>(Recognizer);
+            services.AddSingleton<IParsedItemDraftRepository>(Drafts);
+            services.AddSingleton<IItemRecognizer>(Recognizer);
             services.AddSingleton<INotificationService>(Notifications);
             services.AddSingleton<IUserProfileRepository>(Profiles);
         });
@@ -163,57 +163,57 @@ internal sealed class InMemoryEmailAttachmentRepository : IEmailAttachmentReposi
     }
 }
 
-internal sealed class InMemoryParsedEventDraftRepository : IParsedEventDraftRepository
+internal sealed class InMemoryParsedItemDraftRepository : IParsedItemDraftRepository
 {
-    private readonly List<ParsedEventDraftRecord> _rows = [];
+    private readonly List<ParsedItemDraftRecord> _rows = [];
 
-    public IReadOnlyList<ParsedEventDraftRecord> Rows
+    public IReadOnlyList<ParsedItemDraftRecord> Rows
     {
         get { lock (_rows) { return _rows.ToArray(); } }
     }
 
-    public Task<ParsedEventDraftRecord?> InsertAsync(NewParsedEventDraft draft, CancellationToken ct = default)
+    public Task<ParsedItemDraftRecord?> InsertAsync(NewParsedItemDraft draft, CancellationToken ct = default)
     {
-        var record = new ParsedEventDraftRecord(
-            Guid.NewGuid(), draft.InboxEmailId, draft.UserId, draft.TripId, draft.TripLegId, draft.EventType,
+        var record = new ParsedItemDraftRecord(
+            Guid.NewGuid(), draft.InboxEmailId, draft.UserId, draft.TripId, draft.TripLegId, draft.ItemType,
             draft.Title, draft.Location, draft.StartLocal, draft.StartTimeZoneId, draft.EndLocal, draft.EndTimeZoneId,
             draft.ConfirmationCode, draft.Notes, draft.Confidence, "pending_review", DateTimeOffset.UtcNow);
         lock (_rows) { _rows.Add(record); }
-        return Task.FromResult<ParsedEventDraftRecord?>(record);
+        return Task.FromResult<ParsedItemDraftRecord?>(record);
     }
 
-    public Task<IReadOnlyList<ParsedEventDraftRecord>> GetPendingAsync(string userId, CancellationToken ct = default)
+    public Task<IReadOnlyList<ParsedItemDraftRecord>> GetPendingAsync(string userId, CancellationToken ct = default)
     {
         lock (_rows)
         {
-            IReadOnlyList<ParsedEventDraftRecord> result = _rows.Where(r => r.UserId == userId && r.ReviewStatus == "pending_review").ToArray();
+            IReadOnlyList<ParsedItemDraftRecord> result = _rows.Where(r => r.UserId == userId && r.ReviewStatus == "pending_review").ToArray();
             return Task.FromResult(result);
         }
     }
 
-    public Task<ParsedEventDraftRecord?> GetByIdAsync(Guid parsedEventDraftId, string userId, CancellationToken ct = default)
+    public Task<ParsedItemDraftRecord?> GetByIdAsync(Guid parsedItemDraftId, string userId, CancellationToken ct = default)
     {
         lock (_rows)
         {
-            return Task.FromResult(_rows.FirstOrDefault(r => r.ParsedEventDraftId == parsedEventDraftId && r.UserId == userId));
+            return Task.FromResult(_rows.FirstOrDefault(r => r.ParsedItemDraftId == parsedItemDraftId && r.UserId == userId));
         }
     }
 
-    public Task<ParsedEventDraftRecord?> UpdateAsync(Guid parsedEventDraftId, string userId, DraftUpdate update, CancellationToken ct = default)
+    public Task<ParsedItemDraftRecord?> UpdateAsync(Guid parsedItemDraftId, string userId, DraftUpdate update, CancellationToken ct = default)
     {
         lock (_rows)
         {
-            var index = _rows.FindIndex(r => r.ParsedEventDraftId == parsedEventDraftId && r.UserId == userId);
+            var index = _rows.FindIndex(r => r.ParsedItemDraftId == parsedItemDraftId && r.UserId == userId);
             if (index < 0)
             {
-                return Task.FromResult<ParsedEventDraftRecord?>(null);
+                return Task.FromResult<ParsedItemDraftRecord?>(null);
             }
 
             _rows[index] = _rows[index] with
             {
                 TripId = update.TripId,
                 TripLegId = update.TripLegId,
-                EventType = update.EventType,
+                ItemType = update.ItemType,
                 Title = update.Title,
                 Location = update.Location,
                 StartLocal = update.StartLocal,
@@ -223,15 +223,15 @@ internal sealed class InMemoryParsedEventDraftRepository : IParsedEventDraftRepo
                 ConfirmationCode = update.ConfirmationCode,
                 Notes = update.Notes
             };
-            return Task.FromResult<ParsedEventDraftRecord?>(_rows[index]);
+            return Task.FromResult<ParsedItemDraftRecord?>(_rows[index]);
         }
     }
 
-    public Task<bool> SetReviewStatusAsync(Guid parsedEventDraftId, string userId, string reviewStatus, CancellationToken ct = default)
+    public Task<bool> SetReviewStatusAsync(Guid parsedItemDraftId, string userId, string reviewStatus, CancellationToken ct = default)
     {
         lock (_rows)
         {
-            var index = _rows.FindIndex(r => r.ParsedEventDraftId == parsedEventDraftId && r.UserId == userId);
+            var index = _rows.FindIndex(r => r.ParsedItemDraftId == parsedItemDraftId && r.UserId == userId);
             if (index < 0)
             {
                 return Task.FromResult(false);
@@ -244,12 +244,12 @@ internal sealed class InMemoryParsedEventDraftRepository : IParsedEventDraftRepo
 }
 
 /// <summary>A recognizer whose result each test scripts explicitly.</summary>
-internal sealed class StubEventRecognizer : IEventRecognizer
+internal sealed class StubItemRecognizer : IItemRecognizer
 {
     public Func<Guid, string, string, RecognitionResult> Behavior { get; set; } =
         (inboxEmailId, userId, _) => RecognitionResult.Parsed(
         [
-            new NewParsedEventDraft(inboxEmailId, userId, null, null, "flight", "Flight ABC123", "SEA",
+            new NewParsedItemDraft(inboxEmailId, userId, null, null, "flight", "Flight ABC123", "SEA",
                 new DateTime(2026, 8, 12, 9, 30, 0), "America/Los_Angeles", null, null, "ABC123", null, 0.9)
         ]);
 
