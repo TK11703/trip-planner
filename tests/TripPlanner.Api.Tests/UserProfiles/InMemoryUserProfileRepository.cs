@@ -11,6 +11,15 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
     public Task<UserProfileResponse?> GetAsync(string userId, CancellationToken cancellationToken = default)
         => Task.FromResult(_profiles.TryGetValue(userId, out var profile) ? profile : null);
 
+    public Task<IReadOnlyList<string>> FindUserIdsByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<string> matches = _profiles.Values
+            .Where(p => !string.IsNullOrWhiteSpace(p.Email) && string.Equals(p.Email!.Trim(), email.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Select(p => p.UserId)
+            .ToArray();
+        return Task.FromResult(matches);
+    }
+
     public Task<UserProfileResponse> EnsureFromAuthenticatedUserAsync(string userId, string? firstName, string? lastName, string? displayName, string? email, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
     {
         if (_profiles.TryGetValue(userId, out var existing))

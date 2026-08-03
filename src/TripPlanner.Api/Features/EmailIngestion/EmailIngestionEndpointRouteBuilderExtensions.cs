@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Hosting;
 using TripPlanner.Api.Extensions;
 
 namespace TripPlanner.Api.Features.EmailIngestion;
@@ -14,17 +14,13 @@ public static class EmailIngestionEndpointRouteBuilderExtensions
             .RequireAuthorization(WebApplicationBuilderExtensions.AuthenticatedUserPolicy)
             .WithTags("Email ingestion");
 
-        // Webhook: requires managed identity bearer token delivered by Event Grid.
-        var webhookGroup = endpoints.MapGroup("/api/email-ingestion")
-            .RequireAuthorization(EmailIngestionPolicy.WebhookPolicy)
+        // Relay ingestion: an application token carrying the EmailIngestion.Relay app role.
+        // This is not part of the interactive surface, so it lives in its own group.
+        var relayGroup = endpoints.MapGroup("/api/email-ingestion")
+            .RequireAuthorization(EmailIngestionPolicy.RelayPolicy)
             .WithTags("Email ingestion");
-        webhookGroup.MapReceiveEmailWebhook();
-
-        // Dev-inject: authenticated user only, development environment only.
-        if (environment.IsDevelopment())
-        {
-            group.MapDevInjectEmail();
-        }
+        relayGroup.MapIngestRelayMessage()
+            .WithMetadata(new RequestSizeLimitMetadata(EmailAttachmentTextExtractor.MaxRequestBytes));
 
         group.MapGetDraftList();
         group.MapUpdateDraft();
@@ -34,5 +30,13 @@ public static class EmailIngestionEndpointRouteBuilderExtensions
         group.MapReprocessEmail();
 
         return endpoints;
+    }
+
+    /// <summary>Caps the relay request body so an oversized payload is rejected before it is buffered.</summary>
+    private sealed class RequestSizeLimitMetadata : IRequestSizeLimitMetadata
+    {
+        public RequestSizeLimitMetadata(long maxRequestBodySize) => MaxRequestBodySize = maxRequestBodySize;
+
+        public long? MaxRequestBodySize { get; }
     }
 }

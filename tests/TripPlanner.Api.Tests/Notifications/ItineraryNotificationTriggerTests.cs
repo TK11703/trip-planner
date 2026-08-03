@@ -98,6 +98,14 @@ public class ItineraryNotificationTriggerTests
         public Task<UserProfileResponse> EnsureFromAuthenticatedUserAsync(string userId, string? firstName, string? lastName, string? displayName, string? email, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
 
+        public Task<IReadOnlyList<string>> FindUserIdsByEmailAsync(string email, CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<string> matches = string.Equals(email.Trim(), _ownerEmail, StringComparison.OrdinalIgnoreCase)
+                ? new[] { _ownerId }
+                : Array.Empty<string>();
+            return Task.FromResult(matches);
+        }
+
         public Task<UserProfileResponse?> UpdateAsync(string userId, UpdateUserProfileRequest request, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }

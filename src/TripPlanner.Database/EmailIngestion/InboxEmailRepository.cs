@@ -1,4 +1,5 @@
 using Dapper;
+using Npgsql;
 using TripPlanner.Database.Connections;
 using TripPlanner.Database.Sql;
 
@@ -19,26 +20,37 @@ public sealed class InboxEmailRepository : IInboxEmailRepository
     {
         await using var conn = await _factory.CreateOpenConnectionAsync(ct);
         var command = _sql.Get("Commands/EmailIngestion/InsertInboxEmail.sql");
-        var row = await conn.QuerySingleOrDefaultAsync<InboxEmailRow>(new CommandDefinition(command, new
+        try
         {
-            InboxEmailId = Guid.NewGuid(),
-            email.UserId,
-            email.Sender,
-            email.Subject,
-            email.BodyText,
-            email.BodyHtml,
-            email.ReceivedAt,
-            email.DedupeHash
-        }, cancellationToken: ct));
-        return row?.ToRecord();
+            var row = await conn.QuerySingleOrDefaultAsync<InboxEmailRow>(new CommandDefinition(command, new
+            {
+                InboxEmailId = Guid.NewGuid(),
+                email.UserId,
+                email.MessageId,
+                email.Sender,
+                email.Recipient,
+                email.Subject,
+                email.BodyText,
+                email.BodyHtml,
+                email.ReceivedAt,
+                email.DedupeHash,
+                email.ParseStatus
+            }, cancellationToken: ct));
+            return row?.ToRecord();
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            // A concurrent relay retry won the race. Report it as a duplicate, not a failure.
+            return null;
+        }
     }
 
-    public async Task<IReadOnlyList<InboxEmailRecord>> GetPendingAsync(int limit, CancellationToken ct = default)
+    public async Task<InboxEmailRecord?> GetByIdAsync(Guid inboxEmailId, string userId, CancellationToken ct = default)
     {
         await using var conn = await _factory.CreateOpenConnectionAsync(ct);
-        var query = _sql.Get("Queries/EmailIngestion/GetPendingInboxEmails.sql");
-        var rows = await conn.QueryAsync<InboxEmailRow>(new CommandDefinition(query, new { Limit = limit }, cancellationToken: ct));
-        return rows.Select(r => r.ToRecord()).ToArray();
+        var query = _sql.Get("Queries/EmailIngestion/GetInboxEmailById.sql");
+        var row = await conn.QuerySingleOrDefaultAsync<InboxEmailRow>(new CommandDefinition(query, new { InboxEmailId = inboxEmailId, UserId = userId }, cancellationToken: ct));
+        return row?.ToRecord();
     }
 
     public async Task<IReadOnlyList<InboxEmailRecord>> GetListAsync(string userId, int limit, CancellationToken ct = default)
@@ -59,7 +71,9 @@ public sealed class InboxEmailRepository : IInboxEmailRepository
     private sealed record InboxEmailRow(
         Guid InboxEmailId,
         string UserId,
+        string? MessageId,
         string Sender,
+        string? Recipient,
         string Subject,
         string BodyText,
         string? BodyHtml,
@@ -69,7 +83,7 @@ public sealed class InboxEmailRepository : IInboxEmailRepository
         DateTimeOffset CreatedAtUtc)
     {
         public InboxEmailRecord ToRecord() => new(
-            InboxEmailId, UserId, Sender, Subject, BodyText, BodyHtml,
+            InboxEmailId, UserId, MessageId, Sender, Recipient, Subject, BodyText, BodyHtml,
             ReceivedAt, DedupeHash, ParseStatus, CreatedAtUtc);
     }
 }

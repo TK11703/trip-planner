@@ -50,5 +50,39 @@ public sealed record InboxEmailListResponse(IReadOnlyList<InboxEmailDto> Items);
 /// <summary>A page of pending drafts.</summary>
 public sealed record ParsedEventDraftListResponse(IReadOnlyList<ParsedEventDraftDto> Items);
 
-/// <summary>Request payload accepted by the development-only inject endpoint.</summary>
-public sealed record DevInjectEmailRequest(string Sender, string Subject, string BodyText, string? BodyHtml = null);
+/// <summary>A file delivered alongside a relayed email.</summary>
+public sealed record RelayEmailAttachment(string FileName, string ContentType, string ContentBase64);
+
+/// <summary>
+/// A single email message handed to the API by the external automation relay (Logic App).
+/// The relay authenticates as an application; the owning traveler is resolved from
+/// <paramref name="Sender"/>, never from the caller's identity.
+/// </summary>
+public sealed record IngestRelayMessageRequest(
+    string? MessageId,
+    string Sender,
+    string? Recipient,
+    string Subject,
+    DateTimeOffset ReceivedAt,
+    string? BodyText,
+    string? BodyHtml,
+    IReadOnlyList<RelayEmailAttachment>? Attachments);
+
+/// <summary>The conclusive outcome of an ingestion attempt. Never reports deferred work.</summary>
+public sealed record IngestRelayMessageResponse(
+    string Status,
+    Guid? InboxEmailId,
+    IReadOnlyList<Guid> DraftIds,
+    string? Detail);
+
+/// <summary>Outcome values returned by the relay ingestion endpoint.</summary>
+public static class EmailIngestionOutcome
+{
+    public const string Parsed = "parsed";
+    public const string NoContent = "no_content";
+    public const string Duplicate = "duplicate";
+    public const string InvalidRequest = "invalid_request";
+    public const string TooLarge = "too_large";
+    public const string UnknownSender = "unknown_sender";
+    public const string ProcessingFailed = "processing_failed";
+}

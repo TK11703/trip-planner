@@ -15,6 +15,13 @@ else if (_timeline.Legs.Count == 0 && _timeline.UnassignedItems.Count == 0)
 {
     <div class="border-dashed rounded p-4 text-center text-secondary">
         No trip legs yet. Add a trip leg to start building your timeline, then relate events to it.
+        <button type="button"
+                class="ttl-leg-add"
+                title="Add a trip leg"
+                aria-label="Add a trip leg"
+                @onclick="AddLegFromFooterAsync">
+            <span aria-hidden="true">+</span> Add leg
+        </button>
     </div>
 }
 else
