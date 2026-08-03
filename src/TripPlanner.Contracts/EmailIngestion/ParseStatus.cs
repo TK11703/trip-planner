@@ -1,17 +1,17 @@
 namespace TripPlanner.Contracts.EmailIngestion;
 
-/// <summary>The processing state of a raw inbox email.</summary>
+/// <summary>
+/// The processing state of a raw inbox email. Every value is terminal — a message is always
+/// processed to completion inside the ingestion request, so there is no deferred state.
+/// </summary>
 public enum ParseStatus
 {
-    /// <summary>Received and stored; parsing has not yet run.</summary>
-    Pending = 0,
-
-    /// <summary>Parsing completed and produced a draft for review.</summary>
+    /// <summary>Recognition completed and produced at least one draft for review.</summary>
     Parsed = 1,
 
-    /// <summary>Parsing ran but threw an exception or returned no usable result.</summary>
+    /// <summary>Recognition was unavailable or returned unusable output.</summary>
     Failed = 2,
 
-    /// <summary>Parsing ran but confidence was below the acceptance threshold.</summary>
+    /// <summary>Recognition ran but found nothing that resembles a trip event.</summary>
     Unsupported = 3
 }

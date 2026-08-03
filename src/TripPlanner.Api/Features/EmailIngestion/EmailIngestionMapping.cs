@@ -33,9 +33,8 @@ internal static class EmailIngestionMapping
     private static ParseStatus ParseParseStatus(string value) => value switch
     {
         "parsed" => ParseStatus.Parsed,
-        "failed" => ParseStatus.Failed,
         "unsupported" => ParseStatus.Unsupported,
-        _ => ParseStatus.Pending
+        _ => ParseStatus.Failed
     };
 
     private static ReviewStatus ParseReviewStatus(string value) => value switch

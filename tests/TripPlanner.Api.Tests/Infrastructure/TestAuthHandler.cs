@@ -15,6 +15,7 @@ public sealed class TestAuthHandler : AuthenticationHandler<TestAuthHandlerOptio
     public const string TestLastNameHeader = "X-Test-Last-Name";
     public const string TestEmailHeader = "X-Test-Email";
     public const string TestScopeHeader = "X-Test-Scope";
+    public const string TestRolesHeader = "X-Test-Roles";
 
     public TestAuthHandler(IOptionsMonitor<TestAuthHandlerOptions> options, ILoggerFactory logger, UrlEncoder encoder)
         : base(options, logger, encoder)
@@ -53,6 +54,11 @@ public sealed class TestAuthHandler : AuthenticationHandler<TestAuthHandlerOptio
         if (!string.IsNullOrWhiteSpace(email))
         {
             claims.Add(new Claim(ClaimTypes.Email, email));
+        }
+        // Application roles, as Entra emits them for daemon callers.
+        foreach (var role in Request.Headers[TestRolesHeader].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            claims.Add(new Claim("roles", role));
         }
         var identity = new ClaimsIdentity(claims, SchemeName);
         var principal = new ClaimsPrincipal(identity);

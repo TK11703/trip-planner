@@ -95,14 +95,19 @@ public static class WebApplicationBuilderExtensions
 
         builder.Services.AddSingleton<DatabaseInitializer>();
 
-        // Email ingestion: repositories, deduplication, parser (Azure OpenAI via managed identity),
-        // and the background processing service.
+        // Email ingestion: repositories, deduplication, sender resolution, attachment text
+        // extraction, and the recognition parser (Azure OpenAI via managed identity).
+        // Messages are processed synchronously inside the relay request — there is no
+        // hosted service, timer, or mailbox client anywhere in the API.
         builder.Services.AddScoped<IInboxEmailRepository, InboxEmailRepository>();
+        builder.Services.AddScoped<IEmailAttachmentRepository, EmailAttachmentRepository>();
         builder.Services.AddScoped<IParsedEventDraftRepository, ParsedEventDraftRepository>();
         builder.Services.AddSingleton<EmailDeduplicationService>();
+        builder.Services.AddSingleton<EmailAttachmentTextExtractor>();
+        builder.Services.AddScoped<EmailSenderResolver>();
         builder.Services.AddSingleton<AzureOpenAIClient>(_ => CreateOpenAIClient(builder.Configuration));
-        builder.Services.AddScoped<EmailParserService>();
-        builder.Services.AddHostedService<EmailIngestionBackgroundService>();
+        builder.Services.AddScoped<IEventRecognizer, EmailParserService>();
+        builder.Services.AddScoped<RelayMessageProcessor>();
 
         return builder;
     }

@@ -12,6 +12,13 @@ public interface IUserProfileRepository
     Task<UserProfileResponse?> GetAsync(string userId, CancellationToken cancellationToken = default);
     Task<UserProfileResponse> EnsureFromAuthenticatedUserAsync(string userId, string? firstName, string? lastName, string? displayName, string? email, DateTimeOffset nowUtc, CancellationToken cancellationToken = default);
     Task<UserProfileResponse?> UpdateAsync(string userId, UpdateUserProfileRequest request, DateTimeOffset nowUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns every user whose profile email matches <paramref name="email"/> (compared
+    /// case-insensitively after trimming). Callers must treat zero or multiple matches as
+    /// unresolvable rather than guessing an owner.
+    /// </summary>
+    Task<IReadOnlyList<string>> FindUserIdsByEmailAsync(string email, CancellationToken cancellationToken = default);
 }
 
 public sealed class UserProfileRepository : IUserProfileRepository
@@ -103,6 +110,19 @@ public sealed class UserProfileRepository : IUserProfileRepository
 
         var preferences = await LoadPreferencesAsync(conn, userId, cancellationToken);
         return row.ToResponse(preferences);
+    }
+
+    public async Task<IReadOnlyList<string>> FindUserIdsByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return Array.Empty<string>();
+        }
+
+        await using var conn = await _factory.CreateOpenConnectionAsync(cancellationToken);
+        var query = _sql.Get("Queries/UserProfiles/FindUserIdsByEmail.sql");
+        var rows = await conn.QueryAsync<string>(new CommandDefinition(query, new { Email = email.Trim().ToLowerInvariant() }, cancellationToken: cancellationToken));
+        return rows.ToArray();
     }
 
     private async Task<NotificationPreferences> LoadPreferencesAsync(IDbConnection conn, string userId, CancellationToken cancellationToken)
