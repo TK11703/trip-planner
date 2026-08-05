@@ -16,7 +16,7 @@
     <div class="mb-2">
         <label class="form-label" for="item-leg">Trip leg</label>
         <InputSelect id="item-leg" class="form-select" @bind-Value="_model.TripLegId" @bind-Value:after="OnLegChanged">
-            <option value="">Select a trip leg</option>
+            <option value="">No trip leg yet</option>
             @foreach (var leg in Legs)
             {
                 <option value="@leg.TripLegId">@leg.Title</option>
@@ -187,13 +187,14 @@
     {
         <div class="alert alert-danger py-2 small">@_error</div>
     }
-    <button type="submit" class="btn btn-primary" disabled="@(_submitting || Legs.Count == 0)">@(IsEdit ? "Save item" : "Add item")</button>
+    <button type="submit" class="btn btn-primary" disabled="@_submitting">@(IsEdit ? "Save item" : "Add item")</button>
 </EditForm>
 
 @code {
     private sealed class ItemModel : IValidatableObject
     {
-        [Required(ErrorMessage = "Select the trip leg this item belongs to.")]
+        // A leg is optional. An item the traveler cannot place yet saves unassigned and can be
+        // related to a leg later; when a leg is chosen its travel window is still binding.
         public Guid? TripLegId { get; set; }
         public string ItemType { get; set; } = "activity";
         [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
@@ -360,7 +361,14 @@
         }
         SyncLegWindow();
         _clampedLegId = _model.TripLegId;
-        ClampToLegWindow();
+
+        // Only a new item is nudged into the chosen leg's window. Relating an item that already
+        // exists must never silently move dates the traveler recorded — the leg is refused
+        // instead, exactly as an out-of-window edit would be (Feature 024, FR-013).
+        if (Item is null)
+        {
+            ClampToLegWindow();
+        }
     }
 
     // True when the current location value is a plausibly map-capable place/address.
@@ -541,7 +549,8 @@
 
         _model = new ItemModel
         {
-            TripLegId = Item.TripLegId ?? (Legs.Count > 0 ? Legs[0].TripLegId : null),
+            // An item saved without a leg stays without one until the traveler relates it.
+            TripLegId = Item.TripLegId,
             ItemType = Item.ItemType,
             Title = Item.Title,
             Location = Item.Location,
@@ -647,7 +656,7 @@
             }
 
             var request = new CreateTrackedItemRequest(
-                _model.TripLegId ?? Guid.Empty,
+                _model.TripLegId,
                 _model.ItemType,
                 _model.Title.Trim(),
                 _model.Location,

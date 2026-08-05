@@ -20,7 +20,7 @@ public static class DiscardDraftEndpoint
         IParsedItemDraftRepository draftRepository,
         CancellationToken cancellationToken)
     {
-        var success = await draftRepository.SetReviewStatusAsync(id, currentUser.UserId, "discarded", cancellationToken);
+        var success = await draftRepository.SetReviewStatusAsync(id, currentUser.UserId, "discarded", ct: cancellationToken);
         return success ? TypedResults.NoContent() : TypedResults.NotFound();
     }
 }

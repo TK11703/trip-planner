@@ -32,7 +32,7 @@ public class TripTimelineTests : TestContext
             0,
             items);
 
-    private static TimelineItem Item(Guid legId, string title, DateTime start)
+    private static TimelineItem Item(Guid? legId, string title, DateTime start)
         => new(
             Guid.NewGuid(),
             legId,
@@ -76,6 +76,31 @@ public class TripTimelineTests : TestContext
             30,
             legs,
             Array.Empty<TimelineItem>());
+
+    // Feature 024, FR-012: an item confirmed without a leg still shows up on the timeline, with
+    // its dates, in a lane that reads as waiting to be related to a leg.
+    [Fact]
+    public void AnItemWithNoLeg_AppearsInTheUnassignedLane_WithItsDates()
+    {
+        var unassigned = Item(null, "Hotel Kabuki", new DateTime(2026, 9, 2, 15, 0, 0));
+        var response = new TripTimelineResponse(
+            Guid.NewGuid(),
+            new DateOnly(2026, 9, 1),
+            new DateOnly(2026, 9, 3),
+            30,
+            Array.Empty<TimelineLeg>(),
+            new[] { unassigned });
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
+
+        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Unassigned", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Hotel Kabuki", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("assign it to a leg", cut.Markup, StringComparison.Ordinal);
+        });
+    }
 
     [Fact]
     public void LegRow_WithNoItems_ShowsZeroCount()

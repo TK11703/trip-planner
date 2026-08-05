@@ -12,7 +12,14 @@ internal static class EmailIngestionMapping
         record.ReceivedAt,
         ParseParseStatus(record.ParseStatus));
 
-    public static ParsedItemDraftDto ToDto(this ParsedItemDraftRecord record) => new(
+    public static InboxEmailDto ToDto(this InboxEmailSummary summary) => new(
+        summary.InboxEmailId,
+        summary.Sender,
+        summary.Subject,
+        summary.ReceivedAt,
+        ParseParseStatus(summary.ParseStatus));
+
+    public static ParsedItemDraftDto ToDto(this ParsedItemDraftRecord record, DraftPlacement? placement = null) => new(
         record.ParsedItemDraftId,
         record.InboxEmailId,
         record.TripId,
@@ -28,7 +35,8 @@ internal static class EmailIngestionMapping
         record.Notes,
         record.Confidence,
         ParseReviewStatus(record.ReviewStatus),
-        record.CreatedAtUtc);
+        record.CreatedAtUtc,
+        placement);
 
     private static ParseStatus ParseParseStatus(string value) => value switch
     {

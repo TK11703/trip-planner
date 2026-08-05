@@ -8,6 +8,44 @@ public sealed record InboxEmailDto(
     DateTimeOffset ReceivedAt,
     ParseStatus ParseStatus);
 
+/// <summary>
+/// Why a draft can or cannot be placed on a trip leg. Computed per request from the legs that
+/// exist at the moment of the call; never persisted.
+/// </summary>
+public enum DraftPlacementStatus
+{
+    /// <summary>Exactly one editable leg covers the draft's timeframe.</summary>
+    Matched = 0,
+
+    /// <summary>Two or more editable legs cover the draft's timeframe; the traveler must choose.</summary>
+    Ambiguous = 1,
+
+    /// <summary>The draft falls inside an accessible trip's dates but no leg covers it.</summary>
+    NoLegCovers = 2,
+
+    /// <summary>The draft falls outside every accessible trip's dates.</summary>
+    OutsideTripDates = 3,
+
+    /// <summary>The draft has no usable start, so containment cannot be judged.</summary>
+    InsufficientData = 4
+}
+
+/// <summary>A trip leg the draft could be placed on, with enough context to name it in the UI.</summary>
+public sealed record PlacementCandidate(
+    Guid TripId,
+    string TripName,
+    Guid TripLegId,
+    string LegTitle,
+    DateTimeOffset LegStart,
+    DateTimeOffset? LegEnd);
+
+/// <summary>The computed placement suggestion for a pending draft.</summary>
+public sealed record DraftPlacement(
+    DraftPlacementStatus Status,
+    Guid? SuggestedTripId,
+    Guid? SuggestedTripLegId,
+    IReadOnlyList<PlacementCandidate> Candidates);
+
 /// <summary>A structured item extracted from an inbox email, awaiting user review.</summary>
 public sealed record ParsedItemDraftDto(
     Guid ParsedItemDraftId,
@@ -25,7 +63,8 @@ public sealed record ParsedItemDraftDto(
     string? Notes,
     double Confidence,
     ReviewStatus ReviewStatus,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    DraftPlacement? Placement = null);
 
 /// <summary>Request to update editable fields of a parsed item draft.</summary>
 public sealed record UpdateParsedItemDraftRequest(
@@ -42,7 +81,7 @@ public sealed record UpdateParsedItemDraftRequest(
     string? Notes);
 
 /// <summary>Response returned after confirming a draft (the promoted item id).</summary>
-public sealed record ConfirmParsedItemDraftResponse(Guid TrackedItemId, Guid TripId, Guid TripLegId);
+public sealed record ConfirmParsedItemDraftResponse(Guid TrackedItemId, Guid TripId, Guid? TripLegId);
 
 /// <summary>A page of inbox emails.</summary>
 public sealed record InboxEmailListResponse(IReadOnlyList<InboxEmailDto> Items);

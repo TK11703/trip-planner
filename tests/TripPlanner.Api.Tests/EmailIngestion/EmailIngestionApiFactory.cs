@@ -3,10 +3,17 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Api.Features.EmailIngestion;
 using TripPlanner.Api.Features.Notifications;
+using TripPlanner.Api.Security;
 using TripPlanner.Api.Tests.Infrastructure;
 using TripPlanner.Contracts.EmailIngestion;
+using TripPlanner.Contracts.TripItems;
+using TripPlanner.Contracts.Trips;
+using TripPlanner.Database.Audit;
 using TripPlanner.Database.EmailIngestion;
 using TripPlanner.Database.Notifications;
+using TripPlanner.Database.TripItems;
+using TripPlanner.Database.Trips;
+using TripPlanner.Database.TripSharing;
 using TripPlanner.Database.UserProfiles;
 
 namespace TripPlanner.Api.Tests.EmailIngestion;
@@ -27,6 +34,12 @@ internal sealed class EmailIngestionApiFactory : TestApiFactory
     public StubItemRecognizer Recognizer { get; } = new();
     public RecordingNotificationService Notifications { get; } = new();
     public StubProfileDirectory Profiles { get; } = new(TravelerUserId, TravelerEmail);
+    public RecordingTripItemRepository TripItems { get; } = new();
+
+    /// <summary>Trips the confirm path can resolve, keyed by trip id. Tests seed what they need.</summary>
+    public StubTripReadRepository Trips { get; } = new();
+    public RecordingAuditRepository Audit { get; } = new();
+    public RecordingItineraryNotificationService ItineraryNotifications { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -39,6 +52,11 @@ internal sealed class EmailIngestionApiFactory : TestApiFactory
             services.RemoveAll<IItemRecognizer>();
             services.RemoveAll<INotificationService>();
             services.RemoveAll<IUserProfileRepository>();
+            services.RemoveAll<ITripItemRepository>();
+            services.RemoveAll<ITripReadRepository>();
+            services.RemoveAll<ITripAccessResolver>();
+            services.RemoveAll<IAuditRepository>();
+            services.RemoveAll<IItineraryNotificationService>();
 
             services.AddSingleton<IInboxEmailRepository>(Emails);
             services.AddSingleton<IEmailAttachmentRepository>(Attachments);
@@ -46,6 +64,11 @@ internal sealed class EmailIngestionApiFactory : TestApiFactory
             services.AddSingleton<IItemRecognizer>(Recognizer);
             services.AddSingleton<INotificationService>(Notifications);
             services.AddSingleton<IUserProfileRepository>(Profiles);
+            services.AddSingleton<ITripItemRepository>(TripItems);
+            services.AddSingleton<ITripReadRepository>(Trips);
+            services.AddSingleton<ITripAccessResolver>(new StubTripAccessResolver(Trips));
+            services.AddSingleton<IAuditRepository>(Audit);
+            services.AddSingleton<IItineraryNotificationService>(ItineraryNotifications);
         });
     }
 
@@ -106,11 +129,15 @@ internal sealed class InMemoryInboxEmailRepository : IInboxEmailRepository
         }
     }
 
-    public Task<IReadOnlyList<InboxEmailRecord>> GetListAsync(string userId, int limit, CancellationToken ct = default)
+    public Task<IReadOnlyList<InboxEmailSummary>> GetListAsync(string userId, int limit, CancellationToken ct = default)
     {
         lock (_rows)
         {
-            IReadOnlyList<InboxEmailRecord> result = _rows.Where(r => r.UserId == userId).Take(limit).ToArray();
+            IReadOnlyList<InboxEmailSummary> result = _rows
+                .Where(r => r.UserId == userId)
+                .Take(limit)
+                .Select(r => new InboxEmailSummary(r.InboxEmailId, r.UserId, r.Sender, r.Subject, r.ReceivedAt, r.ParseStatus, r.CreatedAtUtc))
+                .ToArray();
             return Task.FromResult(result);
         }
     }
@@ -227,7 +254,7 @@ internal sealed class InMemoryParsedItemDraftRepository : IParsedItemDraftReposi
         }
     }
 
-    public Task<bool> SetReviewStatusAsync(Guid parsedItemDraftId, string userId, string reviewStatus, CancellationToken ct = default)
+    public Task<bool> SetReviewStatusAsync(Guid parsedItemDraftId, string userId, string reviewStatus, Guid? trackedItemId = null, CancellationToken ct = default)
     {
         lock (_rows)
         {
@@ -237,8 +264,24 @@ internal sealed class InMemoryParsedItemDraftRepository : IParsedItemDraftReposi
                 return Task.FromResult(false);
             }
 
-            _rows[index] = _rows[index] with { ReviewStatus = reviewStatus };
+            _rows[index] = _rows[index] with
+            {
+                ReviewStatus = reviewStatus,
+                TrackedItemId = trackedItemId ?? _rows[index].TrackedItemId
+            };
             return Task.FromResult(true);
+        }
+    }
+
+    /// <summary>Legs the caller could place a draft on. Tests script this directly.</summary>
+    public List<PlacementCandidateLeg> CandidateLegs { get; } = [];
+
+    public Task<IReadOnlyList<PlacementCandidateLeg>> GetPlacementCandidateLegsAsync(string userId, string? callerEmail, CancellationToken ct = default)
+    {
+        lock (_rows)
+        {
+            IReadOnlyList<PlacementCandidateLeg> result = CandidateLegs.ToArray();
+            return Task.FromResult(result);
         }
     }
 }
@@ -304,4 +347,111 @@ internal sealed class StubProfileDirectory : IUserProfileRepository
 
     public Task<Contracts.Profile.UserProfileResponse?> UpdateAsync(string userId, Contracts.Profile.UpdateUserProfileRequest request, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
         => throw new NotSupportedException();
+}
+
+/// <summary>
+/// Records the items a confirmed draft creates so tests can assert what reached the timeline —
+/// in particular whether a leg was attached (Feature 024, FR-011).
+/// </summary>
+internal sealed class RecordingTripItemRepository : ITripItemRepository
+{
+    private readonly List<(Guid TripId, Guid? TripLegId, CreateTrackedItemRequest Request)> _rows = [];
+
+    public IReadOnlyList<(Guid TripId, Guid? TripLegId, CreateTrackedItemRequest Request)> Rows
+    {
+        get { lock (_rows) { return _rows.ToArray(); } }
+    }
+
+    public Task<Guid?> CreateTrackedItemAsync(string ownerUserId, Guid tripId, CreateTrackedItemRequest request, DateTimeOffset nowUtc, CancellationToken ct)
+    {
+        lock (_rows) { _rows.Add((tripId, request.TripLegId, request)); }
+        return Task.FromResult<Guid?>(Guid.NewGuid());
+    }
+
+    public Task<IReadOnlyList<TripLegDto>> GetLegsAsync(string ownerUserId, Guid tripId, CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<TripLegDto>>(Legs.Where(l => l.TripId == tripId).ToArray());
+
+    /// <summary>Legs the confirm path validates against. Tests seed what the scenario needs.</summary>
+    public List<TripLegDto> Legs { get; } = [];
+
+    public Task<IReadOnlyList<TrackedItemDto>> GetTrackedItemsAsync(string ownerUserId, Guid tripId, CancellationToken ct) => Task.FromResult<IReadOnlyList<TrackedItemDto>>([]);
+    public Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(string ownerUserId, Guid tripId, CancellationToken ct) => Task.FromResult<TripLegDefaultsResponse?>(new TripLegDefaultsResponse("UTC", "UTC", "profile"));
+    public Task<Guid?> CreateLegAsync(string ownerUserId, Guid tripId, CreateTripLegRequest request, DateTimeOffset nowUtc, CancellationToken ct) => Task.FromResult<Guid?>(Guid.NewGuid());
+    public Task<int> UpdateLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct) => Task.FromResult(1);
+    public Task<int> DeleteLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, CancellationToken ct) => Task.FromResult(1);
+    public Task<int> UpdateTrackedItemAsync(string ownerUserId, Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct) => Task.FromResult(1);
+    public Task<int> DeleteTrackedItemAsync(string ownerUserId, Guid tripId, Guid trackedItemId, CancellationToken ct) => Task.FromResult(1);
+    public Task<int> CountItemsForLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, CancellationToken ct) => Task.FromResult(0);
+}
+
+/// <summary>Trips the confirm path can read. A trip absent here is treated as not found.</summary>
+internal sealed class StubTripReadRepository : ITripReadRepository
+{
+    private readonly Dictionary<Guid, TripDetail> _trips = [];
+
+    public void Add(TripDetail trip)
+    {
+        lock (_trips) { _trips[trip.TripId] = trip; }
+    }
+
+    public bool Contains(Guid tripId)
+    {
+        lock (_trips) { return _trips.ContainsKey(tripId); }
+    }
+
+    public Task<TripDetail?> GetDetailAsync(string ownerUserId, Guid tripId, CancellationToken cancellationToken)
+    {
+        lock (_trips) { return Task.FromResult(_trips.TryGetValue(tripId, out var trip) ? trip : null); }
+    }
+
+    public Task<TripListResponse> GetPageAsync(string ownerUserId, string? callerEmail, int page, int pageSize, CancellationToken cancellationToken)
+        => Task.FromResult(new TripListResponse([], page, pageSize, 0));
+
+    public Task<IReadOnlyList<TripSummary>> GetRecentAsync(string ownerUserId, int limit, CancellationToken cancellationToken)
+        => Task.FromResult<IReadOnlyList<TripSummary>>([]);
+}
+
+/// <summary>Grants owner access to any seeded trip, and none to anything else.</summary>
+internal sealed class StubTripAccessResolver : ITripAccessResolver
+{
+    private readonly StubTripReadRepository _trips;
+
+    public StubTripAccessResolver(StubTripReadRepository trips) => _trips = trips;
+
+    public Task<TripAccess?> ResolveAsync(string callerUserId, Guid tripId, CancellationToken ct)
+        => Task.FromResult(_trips.Contains(tripId)
+            ? new TripAccess(callerUserId, TripAccessLevel.Owner)
+            : null);
+}
+
+internal sealed class RecordingAuditRepository : IAuditRepository
+{
+    private readonly List<(string Operation, string? ResourceId, string Result)> _entries = [];
+
+    public IReadOnlyList<(string Operation, string? ResourceId, string Result)> Entries
+    {
+        get { lock (_entries) { return _entries.ToArray(); } }
+    }
+
+    public Task RecordAsync(string? userId, string operation, string resourceType, string? resourceId, string result, DateTimeOffset occurredAtUtc, CancellationToken cancellationToken)
+    {
+        lock (_entries) { _entries.Add((operation, resourceId, result)); }
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class RecordingItineraryNotificationService : IItineraryNotificationService
+{
+    private readonly List<(Guid TripId, ItineraryChangeKind Change)> _raised = [];
+
+    public IReadOnlyList<(Guid TripId, ItineraryChangeKind Change)> Raised
+    {
+        get { lock (_raised) { return _raised.ToArray(); } }
+    }
+
+    public Task NotifyChangeAsync(Guid tripId, string ownerUserId, string actorUserId, string? actorDisplayName, ItineraryChangeKind change, CancellationToken ct)
+    {
+        lock (_raised) { _raised.Add((tripId, change)); }
+        return Task.CompletedTask;
+    }
 }

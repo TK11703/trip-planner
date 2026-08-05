@@ -104,6 +104,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IParsedItemDraftRepository, ParsedItemDraftRepository>();
         builder.Services.AddSingleton<EmailDeduplicationService>();
         builder.Services.AddSingleton<EmailAttachmentTextExtractor>();
+        builder.Services.AddSingleton<DraftPlacementMatcher>();
         builder.Services.AddScoped<EmailSenderResolver>();
         builder.Services.AddSingleton<AzureOpenAIClient>(_ => CreateOpenAIClient(builder.Configuration));
         builder.Services.AddScoped<IItemRecognizer, EmailParserService>();

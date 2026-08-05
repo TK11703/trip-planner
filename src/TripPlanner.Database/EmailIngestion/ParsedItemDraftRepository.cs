@@ -79,7 +79,7 @@ public sealed class ParsedItemDraftRepository : IParsedItemDraftRepository
         return row?.ToRecord();
     }
 
-    public async Task<bool> SetReviewStatusAsync(Guid parsedItemDraftId, string userId, string reviewStatus, CancellationToken ct = default)
+    public async Task<bool> SetReviewStatusAsync(Guid parsedItemDraftId, string userId, string reviewStatus, Guid? trackedItemId = null, CancellationToken ct = default)
     {
         await using var conn = await _factory.CreateOpenConnectionAsync(ct);
         var command = _sql.Get("Commands/EmailIngestion/UpdateParsedItemDraftReviewStatus.sql");
@@ -87,9 +87,19 @@ public sealed class ParsedItemDraftRepository : IParsedItemDraftRepository
         {
             ParsedItemDraftId = parsedItemDraftId,
             UserId = userId,
-            ReviewStatus = reviewStatus
+            ReviewStatus = reviewStatus,
+            TrackedItemId = trackedItemId
         }, cancellationToken: ct));
         return result is not null;
+    }
+
+    public async Task<IReadOnlyList<PlacementCandidateLeg>> GetPlacementCandidateLegsAsync(string userId, string? callerEmail, CancellationToken ct = default)
+    {
+        await using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        var query = _sql.Get("Queries/EmailIngestion/GetPlacementCandidateLegs.sql");
+        var rows = await conn.QueryAsync<PlacementCandidateLeg>(new CommandDefinition(
+            query, new { OwnerUserId = userId, CallerEmail = callerEmail }, cancellationToken: ct));
+        return rows.ToArray();
     }
 
     private sealed record DraftRow(
@@ -109,12 +119,13 @@ public sealed class ParsedItemDraftRepository : IParsedItemDraftRepository
         string? Notes,
         double Confidence,
         string ReviewStatus,
-        DateTimeOffset CreatedAtUtc)
+        DateTimeOffset CreatedAtUtc,
+        Guid? TrackedItemId)
     {
         public ParsedItemDraftRecord ToRecord() => new(
             ParsedItemDraftId, InboxEmailId, UserId, TripId, TripLegId,
             ItemType, Title, Location,
             StartLocal, StartTimeZoneId, EndLocal, EndTimeZoneId,
-            ConfirmationCode, Notes, Confidence, ReviewStatus, CreatedAtUtc);
+            ConfirmationCode, Notes, Confidence, ReviewStatus, CreatedAtUtc, TrackedItemId);
     }
 }

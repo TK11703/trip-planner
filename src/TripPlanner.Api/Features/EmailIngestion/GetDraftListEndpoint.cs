@@ -18,10 +18,17 @@ public static class GetDraftListEndpoint
     private static async Task<Ok<ParsedItemDraftListResponse>> HandleAsync(
         ICurrentUser currentUser,
         IParsedItemDraftRepository draftRepository,
+        DraftPlacementMatcher placementMatcher,
         CancellationToken cancellationToken)
     {
         var drafts = await draftRepository.GetPendingAsync(currentUser.UserId, cancellationToken);
-        var items = drafts.Select(d => d.ToDto()).ToArray();
+
+        // One candidate-leg read serves every draft in the response, so the queue costs the same
+        // whether it holds one draft or fifty (SC-008).
+        var candidateLegs = await draftRepository.GetPlacementCandidateLegsAsync(
+            currentUser.UserId, currentUser.Email, cancellationToken);
+
+        var items = drafts.Select(d => d.ToDto(placementMatcher.Match(d, candidateLegs))).ToArray();
         return TypedResults.Ok(new ParsedItemDraftListResponse(items));
     }
 }

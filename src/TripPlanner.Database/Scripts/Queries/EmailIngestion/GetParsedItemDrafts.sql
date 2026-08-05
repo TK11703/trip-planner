@@ -14,7 +14,8 @@ SELECT d.parsed_item_draft_id AS ParsedItemDraftId,
        d.notes AS Notes,
        d.confidence AS Confidence,
        d.review_status AS ReviewStatus,
-       d.created_at_utc AS CreatedAtUtc
+       d.created_at_utc AS CreatedAtUtc,
+       d.tracked_item_id AS TrackedItemId
 FROM parsed_item_drafts d
 WHERE d.user_id = @UserId
   AND d.review_status = 'pending_review'
