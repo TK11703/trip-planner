@@ -1,0 +1,369 @@
+@using System.ComponentModel.DataAnnotations
+@using TripPlanner.Contracts.EmailIngestion
+@using TripPlanner.Contracts.Trips
+@using TripPlanner.Web.Features.EmailIngestion
+@inject ITripApiClient TripApi
+@inject IEmailIngestionApiClient EmailIngestionApi
+@inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
+
+<div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="draftEditTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="draftEditTitle">Edit parsed item</h2>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAsync"></button>
+            </div>
+            <EditForm Model="_model" OnValidSubmit="SaveAsync" FormName="@($"draft-edit-{Draft.ParsedItemDraftId}")">
+                <DataAnnotationsValidator />
+                <div class="modal-body">
+                    @if (_error is not null)
+                    {
+                        <div class="alert alert-danger py-2 small" role="alert">@_error</div>
+                    }
+
+                    @* The traveler owns the placement: whatever the parser proposed can be
+                       overridden here before anything reaches the timeline (FR-016, FR-018). *@
+                    <div class="mb-2">
+                        <label class="form-label" for="draft-trip">Trip</label>
+                        <InputSelect id="draft-trip" class="form-select" @bind-Value="_model.TripId" @bind-Value:after="OnTripChangedAsync">
+                            <option value="">No trip yet</option>
+                            @foreach (var trip in _trips)
+                            {
+                                <option value="@trip.TripId">@trip.Name</option>
+                            }
+                        </InputSelect>
+                        <div class="form-text">Only trips you can add items to are listed.</div>
+                        <ValidationMessage For="@(() => _model.TripId)" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label" for="draft-leg">Trip leg</label>
+                        <InputSelect id="draft-leg" class="form-select" @bind-Value="_model.TripLegId" disabled="@(_model.TripId is null || _loadingLegs)">
+                            <option value="">No trip leg yet</option>
+                            @foreach (var leg in _legs)
+                            {
+                                <option value="@leg.TripLegId">@leg.Title</option>
+                            }
+                        </InputSelect>
+                        <div class="form-text">Optional. An item saved without a leg waits in the trip's unassigned area.</div>
+                        <ValidationMessage For="@(() => _model.TripLegId)" />
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-5">
+                            <label class="form-label" for="draft-type">Type</label>
+                            <InputSelect id="draft-type" class="form-select" @bind-Value="_model.ItemType">
+                                <option value="activity">Activity</option>
+                                <option value="reservation">Reservation</option>
+                                <option value="event">Event</option>
+                                <option value="reminder">Reminder</option>
+                            </InputSelect>
+                        </div>
+                        <div class="col-7">
+                            <label class="form-label" for="draft-title">Title</label>
+                            <InputText id="draft-title" class="form-control" @bind-Value="_model.Title" />
+                            <ValidationMessage For="@(() => _model.Title)" />
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label" for="draft-location">Location</label>
+                        <InputText id="draft-location" class="form-control" @bind-Value="_model.Location" />
+                        <ValidationMessage For="@(() => _model.Location)" />
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label" for="draft-start">Start</label>
+                            <InputDate id="draft-start" Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.StartLocal" />
+                            <ValidationMessage For="@(() => _model.StartLocal)" />
+                            @if (SelectedLeg is not null)
+                            {
+                                <div class="form-text">Must fall within @SelectedLeg.Title: @LegWindowHint()</div>
+                            }
+                            <label class="form-label mt-2" for="draft-start-tz">Start timezone</label>
+                            <InputSelect id="draft-start-tz" class="form-select" @bind-Value="_model.StartTimeZoneId">
+                                <option value="">Select a timezone</option>
+                                @foreach (var option in TimezoneOptions.GetOptions())
+                                {
+                                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => _model.StartTimeZoneId)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="draft-end">End</label>
+                            <InputDate id="draft-end" Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndLocal" />
+                            <ValidationMessage For="@(() => _model.EndLocal)" />
+                            <label class="form-label mt-2" for="draft-end-tz">End timezone</label>
+                            <InputSelect id="draft-end-tz" class="form-select" @bind-Value="_model.EndTimeZoneId">
+                                <option value="">Same as start</option>
+                                @foreach (var option in TimezoneOptions.GetOptions())
+                                {
+                                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label" for="draft-code">Confirmation/Reservation Code</label>
+                        <InputText id="draft-code" class="form-control" maxlength="255" @bind-Value="_model.ConfirmationCode" />
+                        <ValidationMessage For="@(() => _model.ConfirmationCode)" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label" for="draft-notes">Notes</label>
+                        <InputTextArea id="draft-notes" class="form-control" rows="3" maxlength="2000" @bind-Value="_model.Notes" />
+                        <ValidationMessage For="@(() => _model.Notes)" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseAsync" disabled="@_saving">Cancel</button>
+                    <button type="submit" class="btn btn-primary" disabled="@_saving">Save</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop show"></div>
+
+@code {
+    private sealed class DraftModel : IValidatableObject
+    {
+        // Both the trip and the leg are optional here: a draft can be corrected in stages, and a
+        // trip without a leg is a legitimate destination (FR-011).
+        public Guid? TripId { get; set; }
+        public Guid? TripLegId { get; set; }
+        public string ItemType { get; set; } = "activity";
+        [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
+        public string? Location { get; set; }
+        public DateTime? StartLocal { get; set; }
+        public string? StartTimeZoneId { get; set; }
+        public DateTime? EndLocal { get; set; }
+        public string? EndTimeZoneId { get; set; }
+        [StringLength(255, ErrorMessage = "Confirmation/Reservation Code must be 255 characters or fewer.")] public string? ConfirmationCode { get; set; }
+        [StringLength(2000, ErrorMessage = "Notes must be 2,000 characters or fewer.")] public string? Notes { get; set; }
+
+        // Travel window of the selected leg as UTC instants, so the range rules below compare
+        // correctly across time zones. Null when no leg is selected.
+        public DateTimeOffset? LegStartUtc { get; set; }
+        public DateTimeOffset? LegEndUtc { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (TripLegId is not null && TripId is null)
+            {
+                yield return new ValidationResult("Choose a trip before choosing one of its legs.", new[] { nameof(TripLegId) });
+            }
+
+            if (StartLocal is null)
+            {
+                yield return new ValidationResult("Start is required.", new[] { nameof(StartLocal) });
+            }
+
+            if (string.IsNullOrWhiteSpace(StartTimeZoneId))
+            {
+                yield return new ValidationResult("Start timezone is required.", new[] { nameof(StartTimeZoneId) });
+            }
+
+            // The leg's travel window binds an email-sourced item exactly as it binds a typed one
+            // (FR-020): widening the leg is not offered here.
+            if (LegStartUtc is { } legStart && LegEndUtc is { } legEnd)
+            {
+                if (StartLocal is { } startLocal && ToInstant(startLocal, StartTimeZoneId) is { } start && (start < legStart || start > legEnd))
+                {
+                    yield return new ValidationResult(
+                        $"Start must be between {FormatBound(legStart, StartTimeZoneId)} and {FormatBound(legEnd, StartTimeZoneId)}.",
+                        new[] { nameof(StartLocal) });
+                }
+
+                var endZoneId = string.IsNullOrWhiteSpace(EndTimeZoneId) ? StartTimeZoneId : EndTimeZoneId;
+                if (EndLocal is { } endLocal && ToInstant(endLocal, endZoneId) is { } end && (end < legStart || end > legEnd))
+                {
+                    yield return new ValidationResult(
+                        $"End must be between {FormatBound(legStart, endZoneId)} and {FormatBound(legEnd, endZoneId)}.",
+                        new[] { nameof(EndLocal) });
+                }
+            }
+
+            if (StartLocal is { } s && EndLocal is { } e && e < s)
+            {
+                yield return new ValidationResult("End must be on or after the start.", new[] { nameof(EndLocal) });
+            }
+        }
+    }
+
+    [Parameter, EditorRequired] public ParsedItemDraftDto Draft { get; set; } = default!;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private DraftModel _model = new();
+    private IReadOnlyList<TripSummary> _trips = Array.Empty<TripSummary>();
+    private List<TripLegDto> _legs = new();
+    private bool _loadingLegs;
+    private bool _saving;
+    private string? _error;
+
+    private TripLegDto? SelectedLeg => _model.TripLegId is { } id ? _legs.FirstOrDefault(l => l.TripLegId == id) : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _model = new DraftModel
+        {
+            TripId = Draft.TripId,
+            TripLegId = Draft.TripLegId,
+            ItemType = string.IsNullOrWhiteSpace(Draft.ItemType) ? "activity" : Draft.ItemType,
+            Title = Draft.Title ?? string.Empty,
+            Location = Draft.Location,
+            StartLocal = Draft.StartLocal,
+            StartTimeZoneId = Draft.StartTimeZoneId,
+            EndLocal = Draft.EndLocal,
+            EndTimeZoneId = Draft.EndTimeZoneId,
+            ConfirmationCode = Draft.ConfirmationCode,
+            Notes = Draft.Notes
+        };
+
+        // Only trips the traveler can add items to belong in the picker; a viewer-level trip
+        // would offer a placement the API would refuse (FR-003).
+        var list = await TripApi.GetTripsAsync(page: 1, pageSize: 100);
+        _trips = list.Trips
+            .Where(t => t.AccessLevel is TripAccessLevel.Owner or TripAccessLevel.Collaborator)
+            .ToArray();
+
+        await LoadLegsAsync();
+    }
+
+    private async Task OnTripChangedAsync()
+    {
+        // A leg carried over from the previous trip would point the item at another trip, so it
+        // is cleared before the new trip's legs arrive (FR-018).
+        _model.TripLegId = null;
+        await LoadLegsAsync();
+    }
+
+    private async Task LoadLegsAsync()
+    {
+        _legs.Clear();
+        ApplyLegWindow();
+
+        if (_model.TripId is not { } tripId) return;
+
+        _loadingLegs = true;
+        try
+        {
+            var detail = await TripApi.GetDetailAsync(tripId);
+            if (detail is not null)
+            {
+                _legs = detail.Legs.OrderBy(l => l.SortOrder).ToList();
+            }
+
+            // The saved leg only survives if it actually belongs to the trip now selected.
+            if (_model.TripLegId is { } legId && _legs.All(l => l.TripLegId != legId))
+            {
+                _model.TripLegId = null;
+            }
+            ApplyLegWindow();
+        }
+        finally
+        {
+            _loadingLegs = false;
+        }
+    }
+
+    private void ApplyLegWindow()
+    {
+        if (SelectedLeg is { } leg)
+        {
+            _model.LegStartUtc = ToInstant(leg.StartLocal, leg.StartTimeZoneId);
+            _model.LegEndUtc = ToInstant(leg.EndLocal, leg.EndTimeZoneId);
+        }
+        else
+        {
+            _model.LegStartUtc = null;
+            _model.LegEndUtc = null;
+        }
+    }
+
+    private string LegWindowHint()
+    {
+        if (_model.LegStartUtc is not { } start || _model.LegEndUtc is not { } end) return string.Empty;
+        var zoneId = _model.StartTimeZoneId;
+        return $"{FormatBound(start, zoneId)} – {FormatBound(end, zoneId)}";
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            // The leg window is re-derived from the current selection so a stale window can never
+            // let a placement through that the API would refuse.
+            ApplyLegWindow();
+
+            var result = await EmailIngestionApi.UpdateDraftAsync(Draft.ParsedItemDraftId, new UpdateParsedItemDraftRequest(
+                _model.TripId, _model.TripLegId, _model.ItemType, _model.Title, _model.Location,
+                _model.StartLocal, _model.StartTimeZoneId, _model.EndLocal, _model.EndTimeZoneId,
+                _model.ConfirmationCode, _model.Notes));
+
+            if (!result.Succeeded)
+            {
+                // The API names the input it refused, so the message lands next to that control
+                // rather than as an unattributed banner.
+                _error = result.Field is { } field
+                    ? $"{FieldLabel(field)}: {result.Error!.Message}"
+                    : result.Error?.Message ?? "We couldn't save your changes. Please try again.";
+                return;
+            }
+
+            await OnSaved.InvokeAsync();
+            await OnClose.InvokeAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+
+    private static string FieldLabel(string field) => field switch
+    {
+        "tripId" => "Trip",
+        "tripLegId" => "Trip leg",
+        "title" => "Title",
+        "startLocal" => "Start",
+        "endLocal" => "End",
+        "startTimeZoneId" => "Start timezone",
+        "itemType" => "Type",
+        _ => field
+    };
+
+    private static DateTimeOffset? ToInstant(DateTime local, string? timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId)) return null;
+        try
+        {
+            return TripInstant.ToInstant(local, TimeZoneInfo.FindSystemTimeZoneById(timeZoneId));
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return null;
+        }
+    }
+
+    private static string FormatBound(DateTimeOffset instant, string? timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId)) return instant.ToString("MMM d, yyyy h:mm tt");
+        try
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return TimeZoneInfo.ConvertTime(instant, zone).ToString("MMM d, yyyy h:mm tt");
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return instant.ToString("MMM d, yyyy h:mm tt");
+        }
+    }
+}

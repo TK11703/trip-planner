@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using TripPlanner.Contracts.EmailIngestion
+@using TripPlanner.Web.Components.EmailIngestion
 @using TripPlanner.Web.Features.EmailIngestion
 @inject IEmailIngestionApiClient EmailIngestionApi
 @inject NavigationManager Nav
@@ -61,7 +62,70 @@
                                 <div class="small text-secondary mt-1">
                                     Confidence: @draft.Confidence.ToString("P0")
                                 </div>
-                                @if (draft.TripId is null)
+
+                                @* A refusal names the input that caused it, so the traveler can
+                                   correct it here rather than guessing (FR-022). *@
+                                @if (_errors.TryGetValue(draft.ParsedItemDraftId, out var draftError))
+                                {
+                                    <div class="alert alert-danger mt-2 py-1 px-2 small" role="alert" data-draft-error="@draft.ParsedItemDraftId">@draftError</div>
+                                }
+
+                                @* Where this item could go. The suggestion is advisory — nothing
+                                   reaches the timeline until the traveler confirms (FR-006). *@
+                                @if (draft.Placement is { } placement)
+                                {
+                                    @switch (placement.Status)
+                                    {
+                                        case DraftPlacementStatus.Matched:
+                                            var matched = placement.Candidates[0];
+                                            <div class="alert alert-success mt-2 py-1 px-2 small" role="status" data-placement="matched">
+                                                Goes on <strong>@matched.TripName</strong> — <strong>@matched.LegTitle</strong>,
+                                                which runs @FormatLegWindow(matched).
+                                            </div>
+                                            break;
+
+                                        case DraftPlacementStatus.Ambiguous:
+                                            <div class="mt-2" data-placement="ambiguous">
+                                                <div class="alert alert-warning py-1 px-2 small mb-2" role="alert">
+                                                    More than one trip leg covers these dates. Choose where this item belongs.
+                                                </div>
+                                                <label class="form-label small mb-1" for="@($"placement-{draft.ParsedItemDraftId}")">Trip leg</label>
+                                                <select id="@($"placement-{draft.ParsedItemDraftId}")" class="form-select form-select-sm"
+                                                        value="@SelectedLegValue(draft)"
+                                                        @onchange="e => OnCandidateChosen(draft, e)">
+                                                    <option value="">Choose a trip leg</option>
+                                                    @foreach (var candidate in placement.Candidates)
+                                                    {
+                                                        <option value="@candidate.TripLegId">@candidate.TripName — @candidate.LegTitle (@FormatLegWindow(candidate))</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            break;
+
+                                        case DraftPlacementStatus.InsufficientData:
+                                            <div class="alert alert-warning mt-2 py-1 px-2 small" role="alert" data-placement="insufficient-data">
+                                                We couldn't read a start date and time zone from this email, so we can't tell
+                                                which trip leg it belongs to. Add them to place this item.
+                                            </div>
+                                            break;
+
+                                        case DraftPlacementStatus.NoLegCovers:
+                                            <div class="alert alert-warning mt-2 py-1 px-2 small" role="alert" data-placement="no-leg-covers">
+                                                @DraftDates(draft) falls inside one of your trips, but no leg of that trip
+                                                covers it. Confirm it without a leg and relate it to one later, or add a leg
+                                                that covers these dates first.
+                                            </div>
+                                            break;
+
+                                        default:
+                                            <div class="alert alert-warning mt-2 py-1 px-2 small" role="alert" data-placement="outside-trip-dates">
+                                                @DraftDates(draft) falls outside every trip you can edit. Check the dates, or
+                                                plan a trip that covers them.
+                                            </div>
+                                            break;
+                                    }
+                                }
+                                else if (draft.TripId is null)
                                 {
                                     <div class="alert alert-warning mt-2 py-1 px-2 small" role="alert">
                                         Assign this item to a trip before confirming.
@@ -70,9 +134,14 @@
                             </div>
                             <div class="d-flex flex-column gap-2 align-items-end">
                                 <button class="btn btn-sm btn-success"
-                                        @onclick="() => ConfirmAsync(draft.ParsedItemDraftId)"
-                                        disabled="@(_isBusy || draft.TripId is null || draft.TripLegId is null || draft.StartLocal is null)">
+                                        @onclick="() => ConfirmAsync(draft)"
+                                        disabled="@(_isBusy || !CanConfirm(draft))">
                                     Confirm
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        @onclick="() => _editing = draft"
+                                        disabled="@_isBusy">
+                                    Edit
                                 </button>
                                 <button class="btn btn-sm btn-outline-danger"
                                         @onclick="() => DiscardAsync(draft.ParsedItemDraftId)"
@@ -88,11 +157,26 @@
     }
 </section>
 
+@if (_editing is { } editing)
+{
+    <DraftEditModal Draft="editing" OnClose="() => _editing = null" OnSaved="LoadAsync" />
+}
+
 @code {
     private bool _isLoading = true;
     private bool _isBusy;
     private string? _loadError;
     private List<ParsedItemDraftDto> _drafts = new();
+
+    // The draft currently open in the edit modal, if any.
+    private ParsedItemDraftDto? _editing;
+
+    // Per-draft refusal messages, keyed by draft so each one stays next to the card it belongs to.
+    private readonly Dictionary<Guid, string> _errors = new();
+
+    // The traveler's chosen leg per draft. Seeded from an unambiguous suggestion so a matched
+    // draft arrives ready to confirm; left empty when the suggestion is ambiguous (FR-004, FR-005).
+    private readonly Dictionary<Guid, Guid?> _chosenLeg = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -107,6 +191,19 @@
         {
             var items = await EmailIngestionApi.GetDraftsAsync();
             _drafts = items.ToList();
+            _chosenLeg.Clear();
+            _errors.Clear();
+            foreach (var draft in _drafts)
+            {
+                if (draft.Placement is { Status: DraftPlacementStatus.Matched } matched)
+                {
+                    _chosenLeg[draft.ParsedItemDraftId] = matched.SuggestedTripLegId;
+                }
+                else if (draft.TripLegId is { } saved)
+                {
+                    _chosenLeg[draft.ParsedItemDraftId] = saved;
+                }
+            }
         }
         catch
         {
@@ -118,15 +215,76 @@
         }
     }
 
-    private async Task ConfirmAsync(Guid draftId)
+    private string SelectedLegValue(ParsedItemDraftDto draft)
+        => _chosenLeg.TryGetValue(draft.ParsedItemDraftId, out var legId) && legId is { } id
+            ? id.ToString()
+            : string.Empty;
+
+    private void OnCandidateChosen(ParsedItemDraftDto draft, ChangeEventArgs e)
+        => _chosenLeg[draft.ParsedItemDraftId] =
+            Guid.TryParse(e.Value?.ToString(), out var legId) ? legId : null;
+
+    private PlacementCandidate? ChosenCandidate(ParsedItemDraftDto draft)
+    {
+        if (draft.Placement is not { } placement) return null;
+        if (!_chosenLeg.TryGetValue(draft.ParsedItemDraftId, out var legId) || legId is null) return null;
+        return placement.Candidates.FirstOrDefault(c => c.TripLegId == legId);
+    }
+
+    // A leg is optional — an item confirmed without one waits in the timeline's unassigned area.
+    // A trip is not: an item has to belong somewhere (FR-011).
+    private bool CanConfirm(ParsedItemDraftDto draft)
+    {
+        if (draft.StartLocal is null) return false;
+        if (ChosenCandidate(draft) is not null) return true;
+        return draft.TripId is not null;
+    }
+
+    private static string FormatLegWindow(PlacementCandidate candidate)
+        => candidate.LegEnd is { } end
+            ? $"{candidate.LegStart:MMM d} – {end:MMM d, yyyy}"
+            : $"{candidate.LegStart:MMM d, yyyy} onward";
+
+    /// <summary>The draft's own dates, named back to the traveler when nothing covers them.</summary>
+    private static string DraftDates(ParsedItemDraftDto draft)
+        => draft.StartLocal is not { } start
+            ? "This item"
+            : draft.EndLocal is { } end && end.Date != start.Date
+                ? $"{start:MMM d} – {end:MMM d, yyyy}"
+                : $"{start:MMM d, yyyy}";
+
+    private async Task ConfirmAsync(ParsedItemDraftDto draft)
     {
         _isBusy = true;
+        _errors.Remove(draft.ParsedItemDraftId);
         try
         {
-            var result = await EmailIngestionApi.ConfirmDraftAsync(draftId);
-            if (result is not null)
+            // The confirm endpoint acts on the draft's saved state, so the traveler's chosen
+            // placement is written first — this click is the explicit action FR-006 requires.
+            var chosen = ChosenCandidate(draft);
+            if (chosen is not null && (draft.TripId != chosen.TripId || draft.TripLegId != chosen.TripLegId))
+            {
+                var saved = await EmailIngestionApi.UpdateDraftAsync(draft.ParsedItemDraftId, new UpdateParsedItemDraftRequest(
+                    chosen.TripId, chosen.TripLegId, draft.ItemType, draft.Title, draft.Location,
+                    draft.StartLocal, draft.StartTimeZoneId, draft.EndLocal, draft.EndTimeZoneId,
+                    draft.ConfirmationCode, draft.Notes));
+
+                if (!saved.Succeeded)
+                {
+                    _errors[draft.ParsedItemDraftId] = Describe(saved.Field, saved.Error?.Message);
+                    return;
+                }
+            }
+
+            var result = await EmailIngestionApi.ConfirmDraftAsync(draft.ParsedItemDraftId);
+            if (result.Succeeded)
             {
                 await LoadAsync();
+            }
+            else
+            {
+                // Nothing was written, so the draft stays in the queue for the traveler to fix.
+                _errors[draft.ParsedItemDraftId] = Describe(result.Field, result.Error?.Message);
             }
         }
         finally
@@ -134,6 +292,25 @@
             _isBusy = false;
         }
     }
+
+    /// <summary>Names the refused input alongside the reason, when the API named one.</summary>
+    private static string Describe(string? field, string? message)
+    {
+        var reason = string.IsNullOrWhiteSpace(message) ? "We couldn't add this item. Please try again." : message;
+        return field is null ? reason : $"{FieldLabel(field)}: {reason}";
+    }
+
+    private static string FieldLabel(string field) => field switch
+    {
+        "tripId" => "Trip",
+        "tripLegId" => "Trip leg",
+        "title" => "Title",
+        "startLocal" => "Start",
+        "endLocal" => "End",
+        "startTimeZoneId" => "Start timezone",
+        "itemType" => "Type",
+        _ => field
+    };
 
     private async Task DiscardAsync(Guid draftId)
     {

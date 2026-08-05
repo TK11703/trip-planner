@@ -15,6 +15,16 @@ public sealed record InboxEmailRecord(
     string ParseStatus,
     DateTimeOffset CreatedAtUtc);
 
+/// <summary>List projection of an inbox email. Body columns are omitted so history reads stay cheap.</summary>
+public sealed record InboxEmailSummary(
+    Guid InboxEmailId,
+    string UserId,
+    string Sender,
+    string Subject,
+    DateTimeOffset ReceivedAt,
+    string ParseStatus,
+    DateTimeOffset CreatedAtUtc);
+
 /// <summary>A new inbox email to store. The parse status is always terminal — there is no deferred state.</summary>
 public sealed record NewInboxEmail(
     string UserId,
@@ -38,7 +48,7 @@ public interface IInboxEmailRepository
     Task<InboxEmailRecord?> InsertAsync(NewInboxEmail email, CancellationToken ct = default);
 
     Task<InboxEmailRecord?> GetByIdAsync(Guid inboxEmailId, string userId, CancellationToken ct = default);
-    Task<IReadOnlyList<InboxEmailRecord>> GetListAsync(string userId, int limit, CancellationToken ct = default);
+    Task<IReadOnlyList<InboxEmailSummary>> GetListAsync(string userId, int limit, CancellationToken ct = default);
     Task UpdateParseStatusAsync(Guid inboxEmailId, string userId, string parseStatus, CancellationToken ct = default);
 }
 

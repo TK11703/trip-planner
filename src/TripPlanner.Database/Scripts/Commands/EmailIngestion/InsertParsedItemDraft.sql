@@ -24,4 +24,5 @@ RETURNING parsed_item_draft_id AS ParsedItemDraftId,
           notes AS Notes,
           confidence AS Confidence,
           review_status AS ReviewStatus,
-          created_at_utc AS CreatedAtUtc;
+          created_at_utc AS CreatedAtUtc,
+          tracked_item_id AS TrackedItemId;

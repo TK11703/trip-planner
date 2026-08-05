@@ -53,12 +53,12 @@ public sealed class InboxEmailRepository : IInboxEmailRepository
         return row?.ToRecord();
     }
 
-    public async Task<IReadOnlyList<InboxEmailRecord>> GetListAsync(string userId, int limit, CancellationToken ct = default)
+    public async Task<IReadOnlyList<InboxEmailSummary>> GetListAsync(string userId, int limit, CancellationToken ct = default)
     {
         await using var conn = await _factory.CreateOpenConnectionAsync(ct);
         var query = _sql.Get("Queries/EmailIngestion/GetInboxEmails.sql");
-        var rows = await conn.QueryAsync<InboxEmailRow>(new CommandDefinition(query, new { UserId = userId, Limit = limit }, cancellationToken: ct));
-        return rows.Select(r => r.ToRecord()).ToArray();
+        var rows = await conn.QueryAsync<InboxEmailSummary>(new CommandDefinition(query, new { UserId = userId, Limit = limit }, cancellationToken: ct));
+        return rows.ToArray();
     }
 
     public async Task UpdateParseStatusAsync(Guid inboxEmailId, string userId, string parseStatus, CancellationToken ct = default)

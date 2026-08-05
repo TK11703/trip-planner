@@ -28,7 +28,7 @@ internal static class TrackedItemFormTestData
             null,
             0);
 
-    public static TrackedItemDto Item(Guid tripLegId, DateTime start, DateTime end, string itemType = "activity", string? location = null)
+    public static TrackedItemDto Item(Guid? tripLegId, DateTime start, DateTime end, string itemType = "activity", string? location = null)
         => new(
             Guid.NewGuid(),
             Guid.NewGuid(),

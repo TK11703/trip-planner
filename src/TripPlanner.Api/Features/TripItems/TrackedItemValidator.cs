@@ -24,7 +24,7 @@ public sealed class TrackedItemValidator
     public ValidationResult Validate(UpdateTrackedItemRequest request, TripDetail trip)
         => ValidateCore(request.TripLegId, request.ItemType, request.Title, request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId, request.DisplayColor, request.ConfirmationCode, request.Notes, request.EstimatedCost, trip);
 
-    private ValidationResult ValidateCore(Guid tripLegId, string itemType, string title, DateTime startLocal, string startTimeZoneId, DateTime? endLocal, string? endTimeZoneId, string displayColor, string? confirmationCode, string? notes, decimal? estimatedCost, TripDetail trip)
+    private ValidationResult ValidateCore(Guid? tripLegId, string itemType, string title, DateTime startLocal, string startTimeZoneId, DateTime? endLocal, string? endTimeZoneId, string displayColor, string? confirmationCode, string? notes, decimal? estimatedCost, TripDetail trip)
     {
         if (string.IsNullOrWhiteSpace(itemType) || !TrackedItemTypes.All.Contains(itemType))
             return ValidationResult.Fail("Item type must be one of: event, reservation, activity, reminder.", "itemType");
@@ -47,8 +47,8 @@ public sealed class TrackedItemValidator
 
         if (endLocal is { } end && endTimeZone is not null)
         {
-            var startInstant = ToInstant(startLocal, startTimeZone);
-            var endInstant = ToInstant(end, endTimeZone);
+            var startInstant = TripInstant.ToInstant(startLocal, startTimeZone);
+            var endInstant = TripInstant.ToInstant(end, endTimeZone);
             if (endInstant < startInstant)
                 return ValidationResult.Fail("End must be on or after start.", "endLocal");
         }
@@ -68,11 +68,12 @@ public sealed class TrackedItemValidator
             if (decimal.Round(cost, 2) != cost)
                 return ValidationResult.Fail("Enter an estimated cost with up to two decimal places.", "estimatedCost");
         }
-        if (trip.Legs.Count == 0)
-            return ValidationResult.Fail("Add a trip leg before adding an item, then relate the item to that leg.", "tripLegId");
-        if (tripLegId == Guid.Empty)
-            return ValidationResult.Fail("Select the trip leg this item belongs to.", "tripLegId");
-        var leg = trip.Legs.FirstOrDefault(l => l.TripLegId == tripLegId);
+        // A leg is optional: an item the traveler cannot place yet lands in the timeline's
+        // unassigned area. But once a leg is chosen, the leg's travel window is binding.
+        if (tripLegId is not { } legId || legId == Guid.Empty)
+            return ValidationResult.Success;
+
+        var leg = trip.Legs.FirstOrDefault(l => l.TripLegId == legId);
         if (leg is null)
             return ValidationResult.Fail("The selected trip leg does not belong to this trip.", "tripLegId");
 
@@ -82,27 +83,20 @@ public sealed class TrackedItemValidator
         var legEndZone = _timezones.FindTimeZone(leg.EndTimeZoneId ?? string.Empty);
         if (legStartZone is not null && legEndZone is not null)
         {
-            var legStart = ToInstant(leg.StartLocal, legStartZone);
-            var legEnd = ToInstant(leg.EndLocal, legEndZone);
+            var legStart = TripInstant.ToInstant(leg.StartLocal, legStartZone);
+            var legEnd = TripInstant.ToInstant(leg.EndLocal, legEndZone);
 
-            var start = ToInstant(startLocal, startTimeZone);
+            var start = TripInstant.ToInstant(startLocal, startTimeZone);
             if (start < legStart || start > legEnd)
                 return ValidationResult.Fail("Start must fall within the selected trip leg's travel dates.", "startLocal");
 
             if (endLocal is { } itemEnd && endTimeZone is not null)
             {
-                var itemEndInstant = ToInstant(itemEnd, endTimeZone);
+                var itemEndInstant = TripInstant.ToInstant(itemEnd, endTimeZone);
                 if (itemEndInstant < legStart || itemEndInstant > legEnd)
                     return ValidationResult.Fail("End must fall within the selected trip leg's travel dates.", "endLocal");
             }
         }
         return ValidationResult.Success;
-    }
-
-    private static DateTimeOffset ToInstant(DateTime local, TimeZoneInfo timeZone)
-    {
-        var unspecifiedLocal = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
-        var offset = timeZone.GetUtcOffset(unspecifiedLocal);
-        return new DateTimeOffset(unspecifiedLocal, offset).ToUniversalTime();
     }
 }
