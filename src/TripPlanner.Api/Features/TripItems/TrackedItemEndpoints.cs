@@ -51,7 +51,18 @@ public static class TrackedItemEndpoints
             await audit.RecordAsync(callerId, AuditOperations.TrackedItemCreate, "tracked-item", tripId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
             return TypedResults.BadRequest(validation.Error!);
         }
-        var id = await items.CreateTrackedItemAsync(ownerId, tripId, request, clock.UtcNow, ct);
+        Guid? id;
+        try
+        {
+            id = await items.CreateTrackedItemAsync(ownerId, tripId, request, clock.UtcNow, ct);
+        }
+        catch (TripLegItemEligibilityException ex)
+        {
+            // The leg became a flight, train, bus, or boat between validation and the write.
+            await audit.RecordAsync(callerId, AuditOperations.TrackedItemCreate, "tracked-item", tripId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
+            return TypedResults.BadRequest(ApiError.ValidationFailed(ex.Message, "tripLegId"));
+        }
+
         if (id is null)
         {
             await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "tracked-item", tripId.ToString(), AuditResults.Denied, clock.UtcNow, ct);
@@ -89,7 +100,17 @@ public static class TrackedItemEndpoints
             await audit.RecordAsync(callerId, AuditOperations.TrackedItemUpdate, "tracked-item", trackedItemId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
             return TypedResults.BadRequest(validation.Error!);
         }
-        var affected = await items.UpdateTrackedItemAsync(ownerId, tripId, trackedItemId, request, ct);
+        int affected;
+        try
+        {
+            affected = await items.UpdateTrackedItemAsync(ownerId, tripId, trackedItemId, request, ct);
+        }
+        catch (TripLegItemEligibilityException ex)
+        {
+            await audit.RecordAsync(callerId, AuditOperations.TrackedItemUpdate, "tracked-item", trackedItemId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
+            return TypedResults.BadRequest(ApiError.ValidationFailed(ex.Message, "tripLegId"));
+        }
+
         if (affected == 0)
         {
             await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "tracked-item", trackedItemId.ToString(), AuditResults.Denied, clock.UtcNow, ct);

@@ -12,11 +12,11 @@ namespace TripPlanner.Web.Tests.TripItems;
 /// </summary>
 internal static class TrackedItemFormTestData
 {
-    public static TripLegDto Leg(DateTime start, DateTime end)
+    public static TripLegDto Leg(DateTime start, DateTime end, string? legKind = null, string? transportationMode = null, string title = "Main leg")
         => new(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            "Main leg",
+            title,
             null,
             null,
             start,
@@ -26,7 +26,9 @@ internal static class TrackedItemFormTestData
             "UTC",
             "UTC",
             null,
-            0);
+            0,
+            legKind,
+            transportationMode);
 
     public static TrackedItemDto Item(Guid? tripLegId, DateTime start, DateTime end, string itemType = "activity", string? location = null)
         => new(

@@ -1,3 +1,5 @@
+using TripPlanner.Contracts.TripItems;
+
 namespace TripPlanner.Contracts.Timeline;
 
 public sealed record TripTimelineResponse(
@@ -21,7 +23,17 @@ public sealed record TimelineLeg(
     string? EndTimeZoneLabel,
     int SortOrder,
     IReadOnlyList<TimelineItem> Items,
-    decimal EstimatedCostTotal = 0m);
+    decimal EstimatedCostTotal = 0m,
+    string? LegKind = null,
+    string? TransportationMode = null,
+    decimal? TravelCost = null,
+    string? ConfirmationCode = null)
+{
+    /// <summary>Derived from kind and mode; drives whether the timeline offers item entry on this row.</summary>
+    public bool CanContainItems => TripLegEligibility.CanContainItems(LegKind, TransportationMode);
+
+    public string ModeLabel => TransportationModes.Label(TransportationMode);
+}
 
 public sealed record TimelineItem(
     Guid TrackedItemId,

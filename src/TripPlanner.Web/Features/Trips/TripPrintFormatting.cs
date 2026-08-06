@@ -1,5 +1,6 @@
 using System.Globalization;
 using TripPlanner.Contracts.Common;
+using TripPlanner.Contracts.TripItems;
 using TripPlanner.Contracts.Trips;
 
 namespace TripPlanner.Web.Features.Trips;
@@ -136,7 +137,11 @@ public static class TripPrintFormatting
                 FormatDateTimeWithZone(leg.EndLocal, leg.EndTimeZoneId),
                 byLeg.TryGetValue(leg.TripLegId, out var legItems)
                     ? legItems.Select(ToPrintableItem).ToList()
-                    : Array.Empty<PrintableItem>()))
+                    : Array.Empty<PrintableItem>(),
+                // Only a travel leg has a mode or booking details; a stay prints without them.
+                TransportationModes.Label(leg.TransportationMode) is { Length: > 0 } mode ? mode : null,
+                string.IsNullOrWhiteSpace(leg.ConfirmationCode) ? null : leg.ConfirmationCode,
+                leg.TravelCost is { } travelCost ? travelCost.ToString("C", CultureInfo.CurrentCulture) : null))
             .ToList();
 
         var description = string.IsNullOrWhiteSpace(trip.Description) ? null : trip.Description;
@@ -192,7 +197,10 @@ public sealed record PrintableLeg(
     string? RouteText,
     string StartText,
     string EndText,
-    IReadOnlyList<PrintableItem> Items);
+    IReadOnlyList<PrintableItem> Items,
+    string? ModeText = null,
+    string? ConfirmationCode = null,
+    string? TravelCostText = null);
 
 /// <summary>An item row; one property per printed column.</summary>
 public sealed record PrintableItem(

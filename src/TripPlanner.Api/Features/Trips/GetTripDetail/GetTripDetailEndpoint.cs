@@ -53,11 +53,13 @@ public static class GetTripDetailEndpoint
         var legs = await itemReads.GetLegsAsync(ownerId, tripId, cancellationToken);
         var items = await itemReads.GetTrackedItemsAsync(ownerId, tripId, cancellationToken);
         var sharedPeople = await sharing.GetSharesAsync(tripId, cancellationToken);
-        // Trip estimated total = sum of leg-assigned item estimated costs (matches the sum of the
-        // per-leg estimated totals shown on the timeline). Items with no estimate are excluded.
+        // Trip estimated total = leg-assigned item estimated costs plus each Travel leg's own cost.
+        // A leg's travel cost is stored on the leg rather than as an item, so it is added here once
+        // and cannot overlap with the per-leg item subtotals shown on the timeline.
         var estimatedCostTotal = items
             .Where(i => i.TripLegId is not null && i.EstimatedCost is not null)
-            .Sum(i => i.EstimatedCost!.Value);
+            .Sum(i => i.EstimatedCost!.Value)
+            + legs.Where(l => l.TravelCost is not null).Sum(l => l.TravelCost!.Value);
         var withChildren = detail with
         {
             Legs = legs,

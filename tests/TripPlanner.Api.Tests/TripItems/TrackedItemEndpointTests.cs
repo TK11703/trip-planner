@@ -206,4 +206,87 @@ public class TrackedItemEndpointTests
             new DateTime(2026, 7, 11, 5, 0, 0), "America/Chicago", null, null, "teal", null, null), TripWithLeg(tripId, legId));
         Assert.True(r.IsValid);
     }
+
+    // --- Feature 025: items belong only where the traveler controls the stop ---
+
+    [Theory]
+    [InlineData(TransportationModes.Flight)]
+    [InlineData(TransportationModes.Train)]
+    [InlineData(TransportationModes.Bus)]
+    [InlineData(TransportationModes.Boat)]
+    public void Validator_RejectsItemOnRestrictedTravelLeg(string mode)
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var trip = TripLegModeTestData.TripWith(tripId, TripLegModeTestData.TravelLeg(tripId, legId, mode));
+        var r = NewValidator().Validate(new CreateTrackedItemRequest(legId, "activity", "Tour", null,
+            Start, "UTC", null, null, "teal", null, null), trip);
+        Assert.False(r.IsValid);
+        Assert.Equal("tripLegId", r.Error!.Details!["field"]);
+    }
+
+    [Fact]
+    public void Validator_AcceptsItemOnCarLeg()
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var trip = TripLegModeTestData.TripWith(tripId, TripLegModeTestData.TravelLeg(tripId, legId, TransportationModes.Car));
+        var r = NewValidator().Validate(new CreateTrackedItemRequest(legId, "activity", "Tour", null,
+            Start, "UTC", null, null, "teal", null, null), trip);
+        Assert.True(r.IsValid);
+    }
+
+    [Fact]
+    public void Validator_AcceptsItemOnStayLeg()
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var trip = TripLegModeTestData.TripWith(tripId, TripLegModeTestData.StayLeg(tripId, legId));
+        var r = NewValidator().Validate(new CreateTrackedItemRequest(legId, "activity", "Tour", null,
+            Start, "UTC", null, null, "teal", null, null), trip);
+        Assert.True(r.IsValid);
+    }
+
+    /// <summary>Eligibility is checked before the leg's timeframe, so the traveler is told the real
+    /// problem instead of being sent to fix times on a leg that can never hold the item.</summary>
+    [Fact]
+    public void Validator_ReportsEligibility_BeforeTimeframe()
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var trip = TripLegModeTestData.TripWith(tripId, TripLegModeTestData.TravelLeg(tripId, legId, TransportationModes.Flight));
+        var r = NewValidator().Validate(new CreateTrackedItemRequest(legId, "activity", "Tour", null,
+            new DateTime(2026, 7, 17, 9, 0, 0), "UTC", null, null, "teal", null, null), trip);
+        Assert.False(r.IsValid);
+        Assert.Equal("tripLegId", r.Error!.Details!["field"]);
+    }
+
+    /// <summary>A trip whose only legs are restricted still accepts an unassigned item.</summary>
+    [Fact]
+    public void Validator_AcceptsUnassignedItem_WhenEveryLegIsRestricted()
+    {
+        var tripId = Guid.NewGuid();
+        var trip = TripLegModeTestData.TripWith(tripId,
+            TripLegModeTestData.TravelLeg(tripId, Guid.NewGuid(), TransportationModes.Flight),
+            TripLegModeTestData.TravelLeg(tripId, Guid.NewGuid(), TransportationModes.Boat));
+        var r = NewValidator().Validate(new CreateTrackedItemRequest(null, "activity", "Tour", null,
+            Start, "UTC", null, null, "teal", null, null), trip);
+        Assert.True(r.IsValid);
+    }
+
+    [Theory]
+    [InlineData(TransportationModes.Flight)]
+    [InlineData(TransportationModes.Train)]
+    [InlineData(TransportationModes.Bus)]
+    [InlineData(TransportationModes.Boat)]
+    public void Validator_RejectsUpdateMovingItemToRestrictedLeg(string mode)
+    {
+        var tripId = Guid.NewGuid();
+        var legId = Guid.NewGuid();
+        var trip = TripLegModeTestData.TripWith(tripId, TripLegModeTestData.TravelLeg(tripId, legId, mode));
+        var r = NewValidator().Validate(new UpdateTrackedItemRequest(legId, "activity", "Tour", null,
+            Start, "UTC", null, null, "teal", null, null), trip);
+        Assert.False(r.IsValid);
+        Assert.Equal("tripLegId", r.Error!.Details!["field"]);
+    }
 }

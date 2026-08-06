@@ -5,47 +5,59 @@
 <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName">
     <DataAnnotationsValidator />
     <div class="mb-2">
-        <label class="form-label" for="leg-title">Title</label>
+        <label class="form-label" for="leg-title">Name</label>
         <InputText id="leg-title" class="form-control" @bind-Value="_model.Title" />
         <ValidationMessage For="@(() => _model.Title)" />
     </div>
-    <fieldset class="mb-2">
-        <legend class="form-label fs-6 mb-1">Leg type</legend>
-        <InputRadioGroup @bind-Value="_model.Kind">
-            <div class="form-check form-check-inline">
-                <InputRadio class="form-check-input" id="leg-kind-travel" Value="LegKind.Travel" />
-                <label class="form-check-label" for="leg-kind-travel">Travel</label>
-            </div>
-            <div class="form-check form-check-inline">
-                <InputRadio class="form-check-input" id="leg-kind-stay" Value="LegKind.Stay" />
-                <label class="form-check-label" for="leg-kind-stay">Stay</label>
-            </div>
-        </InputRadioGroup>
-    </fieldset>
-    <div class="alert alert-info py-2 small mb-3" role="note">
+    <div class="row g-2 mb-2">
+        <div class="@(_model.Kind == LegKind.Travel ? "col-6" : "col-12")">
+            <fieldset>
+                <legend class="form-label fs-6 mb-1">Leg type</legend>
+                <InputRadioGroup @bind-Value="_model.Kind">
+                    <div class="form-check form-check-inline">
+                        <InputRadio class="form-check-input" id="leg-kind-travel" Value="LegKind.Travel" />
+                        <label class="form-check-label" for="leg-kind-travel">Travel</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <InputRadio class="form-check-input" id="leg-kind-stay" Value="LegKind.Stay" />
+                        <label class="form-check-label" for="leg-kind-stay">Stay</label>
+                    </div>
+                </InputRadioGroup>
+            </fieldset>
+        </div>
         @if (_model.Kind == LegKind.Travel)
         {
-            <text>A travel leg is a single segment from one place to another. Fill in where you're leaving and arriving, along with the start/end dates, times, and time zones.</text>
-            <div class="mt-1 fst-italic">Example: Leaving <span class="badge text-bg-secondary">ORIGIN</span> Washington DC on <span class="badge text-bg-secondary">START</span> 8/1/2026 at 8:35 AM EST and arriving in <span class="badge text-bg-secondary">DESTINATION</span> Honolulu on <span class="badge text-bg-secondary">END</span> 8/1/2026 at 2:55 PM HST.</div>
-        }
-        else
-        {
-            <text>A stay leg is time spent at a single location. Fill in where you're staying, along with the start/end dates, times, and time zones.</text>
-            <div class="mt-1 fst-italic">Example: Staying in <span class="badge text-bg-secondary">DESTINATION</span> Honolulu from <span class="badge text-bg-secondary">START</span> 8/1/2026 at 3:00 PM HST until <span class="badge text-bg-secondary">END</span> 8/5/2026 at 10:00 AM HST.</div>
+            <div class="col-6">
+                <label class="form-label" for="leg-transportation-mode">Travel Mode</label>
+                <InputSelect id="leg-transportation-mode" class="form-select" @bind-Value="_model.TransportationMode">
+                    <option value="">Select how you're traveling</option>
+                    @foreach (var mode in TransportationModes.All)
+                    {
+                        <option value="@mode">@TransportationModes.Label(mode)</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="@(() => _model.TransportationMode)" />
+            </div>
         }
     </div>
     <div class="row g-2 mb-2">
         @if (_model.Kind == LegKind.Travel)
         {
             <div class="col-6">
-                <label class="form-label" for="leg-origin">Origin</label>
-                <InputText id="leg-origin" class="form-control" @bind-Value="_model.Origin" />
+                <label class="form-label" for="leg-origin">
+                    Origin
+                    <span class="text-secondary" role="note" data-testid="leg-origin-help" title="@OriginHelp">&#9432;</span>
+                </label>
+                <InputText id="leg-origin" class="form-control" placeholder="@PlacePlaceholder" @bind-Value="_model.Origin" />
                 <ValidationMessage For="@(() => _model.Origin)" />
             </div>
         }
         <div class="@(_model.Kind == LegKind.Travel ? "col-6" : "col-12")">
-            <label class="form-label" for="leg-destination">Destination</label>
-            <InputText id="leg-destination" class="form-control" @bind-Value="_model.Destination" />
+            <label class="form-label" for="leg-destination">
+                Destination
+                <span class="text-secondary" role="note" data-testid="leg-destination-help" title="@DestinationHelp">&#9432;</span>
+            </label>
+            <InputText id="leg-destination" class="form-control" placeholder="@DestinationPlaceholder" @bind-Value="_model.Destination" />
             <ValidationMessage For="@(() => _model.Destination)" />
         </div>
     </div>
@@ -83,10 +95,31 @@
             <ValidationMessage For="@(() => _model.EndTimeZoneId)" />
         </div>
     </div>
+    @if (_model.Kind == LegKind.Travel)
+    {
+        <div class="row g-2 mb-2">
+            <div class="col-6">
+                <label class="form-label" for="leg-travel-cost">Cost <span class="text-body-secondary fw-normal">(optional)</span></label>
+                <InputNumber id="leg-travel-cost" class="form-control" step="0.01" @bind-Value="_model.TravelCost" />
+                <ValidationMessage For="@(() => _model.TravelCost)" />
+            </div>
+            <div class="col-6">
+                <label class="form-label" for="leg-confirmation-code">Confirmation/Reservation Code <span class="text-body-secondary fw-normal">(optional)</span></label>
+                <InputText id="leg-confirmation-code" class="form-control" @bind-Value="_model.ConfirmationCode" />
+                <ValidationMessage For="@(() => _model.ConfirmationCode)" />
+            </div>
+        </div>
+    }
     <div class="mb-2">
         <label class="form-label">Notes</label>
         <InputTextArea class="form-control" rows="2" @bind-Value="_model.Notes" />
     </div>
+    @if (_model.Kind == LegKind.Travel && !_model.CanContainItems)
+    {
+        <div class="alert alert-warning py-2 small mb-2" role="note" data-testid="leg-item-restriction">
+            You're a passenger on this leg, so you can't schedule stops along the way. Items belong on a stay or a car leg.
+        </div>
+    }
     @if (!string.IsNullOrWhiteSpace(_error))
     {
         <div class="alert alert-danger py-2 small">@_error</div>
@@ -97,20 +130,62 @@
 @code {
     public enum LegKind { Travel, Stay }
 
+    private string OriginHelp => $"Where this leg starts. {PlaceHint}";
+
+    private string DestinationHelp => _model.Kind == LegKind.Travel
+        ? $"Where this leg ends. {PlaceHint}"
+        : "Where you're staying — a city, state, country, or unique name. Save street addresses for the activities, events, and reservations you add to this leg.";
+
+    private string PlaceHint => _model.TransportationMode switch
+    {
+        TransportationModes.Flight => "Use an airport name or code, like Washington Dulles or IAD.",
+        TransportationModes.Train => "Use a station name, city, or address, like Union Station.",
+        TransportationModes.Bus => "Use a station or stop name, city, or address, like Greyhound Terminal.",
+        TransportationModes.Boat => "Use a port or terminal name, city, or address, like Port of Miami.",
+        TransportationModes.Car => "Use an address, city, or place name.",
+        _ => "Use a place name, city, or address."
+    };
+
+    private string DestinationPlaceholder => _model.Kind == LegKind.Travel
+        ? PlacePlaceholder
+        : "City, state, country, or unique name";
+
+    private string PlacePlaceholder => _model.TransportationMode switch
+    {
+        TransportationModes.Flight => "Airport name or code, like IAD",
+        TransportationModes.Train => "Station name, city, or address",
+        TransportationModes.Bus => "Station or stop name, city, or address",
+        TransportationModes.Boat => "Port or terminal name, city, or address",
+        TransportationModes.Car => "Address, city, or place name",
+        _ => "Place name, city, or address"
+    };
+
     private sealed class LegModel : IValidatableObject
     {
-        [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Name is required.")] public string Title { get; set; } = string.Empty;
         public LegKind Kind { get; set; } = LegKind.Travel;
+        public string? TransportationMode { get; set; }
         public string? Origin { get; set; }
         public string? Destination { get; set; }
         public DateTime StartAt { get; set; } = DateTime.Now;
         public DateTime EndAt { get; set; } = DateTime.Now.AddHours(1);
         [Required(ErrorMessage = "Start timezone is required.")] public string StartTimeZoneId { get; set; } = "UTC";
         [Required(ErrorMessage = "End timezone is required.")] public string EndTimeZoneId { get; set; } = "UTC";
+        public decimal? TravelCost { get; set; }
+        public string? ConfirmationCode { get; set; }
         public string? Notes { get; set; }
+
+        public string LegKindValue => Kind == LegKind.Stay ? TripLegKinds.Stay : TripLegKinds.Travel;
+
+        public bool CanContainItems => TripLegEligibility.CanContainItems(LegKindValue, TransportationMode);
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            if (Kind == LegKind.Travel && !TransportationModes.IsValid(TransportationMode))
+            {
+                yield return new ValidationResult("Choose how you are traveling.", new[] { nameof(TransportationMode) });
+            }
+
             if (Kind == LegKind.Travel && string.IsNullOrWhiteSpace(Origin))
             {
                 yield return new ValidationResult("Origin is required for a travel leg.", new[] { nameof(Origin) });
@@ -121,6 +196,25 @@
                 yield return new ValidationResult(
                     Kind == LegKind.Travel ? "Destination is required for a travel leg." : "Destination is required for a stay.",
                     new[] { nameof(Destination) });
+            }
+
+            // Booking details are optional on every travel mode, so they are only checked once the
+            // traveler has actually entered something.
+            if (TravelCost is { } cost && Kind == LegKind.Travel)
+            {
+                if (cost < 0)
+                {
+                    yield return new ValidationResult("Cost cannot be negative.", new[] { nameof(TravelCost) });
+                }
+                else if (decimal.Round(cost, 2) != cost)
+                {
+                    yield return new ValidationResult("Enter a cost with up to two decimal places.", new[] { nameof(TravelCost) });
+                }
+            }
+
+            if (Kind == LegKind.Travel && ConfirmationCode is { Length: > 255 })
+            {
+                yield return new ValidationResult("Confirmation/Reservation Code must be 255 characters or fewer.", new[] { nameof(ConfirmationCode) });
             }
         }
     }
@@ -159,13 +253,20 @@
         _model = new LegModel
         {
             Title = Leg.Title,
-            Kind = string.IsNullOrWhiteSpace(Leg.Origin) ? LegKind.Stay : LegKind.Travel,
+            // Fall back to the old origin-based reading so a leg saved before classifications
+            // existed still opens as the kind the traveler sees on the timeline.
+            Kind = (TripLegKinds.IsValid(Leg.LegKind) ? TripLegKinds.IsTravel(Leg.LegKind) : !string.IsNullOrWhiteSpace(Leg.Origin))
+                ? LegKind.Travel
+                : LegKind.Stay,
+            TransportationMode = TransportationModes.Normalize(Leg.TransportationMode),
             Origin = Leg.Origin,
             Destination = Leg.Destination,
             StartAt = Leg.StartLocal,
             EndAt = Leg.EndLocal,
             StartTimeZoneId = Leg.StartTimeZoneId,
             EndTimeZoneId = Leg.EndTimeZoneId,
+            TravelCost = Leg.TravelCost,
+            ConfirmationCode = Leg.ConfirmationCode,
             Notes = Leg.Notes
         };
         _loadedLegId = Leg.TripLegId;
@@ -193,21 +294,29 @@
         _error = null; _submitting = true;
         try
         {
+            var isStay = _model.Kind == LegKind.Stay;
             var request = new CreateTripLegRequest(
                 _model.Title.Trim(),
-                _model.Kind == LegKind.Stay ? null : _model.Origin,
+                isStay ? null : _model.Origin,
                 _model.Destination,
                 _model.StartAt,
                 _model.StartTimeZoneId,
                 _model.EndAt,
                 _model.EndTimeZoneId,
-                _model.Notes);
+                _model.Notes,
+                // A stay carries no travel-only data, so those values are dropped on the way out
+                // rather than kept as hidden state the traveler cannot see.
+                _model.LegKindValue,
+                isStay ? null : TransportationModes.Normalize(_model.TransportationMode),
+                isStay ? null : _model.TravelCost,
+                isStay ? null : _model.ConfirmationCode);
             if (Leg is null)
             {
                 await TripApi.CreateLegAsync(TripId, request);
                 _model = new LegModel
                 {
                     Kind = _model.Kind,
+                    TransportationMode = _model.TransportationMode,
                     StartTimeZoneId = request.EndTimeZoneId,
                     EndTimeZoneId = request.EndTimeZoneId
                 };
@@ -223,7 +332,11 @@
                     request.StartTimeZoneId,
                     request.EndLocal,
                     request.EndTimeZoneId,
-                    request.Notes));
+                    request.Notes,
+                    request.LegKind,
+                    request.TransportationMode,
+                    request.TravelCost,
+                    request.ConfirmationCode));
             }
             await OnSaved.InvokeAsync();
         }

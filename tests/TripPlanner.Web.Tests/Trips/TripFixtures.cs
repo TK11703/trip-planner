@@ -24,9 +24,31 @@ internal static class TripFixtures
     public static TripDetail Empty() =>
         Trip("Empty trip", null, Array.Empty<TripLegDto>(), Array.Empty<TrackedItemDto>());
 
-    private static TripLegDto Leg(string title, DateTime start, int sortOrder, string? origin = null, string? destination = null) =>
+    /// <summary>A trip whose single leg is classified travel, optionally with booking details.</summary>
+    public static TripDetail WithTravelLeg(string mode, decimal? travelCost = null, string? confirmationCode = null)
+    {
+        var leg = Leg("Getting there", new DateTime(2026, 7, 14, 8, 0, 0), sortOrder: 0,
+            origin: "Seattle", destination: "Tokyo",
+            legKind: TripLegKinds.Travel, transportationMode: mode,
+            travelCost: travelCost, confirmationCode: confirmationCode);
+
+        return Trip("Japan 2026", null, new[] { leg }, Array.Empty<TrackedItemDto>());
+    }
+
+    /// <summary>A trip whose single leg is a stay, so it carries no travel-only details.</summary>
+    public static TripDetail WithStayLeg()
+    {
+        var leg = Leg("Hotel Kabuki", new DateTime(2026, 7, 14, 15, 0, 0), sortOrder: 0,
+            destination: "Tokyo", legKind: TripLegKinds.Stay);
+
+        return Trip("Japan 2026", null, new[] { leg }, Array.Empty<TrackedItemDto>());
+    }
+
+    private static TripLegDto Leg(string title, DateTime start, int sortOrder, string? origin = null, string? destination = null,
+        string? legKind = null, string? transportationMode = null, decimal? travelCost = null, string? confirmationCode = null) =>
         new(Guid.NewGuid(), Guid.NewGuid(), title, origin, destination, start, "America/New_York", "America/New_York",
-            start.AddHours(3), "America/New_York", "America/New_York", null, sortOrder);
+            start.AddHours(3), "America/New_York", "America/New_York", null, sortOrder,
+            legKind, transportationMode, travelCost, confirmationCode);
 
     private static TrackedItemDto Item(Guid? legId, string title, DateTime start, int sortOrder,
         string? location = null, decimal? cost = null, string? confirmation = null, string? notes = null, DateTime? end = null) =>

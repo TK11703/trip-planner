@@ -1,3 +1,5 @@
+using TripPlanner.Contracts.TripItems;
+
 namespace TripPlanner.Contracts.Trips;
 
 public sealed record UserAccount(string UserId, string? DisplayName, string? Email, DateTimeOffset CreatedAtUtc, DateTimeOffset LastSeenAtUtc);
@@ -82,7 +84,16 @@ public sealed record TripLegDto(
     string EndTimeZoneId,
     string? EndTimeZoneLabel,
     string? Notes,
-    int SortOrder);
+    int SortOrder,
+    string? LegKind = null,
+    string? TransportationMode = null,
+    decimal? TravelCost = null,
+    string? ConfirmationCode = null)
+{
+    /// <summary>Derived from kind and mode rather than stored, so it can never disagree with them.
+    /// Presentation only: every write is still validated by the API and the database.</summary>
+    public bool CanContainItems => TripLegEligibility.CanContainItems(LegKind, TransportationMode);
+}
 
 public sealed record TrackedItemDto(
     Guid TrackedItemId,

@@ -252,10 +252,12 @@ public class InboxReviewPageTests : TestContext
         new(tripId, name, null, new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 20),
             DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, legs, Array.Empty<TrackedItemDto>());
 
-    private static TripLegDto Leg(Guid tripId, string title, int startDay, int endDay, int sortOrder = 0) =>
+    private static TripLegDto Leg(Guid tripId, string title, int startDay, int endDay, int sortOrder = 0,
+        string? legKind = null, string? transportationMode = null) =>
         new(Guid.NewGuid(), tripId, title, null, null,
             new DateTime(2026, 8, startDay, 0, 0, 0), "UTC", null,
-            new DateTime(2026, 8, endDay, 23, 59, 0), "UTC", null, null, sortOrder);
+            new DateTime(2026, 8, endDay, 23, 59, 0), "UTC", null, null, sortOrder,
+            legKind, transportationMode);
 
     private (IRenderedComponent<InboxDrafts> Cut, StubEmailIngestionApiClient Ingestion, StubTripApiClient Trips)
         RenderQueueWithEditableTrips(ParsedItemDraftDto draft, params (TripSummary Summary, TripDetail Detail)[] trips)
@@ -398,6 +400,75 @@ public class InboxReviewPageTests : TestContext
         });
         // The draft is still in the queue, because nothing was written.
         Assert.Contains("Flight ABC123", cut.Markup, StringComparison.Ordinal);
+    }
+
+    // ---- Feature 025: the draft's leg picker only offers legs that can hold an item --------
+
+    [Theory]
+    [InlineData(TransportationModes.Flight)]
+    [InlineData(TransportationModes.Train)]
+    [InlineData(TransportationModes.Bus)]
+    [InlineData(TransportationModes.Boat)]
+    public void RestrictedLegsAreAbsentFromTheDraftLegPicker(string mode)
+    {
+        var tripId = Guid.NewGuid();
+        var stay = Leg(tripId, "San Francisco", 11, 14, legKind: TripLegKinds.Stay);
+        var restricted = Leg(tripId, "Getting there", 11, 14, sortOrder: 1, legKind: TripLegKinds.Travel, transportationMode: mode);
+        var draft = Draft(tripId, start: new DateTime(2026, 8, 12, 9, 30, 0));
+
+        var (cut, _, _) = RenderQueueWithEditableTrips(draft,
+            (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", stay, restricted)));
+
+        OpenEditModal(cut);
+
+        var legSelect = cut.Find("#draft-leg");
+        Assert.Contains("San Francisco", legSelect.InnerHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Getting there", legSelect.InnerHtml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CarLegsRemainAvailableInTheDraftLegPicker()
+    {
+        var tripId = Guid.NewGuid();
+        var car = Leg(tripId, "Road trip", 11, 14, legKind: TripLegKinds.Travel, transportationMode: TransportationModes.Car);
+        var draft = Draft(tripId, start: new DateTime(2026, 8, 12, 9, 30, 0));
+
+        var (cut, _, _) = RenderQueueWithEditableTrips(draft,
+            (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", car)));
+
+        OpenEditModal(cut);
+
+        Assert.Contains("Road trip", cut.Find("#draft-leg").InnerHtml, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A trip made only of flights offers no leg at all, and the draft can still be saved
+    /// unassigned rather than being stuck in the queue.
+    /// </summary>
+    [Fact]
+    public void ATripOfOnlyRestrictedLegsLeavesTheDraftUnassigned()
+    {
+        var tripId = Guid.NewGuid();
+        var outbound = Leg(tripId, "Outbound flight", 11, 12, legKind: TripLegKinds.Travel, transportationMode: TransportationModes.Flight);
+        var inbound = Leg(tripId, "Return flight", 13, 14, sortOrder: 1, legKind: TripLegKinds.Travel, transportationMode: TransportationModes.Flight);
+        var draft = Draft(tripId, start: new DateTime(2026, 8, 12, 9, 30, 0));
+
+        var (cut, ingestion, _) = RenderQueueWithEditableTrips(draft,
+            (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", outbound, inbound)));
+
+        OpenEditModal(cut);
+
+        var legValues = cut.FindAll("#draft-leg option").Select(o => o.GetAttribute("value") ?? string.Empty).ToArray();
+        Assert.Equal(new[] { string.Empty }, legValues);
+
+        cut.Find("form").Submit();
+
+        cut.WaitForAssertion(() =>
+        {
+            var (_, request) = Assert.Single(ingestion.Updated);
+            Assert.Equal(tripId, request.TripId);
+            Assert.Null(request.TripLegId);
+        });
     }
 
     [Fact]

@@ -37,4 +37,8 @@ SELECT
     l.end_at      AS "LegEnd"
 FROM editable e
 LEFT JOIN trip_legs l ON l.trip_id = e.trip_id AND l.owner_user_id = e.owner_user_id
+    -- Feature 025: a flight, train, bus, or boat leg can never hold an item, so it must never be
+    -- suggested as one. The join stays LEFT so a trip whose only legs are restricted still comes
+    -- back with a null leg and keeps its no-cover explanation.
+    AND (l.leg_kind IS DISTINCT FROM 'travel' OR l.transportation_mode = 'car')
 ORDER BY l.start_at, l.sort_order, l.trip_leg_id;

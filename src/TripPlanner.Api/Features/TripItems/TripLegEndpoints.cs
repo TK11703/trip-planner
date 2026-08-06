@@ -16,6 +16,9 @@ namespace TripPlanner.Api.Features.TripItems;
 
 public static class TripLegEndpoints
 {
+    private const string PopulatedLegMessage =
+        "This trip leg still has items, so it cannot become a flight, train, bus, or boat leg. Move or unassign those items first.";
+
     public static RouteGroupBuilder MapTripLegs(this RouteGroupBuilder group)
     {
         group.MapGet("/defaults", GetDefaultsAsync).WithName("GetTripLegDefaults");
@@ -115,7 +118,28 @@ public static class TripLegEndpoints
             await audit.RecordAsync(callerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
             return TypedResults.BadRequest(validation.Error!);
         }
-        var affected = await items.UpdateLegAsync(ownerId, tripId, tripLegId, request, ct);
+
+        // Turning a leg into a flight, train, bus, or boat would strand anything already scheduled
+        // on it, so the change is refused outright rather than silently dropping the items. The
+        // count is the friendly path; the database trigger below is what catches a concurrent add.
+        if (!TripLegShape.Resolve(request).CanContainItems
+            && await items.CountItemsForLegAsync(ownerId, tripId, tripLegId, ct) > 0)
+        {
+            await audit.RecordAsync(callerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
+            return TypedResults.BadRequest(ApiError.ValidationFailed(PopulatedLegMessage, "tripLegId"));
+        }
+
+        int affected;
+        try
+        {
+            affected = await items.UpdateLegAsync(ownerId, tripId, tripLegId, request, ct);
+        }
+        catch (TripLegItemEligibilityException)
+        {
+            await audit.RecordAsync(callerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.ValidationFailed, clock.UtcNow, ct);
+            return TypedResults.BadRequest(ApiError.ValidationFailed(PopulatedLegMessage, "tripLegId"));
+        }
+
         if (affected == 0)
         {
             await audit.RecordAsync(callerId, AuditOperations.AccessDenied, "trip-leg", tripLegId.ToString(), AuditResults.Denied, clock.UtcNow, ct);

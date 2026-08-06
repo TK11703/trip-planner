@@ -255,7 +255,10 @@
             var detail = await TripApi.GetDetailAsync(tripId);
             if (detail is not null)
             {
-                _legs = detail.Legs.OrderBy(l => l.SortOrder).ToList();
+                // Flights, trains, buses, and boats can never hold an item, so they are not offered
+                // here. A trip with no eligible leg simply shows an empty list and the draft can
+                // still be confirmed unassigned.
+                _legs = detail.Legs.Where(l => l.CanContainItems).OrderBy(l => l.SortOrder).ToList();
             }
 
             // The saved leg only survives if it actually belongs to the trip now selected.

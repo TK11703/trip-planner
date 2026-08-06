@@ -75,29 +75,47 @@ else
                     var legRowHeight = Rem(LaneMinHeightRem(legLaneCount));
                     <div class="ttl-leg-label" style="min-height:@(legRowHeight)rem" @onclick="() => SelectLegAsync(leg.TripLegId)" role="button" tabindex="0">
                         <div class="fw-semibold">@leg.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(leg.ModeLabel))
+                        {
+                            <div class="small text-secondary" data-testid="leg-mode">@leg.ModeLabel</div>
+                        }
                         @if (!string.IsNullOrWhiteSpace(leg.Origin) || !string.IsNullOrWhiteSpace(leg.Destination))
                         {
                             <div class="small text-secondary">@leg.Origin @(string.IsNullOrWhiteSpace(leg.Origin) || string.IsNullOrWhiteSpace(leg.Destination) ? null : "→") @leg.Destination</div>
                         }
-                        <div class="ttl-leg-meta">
-                            <span class="ttl-leg-count @(leg.Items.Count == 0 ? "ttl-leg-count-empty" : null)">@ItemCountLabel(leg.Items.Count)</span>
-                            @if (CanEdit)
+                        @if (!string.IsNullOrWhiteSpace(leg.ConfirmationCode))
+                        {
+                            <div class="small text-secondary" data-testid="leg-confirmation">Confirmation @leg.ConfirmationCode</div>
+                        }
+                        @if (leg.CanContainItems)
+                        {
+                            <div class="ttl-leg-meta">
+                                <span class="ttl-leg-count @(leg.Items.Count == 0 ? "ttl-leg-count-empty" : null)">@ItemCountLabel(leg.Items.Count)</span>
+                                @if (CanEdit)
+                                {
+                                    <button type="button"
+                                            class="ttl-leg-add"
+                                            title="Add an item to @leg.Title"
+                                            aria-label="Add an item to @leg.Title"
+                                            @onclick="() => AddItemToLegAsync(leg)"
+                                            @onclick:stopPropagation="true">
+                                        <span aria-hidden="true">+</span> Add item
+                                    </button>
+                                }
+                            </div>
+                        }
+                        <div class="ttl-leg-estimate small text-secondary">
+                            @if (leg.CanContainItems)
                             {
-                                <button type="button"
-                                        class="ttl-leg-add"
-                                        title="Add an item to @leg.Title"
-                                        aria-label="Add an item to @leg.Title"
-                                        @onclick="() => AddItemToLegAsync(leg)"
-                                        @onclick:stopPropagation="true">
-                                    <span aria-hidden="true">+</span> Add item
-                                </button>
+                                <span>Estimated total: @leg.EstimatedCostTotal.ToString("C")</span>
+                            }
+                            @if (leg.TravelCost is { } travelCost)
+                            {
+                                <span data-testid="leg-travel-cost">Travel cost: @travelCost.ToString("C")</span>
                             }
                         </div>
-                        <div class="ttl-leg-estimate small text-secondary">
-                            <span>Estimated total: @leg.EstimatedCostTotal.ToString("C")</span>
-                        </div>
                     </div>
-                    <div class="ttl-lane @(CanEdit ? "ttl-lane-clickable" : null)" style="width:@(TrackWidthPx)px; min-height:@(legRowHeight)rem" @onclick="args => OnLaneClickAsync(leg, args)">
+                    <div class="ttl-lane @(CanEdit && leg.CanContainItems ? "ttl-lane-clickable" : null)" style="width:@(TrackWidthPx)px; min-height:@(legRowHeight)rem" @onclick="args => OnLaneClickAsync(leg, args)">
                         @laneGrid
                         @{
                             var band = ComputeSpan(leg.StartLocal, leg.EndLocal);
@@ -445,7 +463,9 @@ else
 
     private async Task OnLaneClickAsync(TimelineLeg leg, MouseEventArgs args)
     {
-        if (!CanEdit) return;
+        // Clicking a restricted leg's lane must not open the item editor: there is nowhere valid
+        // for that item to go.
+        if (!CanEdit || !leg.CanContainItems) return;
         var totalSlots = _days * SlotsPerDay;
         var slotIndex = Math.Clamp((int)Math.Floor(args.OffsetX / SlotWidthPx), 0, totalSlots - 1);
         var startLocal = _start.ToDateTime(TimeOnly.MinValue).AddMinutes(slotIndex * SlotMinutes);

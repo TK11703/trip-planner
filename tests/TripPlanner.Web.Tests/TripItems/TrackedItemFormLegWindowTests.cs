@@ -1,5 +1,7 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using TripPlanner.Contracts.TripItems;
+using TripPlanner.Contracts.Trips;
 using TripPlanner.Web.Components.TripItems;
 using TripPlanner.Web.Features.Timezones;
 using TripPlanner.Web.Features.Trips;
@@ -137,5 +139,87 @@ public class TrackedItemFormLegWindowTests : TestContext
         cut.Find("form").Submit();
 
         Assert.Contains("Start must be between", cut.Markup, StringComparison.Ordinal);
+    }
+
+    // --- Feature 025: the leg list only offers legs that can actually hold an item ---
+
+    private static readonly DateTime WindowStart = new(2026, 9, 1, 8, 0, 0);
+    private static readonly DateTime WindowEnd = new(2026, 9, 10, 18, 0, 0);
+
+    private static TripLegDto EligibleLeg(string title = "Hotel Kabuki")
+        => TrackedItemFormTestData.Leg(WindowStart, WindowEnd, TripLegKinds.Stay, title: title);
+
+    private static TripLegDto RestrictedLeg(string mode, string title = "Getting there")
+        => TrackedItemFormTestData.Leg(WindowStart, WindowEnd, TripLegKinds.Travel, mode, title);
+
+    [Theory]
+    [InlineData(TransportationModes.Flight)]
+    [InlineData(TransportationModes.Train)]
+    [InlineData(TransportationModes.Bus)]
+    [InlineData(TransportationModes.Boat)]
+    public void RestrictedLegs_AreNotOffered(string mode)
+    {
+        var stay = EligibleLeg();
+        var restricted = RestrictedLeg(mode);
+
+        var cut = RenderComponent<TrackedItemForm>(p => p
+            .Add(x => x.TripId, Guid.NewGuid())
+            .Add(x => x.Legs, new[] { stay, restricted }));
+
+        var values = cut.FindAll("#item-leg option").Select(o => o.GetAttribute("value") ?? string.Empty).ToArray();
+        Assert.Contains(stay.TripLegId.ToString(), values);
+        Assert.DoesNotContain(restricted.TripLegId.ToString(), values);
+    }
+
+    [Fact]
+    public void StayAndCarLegs_AreBothOffered()
+    {
+        var stay = EligibleLeg();
+        var car = RestrictedLeg(TransportationModes.Car, "Road trip");
+
+        var cut = RenderComponent<TrackedItemForm>(p => p
+            .Add(x => x.TripId, Guid.NewGuid())
+            .Add(x => x.Legs, new[] { stay, car }));
+
+        var values = cut.FindAll("#item-leg option").Select(o => o.GetAttribute("value") ?? string.Empty).ToArray();
+        Assert.Contains(stay.TripLegId.ToString(), values);
+        Assert.Contains(car.TripLegId.ToString(), values);
+    }
+
+    /// <summary>
+    /// A trip made only of flights has nowhere to put an item, and the form says so rather than
+    /// offering a leg the API would refuse.
+    /// </summary>
+    [Fact]
+    public void TripWithOnlyRestrictedLegs_ShowsTheEmptyState()
+    {
+        var cut = RenderComponent<TrackedItemForm>(p => p
+            .Add(x => x.TripId, Guid.NewGuid())
+            .Add(x => x.Legs, new[] { RestrictedLeg(TransportationModes.Flight), RestrictedLeg(TransportationModes.Train, "Onward") }));
+
+        Assert.Contains("Add a stay or car leg first", cut.Markup, StringComparison.Ordinal);
+        var values = cut.FindAll("#item-leg option").Select(o => o.GetAttribute("value") ?? string.Empty).ToArray();
+        Assert.Equal(new[] { string.Empty }, values);
+    }
+
+    /// <summary>
+    /// An item already sitting on a restricted leg keeps that leg visible so the traveler can move
+    /// it deliberately instead of losing the relationship without noticing.
+    /// </summary>
+    [Fact]
+    public void ItemAlreadyOnARestrictedLeg_StillSeesThatLeg()
+    {
+        var restricted = RestrictedLeg(TransportationModes.Flight);
+        var stay = EligibleLeg();
+        var item = TrackedItemFormTestData.Item(restricted.TripLegId, new DateTime(2026, 9, 5, 14, 0, 0), new DateTime(2026, 9, 5, 16, 0, 0));
+
+        var cut = RenderComponent<TrackedItemForm>(p => p
+            .Add(x => x.TripId, Guid.NewGuid())
+            .Add(x => x.Legs, new[] { stay, restricted })
+            .Add(x => x.Item, item));
+
+        var values = cut.FindAll("#item-leg option").Select(o => o.GetAttribute("value") ?? string.Empty).ToArray();
+        Assert.Contains(restricted.TripLegId.ToString(), values);
+        Assert.Contains(stay.TripLegId.ToString(), values);
     }
 }

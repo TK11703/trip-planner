@@ -27,7 +27,9 @@ internal static class TimelineNavTestData
             "UTC",
             "UTC",
             0,
-            Array.Empty<TimelineItem>());
+            Array.Empty<TimelineItem>(),
+            0m,
+            TripLegKinds.Stay);
 
         return new TripTimelineResponse(
             Guid.NewGuid(),

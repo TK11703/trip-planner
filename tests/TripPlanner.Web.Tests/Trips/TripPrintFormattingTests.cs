@@ -109,9 +109,69 @@ public class TripPrintFormattingTests
         Assert.Null(printable.Description);
     }
 
-    private static TripLegDto Leg(string title, DateTime start, int sortOrder = 0, string? origin = null, string? destination = null) =>
+    // --- Feature 025: the printout says how the traveler is getting there ---
+
+    [Theory]
+    [InlineData(TransportationModes.Flight, "Flight")]
+    [InlineData(TransportationModes.Train, "Train")]
+    [InlineData(TransportationModes.Bus, "Bus")]
+    [InlineData(TransportationModes.Boat, "Boat")]
+    [InlineData(TransportationModes.Car, "Car")]
+    public void BuildPrintableTrip_CarriesTheTransportationMode(string mode, string expected)
+    {
+        var leg = Leg("Getting there", new DateTime(2026, 7, 14, 8, 0, 0), origin: "Seattle", destination: "Tokyo",
+            legKind: TripLegKinds.Travel, transportationMode: mode);
+        var trip = Trip("Japan 2026", null, new[] { leg }, Array.Empty<TrackedItemDto>());
+
+        var printable = TripPrintFormatting.BuildPrintableTrip(trip);
+
+        Assert.Equal(expected, Assert.Single(printable.Legs).ModeText);
+    }
+
+    [Fact]
+    public void BuildPrintableTrip_StayLeg_HasNoModeText()
+    {
+        var leg = Leg("Hotel Kabuki", new DateTime(2026, 7, 14, 8, 0, 0), destination: "Tokyo", legKind: TripLegKinds.Stay);
+        var trip = Trip("Japan 2026", null, new[] { leg }, Array.Empty<TrackedItemDto>());
+
+        var printable = TripPrintFormatting.BuildPrintableTrip(trip);
+
+        Assert.Null(Assert.Single(printable.Legs).ModeText);
+    }
+
+    [Fact]
+    public void BuildPrintableTrip_CarriesBookingDetails()
+    {
+        var leg = Leg("Getting there", new DateTime(2026, 7, 14, 8, 0, 0), origin: "Seattle", destination: "Tokyo",
+            legKind: TripLegKinds.Travel, transportationMode: TransportationModes.Flight,
+            travelCost: 412.50m, confirmationCode: "ABC123");
+        var trip = Trip("Japan 2026", null, new[] { leg }, Array.Empty<TrackedItemDto>());
+
+        var printed = Assert.Single(TripPrintFormatting.BuildPrintableTrip(trip).Legs);
+
+        Assert.Equal("ABC123", printed.ConfirmationCode);
+        Assert.Equal(412.50m.ToString("C", System.Globalization.CultureInfo.CurrentCulture), printed.TravelCostText);
+    }
+
+    /// <summary>An unbooked travel leg still prints; it simply has nothing to say about cost or codes.</summary>
+    [Fact]
+    public void BuildPrintableTrip_TravelLegWithoutBookingDetails_LeavesThemBlank()
+    {
+        var leg = Leg("Getting there", new DateTime(2026, 7, 14, 8, 0, 0), origin: "Seattle", destination: "Tokyo",
+            legKind: TripLegKinds.Travel, transportationMode: TransportationModes.Boat);
+        var trip = Trip("Japan 2026", null, new[] { leg }, Array.Empty<TrackedItemDto>());
+
+        var printed = Assert.Single(TripPrintFormatting.BuildPrintableTrip(trip).Legs);
+
+        Assert.Null(printed.ConfirmationCode);
+        Assert.Null(printed.TravelCostText);
+    }
+
+    private static TripLegDto Leg(string title, DateTime start, int sortOrder = 0, string? origin = null, string? destination = null,
+        string? legKind = null, string? transportationMode = null, decimal? travelCost = null, string? confirmationCode = null) =>
         new(Guid.NewGuid(), Guid.NewGuid(), title, origin, destination, start, "America/New_York", "America/New_York",
-            start.AddHours(3), "America/New_York", "America/New_York", null, sortOrder);
+            start.AddHours(3), "America/New_York", "America/New_York", null, sortOrder,
+            legKind, transportationMode, travelCost, confirmationCode);
 
     private static TrackedItemDto Item(Guid? legId, string title, DateTime start, int sortOrder = 0, string? location = null, decimal? cost = null) =>
         new(Guid.NewGuid(), Guid.NewGuid(), legId, TrackedItemTypes.Event, title, location, start, "America/New_York",

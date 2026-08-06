@@ -67,4 +67,46 @@ public class TripPrintDocumentTests : TestContext
         Assert.Empty(cut.FindAll("table.tp-print-table"));
         Assert.Contains("no legs or items", cut.Markup);
     }
+
+    // --- Feature 025: the paper copy names the mode and the booking ---
+
+    [Theory]
+    [InlineData(TransportationModes.Flight, "Flight")]
+    [InlineData(TransportationModes.Train, "Train")]
+    [InlineData(TransportationModes.Bus, "Bus")]
+    [InlineData(TransportationModes.Boat, "Boat")]
+    [InlineData(TransportationModes.Car, "Car")]
+    public void TravelLeg_PrintsItsTransportationMode(string mode, string label)
+    {
+        var cut = Render(TripFixtures.WithTravelLeg(mode));
+
+        Assert.Equal(label, cut.Find(".tp-print-leg-mode").TextContent.Trim());
+        Assert.Contains("Seattle", cut.Find(".tp-print-leg-route").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StayLeg_PrintsNoTransportationMode()
+    {
+        var cut = Render(TripFixtures.WithStayLeg());
+
+        Assert.Empty(cut.FindAll(".tp-print-leg-mode"));
+    }
+
+    [Fact]
+    public void TravelLeg_PrintsBookingDetails()
+    {
+        var cut = Render(TripFixtures.WithTravelLeg(TransportationModes.Flight, travelCost: 412.50m, confirmationCode: "ABC123"));
+
+        Assert.Contains("ABC123", cut.Find(".tp-print-leg-confirmation").TextContent, StringComparison.Ordinal);
+        Assert.Contains("412", cut.Find(".tp-print-leg-cost").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TravelLeg_WithoutBookingDetails_PrintsNeither()
+    {
+        var cut = Render(TripFixtures.WithTravelLeg(TransportationModes.Boat));
+
+        Assert.Empty(cut.FindAll(".tp-print-leg-confirmation"));
+        Assert.Empty(cut.FindAll(".tp-print-leg-cost"));
+    }
 }

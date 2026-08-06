@@ -7,17 +7,17 @@
 
 <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName">
     <DataAnnotationsValidator />
-    @if (Legs.Count == 0)
+    @if (SelectableLegs.Count == 0)
     {
         <div class="alert alert-warning py-2 small mb-2">
-            Add a trip leg first. Every item must be related to a trip leg.
+            Add a stay or car leg first. Items can't be scheduled on a flight, train, bus, or boat.
         </div>
     }
     <div class="mb-2">
         <label class="form-label" for="item-leg">Trip leg</label>
         <InputSelect id="item-leg" class="form-select" @bind-Value="_model.TripLegId" @bind-Value:after="OnLegChanged">
             <option value="">No trip leg yet</option>
-            @foreach (var leg in Legs)
+            @foreach (var leg in SelectableLegs)
             {
                 <option value="@leg.TripLegId">@leg.Title</option>
             }
@@ -38,7 +38,7 @@
             </div>
         </div>
         <div class="col-7">
-            <label class="form-label">Title</label>
+            <label class="form-label">Name</label>
             <InputText class="form-control" @bind-Value="_model.Title" />
             <ValidationMessage For="@(() => _model.Title)" />
         </div>
@@ -197,7 +197,7 @@
         // related to a leg later; when a leg is chosen its travel window is still binding.
         public Guid? TripLegId { get; set; }
         public string ItemType { get; set; } = "activity";
-        [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Name is required.")] public string Title { get; set; } = string.Empty;
         public string? Location { get; set; }
         public DateTime StartLocal { get; set; } = DateTime.Now;
         [Required(ErrorMessage = "Start timezone is required.")] public string StartTimeZoneId { get; set; } = "UTC";
@@ -277,6 +277,11 @@
     private string FormName => IsEdit ? $"tracked-item-edit-{Item!.TrackedItemId}" : "tracked-item-create";
 
     private TripLegDto? SelectedLeg => _model.TripLegId is { } id ? Legs.FirstOrDefault(l => l.TripLegId == id) : null;
+
+    // Only stay and car legs can hold items. An item that is already on some other leg keeps that
+    // leg in the list so the traveler can see and change it rather than losing it silently.
+    private IReadOnlyList<TripLegDto> SelectableLegs =>
+        Legs.Where(l => l.CanContainItems || l.TripLegId == _model.TripLegId).ToArray();
 
     // ── Trip leg travel window ─────────────────────────────────────────
     // An item belongs to a leg, so its start and end are restricted to that leg's travel window.
@@ -521,9 +526,9 @@
                 _appliedInitial = true;
             }
 
-            if (_model.TripLegId is null && Legs.Count > 0)
+            if (_model.TripLegId is null && SelectableLegs.Count > 0)
             {
-                _model.TripLegId = Legs[0].TripLegId;
+                _model.TripLegId = SelectableLegs[0].TripLegId;
             }
 
             if (!_tzInitialized && SelectedLeg is { } leg)
@@ -671,7 +676,7 @@
             if (Item is null)
             {
                 await TripApi.CreateItemAsync(TripId, request);
-                _model = new ItemModel { TripLegId = Legs.Count > 0 ? Legs[0].TripLegId : null };
+                _model = new ItemModel { TripLegId = Legs.FirstOrDefault(l => l.CanContainItems)?.TripLegId };
                 _tzInitialized = false;
                 _endManuallySet = false;
                 _clampedLegId = null;

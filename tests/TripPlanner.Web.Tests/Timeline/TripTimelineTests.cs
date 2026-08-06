@@ -248,6 +248,131 @@ public class TripTimelineTests : TestContext
         });
     }
 
+    // --- Feature 025: what the leg is, and where items may go ---
+
+    private static TimelineLeg ModeLeg(string? legKind, string? mode, decimal? travelCost = null, string? confirmationCode = null)
+        => new(
+            Guid.NewGuid(), "Getting there", "Paris", "Chicago",
+            new DateTime(2026, 9, 1, 8, 0, 0), "UTC", "UTC",
+            new DateTime(2026, 9, 2, 8, 0, 0), "UTC", "UTC", 0,
+            Array.Empty<TimelineItem>(), 0m, legKind, mode, travelCost, confirmationCode);
+
+    [Theory]
+    [InlineData(TransportationModes.Flight, "Flight")]
+    [InlineData(TransportationModes.Train, "Train")]
+    [InlineData(TransportationModes.Bus, "Bus")]
+    [InlineData(TransportationModes.Boat, "Boat")]
+    [InlineData(TransportationModes.Car, "Car")]
+    public void TravelLeg_ShowsHowTheTravelerIsGettingThere(string mode, string label)
+    {
+        var response = Response(ModeLeg(TripLegKinds.Travel, mode));
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
+
+        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+
+        cut.WaitForAssertion(() => Assert.Equal(label, cut.Find("[data-testid=leg-mode]").TextContent.Trim()));
+        Assert.Contains("Paris", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("Chicago", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StayLeg_ShowsNoTransportationMode()
+    {
+        var response = Response(ModeLeg(TripLegKinds.Stay, null));
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
+
+        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".ttl-leg-label")));
+        Assert.Empty(cut.FindAll("[data-testid=leg-mode]"));
+    }
+
+    [Fact]
+    public void TravelLeg_ShowsConfirmationCodeWhenPresent()
+    {
+        var response = Response(ModeLeg(TripLegKinds.Travel, TransportationModes.Flight, confirmationCode: "ABC123"));
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
+
+        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+
+        cut.WaitForAssertion(() => Assert.Contains("ABC123", cut.Find("[data-testid=leg-confirmation]").TextContent, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TravelLeg_WithoutBookingDetails_ShowsNeither()
+    {
+        var response = Response(ModeLeg(TripLegKinds.Travel, TransportationModes.Flight));
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
+
+        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".ttl-leg-label")));
+        Assert.Empty(cut.FindAll("[data-testid=leg-confirmation]"));
+        Assert.Empty(cut.FindAll("[data-testid=leg-travel-cost]"));
+    }
+
+    /// <summary>Travel cost is the leg's own price, kept apart from the total its items add up to.</summary>
+    [Fact]
+    public void TravelCost_IsShownSeparatelyFromTheItemTotal()
+    {
+        var response = Response(ModeLeg(TripLegKinds.Travel, TransportationModes.Car, travelCost: 412.50m));
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
+
+        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Travel cost", cut.Find("[data-testid=leg-travel-cost]").TextContent, StringComparison.Ordinal));
+        Assert.Contains("Estimated total", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(TransportationModes.Flight)]
+    [InlineData(TransportationModes.Train)]
+    [InlineData(TransportationModes.Bus)]
+    [InlineData(TransportationModes.Boat)]
+    public void RestrictedLeg_OffersNoWayToAddAnItem(string mode)
+    {
+        var response = Response(ModeLeg(TripLegKinds.Travel, mode));
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
+
+        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".ttl-leg-label")));
+        Assert.Empty(cut.FindAll(".ttl-lane.ttl-lane-clickable"));
+        Assert.Empty(cut.FindAll(".ttl-leg-label .ttl-leg-add"));
+    }
+
+    [Theory]
+    [InlineData(TripLegKinds.Travel, TransportationModes.Car)]
+    [InlineData(TripLegKinds.Stay, null)]
+    public void EligibleLeg_KeepsItsAddItemAction(string legKind, string? mode)
+    {
+        var response = Response(ModeLeg(legKind, mode));
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
+
+        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".ttl-leg-label .ttl-leg-add")));
+        Assert.NotEmpty(cut.FindAll(".ttl-lane.ttl-lane-clickable"));
+    }
+
+    /// <summary>Clicking a restricted leg's lane cannot start an item the API would refuse.</summary>
+    [Fact]
+    public void ClickingARestrictedLegsLane_SelectsNothing()
+    {
+        var response = Response(ModeLeg(TripLegKinds.Travel, TransportationModes.Flight));
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
+
+        TripTimeline.TimelineSlotSelection? captured = null;
+        var cut = RenderComponent<TripTimeline>(p => p
+            .Add(x => x.TripId, response.TripId)
+            .Add(x => x.OnLegSlotSelected, s => captured = s));
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".ttl-lane")));
+        cut.FindAll(".ttl-lane")[0].Click();
+
+        Assert.Null(captured);
+    }
+
     private static double ExtractTopRem(string? style)
     {
         var match = Regex.Match(style ?? string.Empty, @"top:\s*([0-9.]+)rem");

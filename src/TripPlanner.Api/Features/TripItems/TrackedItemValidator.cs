@@ -77,6 +77,18 @@ public sealed class TrackedItemValidator
         if (leg is null)
             return ValidationResult.Fail("The selected trip leg does not belong to this trip.", "tripLegId");
 
+        // On a flight, train, bus, or boat the traveler is a passenger and cannot choose where to
+        // stop, so nothing can be scheduled against that leg. This is checked before the timeframe
+        // rules so the traveler is told the real reason rather than a date problem.
+        if (!leg.CanContainItems)
+        {
+            var mode = TransportationModes.Label(leg.TransportationMode);
+            var described = mode.Length == 0 ? "travel" : mode.ToLowerInvariant();
+            return ValidationResult.Fail(
+                $"Items cannot be added to a {described} leg. Choose a stay or car leg, or leave this item unassigned.",
+                "tripLegId");
+        }
+
         // An item has to happen while the traveler is on that leg, so both ends of the item are
         // compared as instants against the leg's own travel window.
         var legStartZone = _timezones.FindTimeZone(leg.StartTimeZoneId ?? string.Empty);

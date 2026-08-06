@@ -48,6 +48,8 @@ public sealed class TimelineRepository : ITimelineRepository
                     .ToArray()
                 : Array.Empty<TimelineItem>();
 
+            // EstimatedCostTotal stays the sum of the leg's items only. The leg's own travel cost
+            // is carried separately so surfaces can show both without double counting either.
             var legEstimatedTotal = legItems
                 .Where(i => i.EstimatedCost is not null)
                 .Sum(i => i.EstimatedCost!.Value);
@@ -65,7 +67,11 @@ public sealed class TimelineRepository : ITimelineRepository
                 leg.EndTimeZoneId,
                 leg.SortOrder,
                 legItems,
-                legEstimatedTotal));
+                legEstimatedTotal,
+                leg.LegKind,
+                leg.TransportationMode,
+                leg.TravelCost,
+                leg.ConfirmationCode));
         }
 
         var unassigned = itemRows
@@ -123,7 +129,11 @@ public sealed class TimelineRepository : ITimelineRepository
         string EndTimeZoneId,
         DateTimeOffset StartAt,
         DateTimeOffset EndAt,
-        int SortOrder);
+        int SortOrder,
+        string? LegKind,
+        string? TransportationMode,
+        decimal? TravelCost,
+        string? ConfirmationCode);
 
     private sealed record ItemRow(
         Guid TrackedItemId,

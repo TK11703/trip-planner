@@ -193,4 +193,39 @@ public class DraftPlacementMatcherTests
         Assert.Equal(DraftPlacementStatus.NoLegCovers, placement.Status);
         Assert.Empty(placement.Candidates);
     }
+
+    /// <summary>
+    /// Feature 025: a flight, train, bus, or boat leg can never hold an item, so the candidate
+    /// query never returns one. A trip whose only legs are restricted therefore arrives here as a
+    /// trip row with no leg — and the draft lands in the same "no leg covers it" gap as a trip with
+    /// nothing planned, which the traveler can still confirm as unassigned.
+    /// </summary>
+    [Fact]
+    public void TripWhoseOnlyLegsAreRestricted_IsNoLegCovers()
+    {
+        var placement = NewMatcher().Match(
+            Draft(new DateTime(2026, 8, 13, 15, 0, 0)),
+            new[] { TripWithNoLegs(new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 20)) });
+
+        Assert.Equal(DraftPlacementStatus.NoLegCovers, placement.Status);
+        Assert.Empty(placement.Candidates);
+        Assert.Null(placement.SuggestedTripLegId);
+    }
+
+    /// <summary>Only the eligible legs reach the matcher, so a covering Car leg still matches even
+    /// when the trip also contains restricted legs over the same dates.</summary>
+    [Fact]
+    public void EligibleLegStillMatches_WhenOnlyEligibleLegsAreSupplied()
+    {
+        var tripId = Guid.NewGuid();
+        var carLeg = Leg(Utc(2026, 8, 12), Utc(2026, 8, 16), "Road trip", tripId,
+            new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 20));
+
+        var placement = NewMatcher().Match(
+            Draft(new DateTime(2026, 8, 13, 15, 0, 0)),
+            new[] { carLeg });
+
+        Assert.Equal(DraftPlacementStatus.Matched, placement.Status);
+        Assert.Equal(carLeg.TripLegId, placement.SuggestedTripLegId);
+    }
 }

@@ -16,7 +16,11 @@ SELECT
     end_time_zone_id                                AS "EndTimeZoneId",
     start_at                                        AS "StartAt",
     COALESCE(end_at, start_at)                      AS "EndAt",
-    sort_order                                      AS "SortOrder"
+    sort_order                                      AS "SortOrder",
+    leg_kind                                        AS "LegKind",
+    transportation_mode                             AS "TransportationMode",
+    travel_cost                                     AS "TravelCost",
+    confirmation_code                               AS "ConfirmationCode"
 FROM trip_legs
 WHERE owner_user_id = @OwnerUserId AND trip_id = @TripId
 ORDER BY start_at, sort_order, title, trip_leg_id;

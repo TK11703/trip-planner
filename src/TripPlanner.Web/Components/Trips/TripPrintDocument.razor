@@ -38,11 +38,23 @@
                     <tr class="tp-print-leg">
                         <th scope="colgroup" colspan="@ColumnCount">
                             <span class="tp-print-leg-title">@leg.Title</span>
+                            @if (!string.IsNullOrWhiteSpace(leg.ModeText))
+                            {
+                                <span class="tp-print-leg-mode">@leg.ModeText</span>
+                            }
                             @if (!string.IsNullOrWhiteSpace(leg.RouteText))
                             {
                                 <span class="tp-print-leg-route">@leg.RouteText</span>
                             }
                             <span class="tp-print-leg-when">@leg.StartText &ndash; @leg.EndText</span>
+                            @if (!string.IsNullOrWhiteSpace(leg.ConfirmationCode))
+                            {
+                                <span class="tp-print-leg-confirmation">Confirmation @leg.ConfirmationCode</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(leg.TravelCostText))
+                            {
+                                <span class="tp-print-leg-cost">@leg.TravelCostText</span>
+                            }
                         </th>
                     </tr>
                     @if (leg.Items.Count == 0)

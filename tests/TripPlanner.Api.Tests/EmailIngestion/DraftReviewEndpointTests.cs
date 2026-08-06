@@ -51,15 +51,16 @@ public sealed class DraftReviewEndpointTests : IDisposable
             new DateTimeOffset(2026, 8, legEndDay, 0, 0, 0, TimeSpan.Zero));
 
     /// <summary>Registers a trip the confirm path can resolve, optionally with one leg.</summary>
-    private Guid SeedTrip(Guid? tripId = null, Guid? legId = null, int legStartDay = 12, int legEndDay = 16)
+    private Guid SeedTrip(Guid? tripId = null, Guid? legId = null, int legStartDay = 12, int legEndDay = 16, string? transportationMode = null)
     {
         var id = tripId ?? Guid.NewGuid();
         TripLegDto[] legs = legId is { } lid
             ?
             [
-                new TripLegDto(lid, id, "San Francisco", null, null,
+                new TripLegDto(lid, id, "San Francisco", transportationMode is null ? null : "Seattle", null,
                     new DateTime(2026, 8, legStartDay, 0, 0, 0), "UTC", "UTC",
-                    new DateTime(2026, 8, legEndDay, 0, 0, 0), "UTC", "UTC", null, 0)
+                    new DateTime(2026, 8, legEndDay, 0, 0, 0), "UTC", "UTC", null, 0,
+                    transportationMode is null ? null : TripLegKinds.Travel, transportationMode)
             ]
             : [];
 
@@ -277,6 +278,45 @@ public sealed class DraftReviewEndpointTests : IDisposable
         Assert.Contains(error.Details!["field"], new[] { "startLocal", "endLocal" });
         Assert.Empty(_factory.TripItems.Rows);
         Assert.Equal("pending_review", _factory.Drafts.Rows.Single().ReviewStatus);
+    }
+
+    // Feature 025: an email draft cannot be confirmed onto a leg the traveler does not control.
+    // A stale suggestion, or a leg that became a flight after the draft was parsed, is refused
+    // against the leg field and nothing reaches the timeline.
+    [Theory]
+    [InlineData(TransportationModes.Flight)]
+    [InlineData(TransportationModes.Train)]
+    [InlineData(TransportationModes.Bus)]
+    [InlineData(TransportationModes.Boat)]
+    public async Task ConfirmingOntoARestrictedLegIsRefusedAndWritesNothing(string mode)
+    {
+        var legId = Guid.NewGuid();
+        var tripId = SeedTrip(legId: legId, transportationMode: mode);
+        var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId, tripId, legId,
+            startLocal: new DateTime(2026, 8, 13, 9, 30, 0));
+
+        var response = await CreateTravelerClient().PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<ApiError>(Web))!;
+        Assert.Equal("tripLegId", error.Details!["field"]);
+        Assert.Empty(_factory.TripItems.Rows);
+        Assert.Equal("pending_review", _factory.Drafts.Rows.Single().ReviewStatus);
+    }
+
+    // A Car leg is still the traveler's own vehicle, so the email path places items on it.
+    [Fact]
+    public async Task ConfirmingOntoACarLegSucceeds()
+    {
+        var legId = Guid.NewGuid();
+        var tripId = SeedTrip(legId: legId, transportationMode: TransportationModes.Car);
+        var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId, tripId, legId,
+            startLocal: new DateTime(2026, 8, 13, 9, 30, 0));
+
+        var response = await CreateTravelerClient().PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(legId, _factory.TripItems.Rows.Single().TripLegId);
     }
 
     // FR-023: a detail the parser could not read is named back rather than filled in with a
