@@ -39,6 +39,22 @@ public class TrackedItemFormLegWindowTests : TestContext
     }
 
     [Fact]
+    public void DatePickers_WithSecondBearingBounds_AcceptAnyWholeSecond()
+    {
+        var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 8, 10, 20, 39, 39), new DateTime(2026, 8, 13, 8, 5, 39));
+
+        var cut = RenderComponent<TrackedItemForm>(p => p
+            .Add(x => x.TripId, Guid.NewGuid())
+            .Add(x => x.Legs, new[] { leg })
+            .Add(x => x.InitialTripLegId, leg.TripLegId)
+            .Add(x => x.InitialStartsAt, new DateTime(2026, 8, 10, 21, 0, 0)));
+
+        var dateInputs = cut.FindAll("input[type=datetime-local]");
+        Assert.All(dateInputs, input => Assert.Equal("1", input.GetAttribute("step")));
+        Assert.Equal("2026-08-10T20:39:39", dateInputs[0].GetAttribute("min"));
+    }
+
+    [Fact]
     public void NewItem_StartOutsideLegWindow_IsPulledToTheLegStart()
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));

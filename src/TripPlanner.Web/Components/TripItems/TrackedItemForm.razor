@@ -91,7 +91,7 @@
                 <label class="form-label mb-0">Start</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyStartFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" @bind-Value="_model.StartLocal" @bind-Value:after="OnStartChanged" />
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" step="1" @bind-Value="_model.StartLocal" @bind-Value:after="OnStartChanged" />
             <ValidationMessage For="@(() => _model.StartLocal)" />
             @if (SelectedLeg is not null)
             {
@@ -122,7 +122,7 @@
                 <label class="form-label mb-0">End</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyEndFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" @bind-Value="_model.EndLocal" @bind-Value:after="OnEndChangedManually" />
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" step="1" @bind-Value="_model.EndLocal" @bind-Value:after="OnEndChangedManually" />
             <ValidationMessage For="@(() => _model.EndLocal)" />
             @if (SelectedLeg is not null)
             {
