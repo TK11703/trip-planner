@@ -9,11 +9,13 @@ var postgres = builder.AddPostgres("postgres", postgresUser, postgresPassword)
 
 var tripPlannerDb = postgres.AddDatabase("tripplanner");
 
-var api = builder.AddProject<Projects.TripPlanner_Api>("api")
+// Explicit launch profiles keep the HTTPS endpoints (api 7082, web 7203) primary
+// regardless of which profile the AppHost itself was started with.
+var api = builder.AddProject<Projects.TripPlanner_Api>("api", launchProfileName: "https")
     .WithReference(tripPlannerDb)
     .WaitFor(tripPlannerDb);
 
-builder.AddProject<Projects.TripPlanner_Web>("web")
+builder.AddProject<Projects.TripPlanner_Web>("web", launchProfileName: "https")
     .WithReference(api)
     .WaitFor(api);
 
