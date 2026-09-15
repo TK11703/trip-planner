@@ -95,36 +95,97 @@ dotnet test TripPlanner.slnx
 - Playwright E2E tests are skipped by default; they require the AppHost to be
   running and Playwright browsers installed via `playwright install`.
 
-## Deployment (CI/CD)
+## Deployment
 
-Production deployment is automated by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
+Infrastructure lives in [`infra/`](infra) as modular Bicep and is driven by the
+**Azure Developer CLI** through [`azure.yaml`](azure.yaml). The same Bicep is applied
+identically by an operator and by CI, so a local `azd provision --preview` genuinely
+previews what the pipeline will do.
+
+### Operator flow
+
+```powershell
+azd auth login
+azd env new trip-planner                   # or: azd env select trip-planner
+azd env set AZURE_LOCATION eastus2
+
+# 1. Readiness — fails the release before anything is touched in Azure
+./scripts/deployment-readiness.ps1 -ReleaseId (git rev-parse HEAD)
+
+# 2. Preview — review for unexpected destructive change
+azd provision --preview
+
+# 3. Deploy (requires explicit approval)
+azd up
+
+# 4. Verify — an unverified release is treated as a failed release
+./scripts/deployment-verify.ps1 -ReleaseId (git rev-parse HEAD)
+```
+
+Both scripts write a sanitized JSON report to `artifacts/deployment-evidence/`,
+validated against the contracts in
+[specs/026-azure-deployment-readiness/contracts](specs/026-azure-deployment-readiness/contracts),
+and exit non-zero when the release should not proceed.
+
+- **[Readiness](scripts/deployment-readiness.ps1)** — pre-deployment gate: Azure context,
+  provider registration, quota, Entra configuration, secrets, and database restore window.
+- **[Verification](scripts/deployment-verify.ps1)** — post-deployment gate: secure
+  reachability, liveness, readiness, sign-in, authenticated API access, cross-user data
+  isolation, the core trip workflow, and persistence across a restart.
+- **[Production runbook](docs/operations/production-runbook.md)** — Entra registration,
+  rollback, secret rotation, data restoration, identity correction, and authorization
+  ownership.
+
+### CI/CD
+
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
 
 - **Pull requests** run build + test only (required status check — no deploy).
-- **Push to `main`** builds + tests, then provisions Azure infrastructure with Bicep
-  (`infra/`), builds the `web` and `api` images with `dotnet publish -t:PublishContainer`,
-  pushes them to Azure Container Registry (tagged with the commit SHA), and updates the
-  two **separate** Azure Container Apps. The deploy job waits for **manual approval** on the
-  `production` environment before provisioning or deploying.
-- **Manual dispatch** with a `rollback_sha` input redeploys a previously built image.
+- **Push to `main`** builds and tests, publishes the `web` and `api` images to
+  ACR tagged with the **commit SHA** (never `latest`), runs the readiness gate, waits for
+  **manual approval** on the `production` environment, runs `azd provision`, then runs the
+  verification gate and uploads its report.
+- **Manual dispatch** with a `rollback_sha` input repoints the container apps at a
+  previously deployed image. Schema migrations are forward-only — see the runbook.
 
-Hosting is cheap by design: `web` and `api` run on the **Container Apps Consumption**
-plan (scale-to-zero), images live in a **Basic** ACR, and PostgreSQL runs as its own
-container app backed by an **Azure Files** share (min 1 replica).
+Hosting is cheap by design: `web` and `api` run on **Container Apps Consumption** with
+`minReplicas: 0`, which keeps their combined consumption inside the Container Apps free
+grant; images live in a **Basic** ACR; telemetry goes to the **managed Aspire dashboard**
+(no extra compute); Log Analytics is capped at 1 GB/day. The **Azure Database for
+PostgreSQL Flexible Server** (Burstable `Standard_B1ms`) is the only always-on cost.
+Estimated cost in `eastus2` is **≈ $24/month** — see
+[.azure/deployment-plan.md](.azure/deployment-plan.md) for the full breakdown.
 
 ### Required GitHub configuration
 
 Cloud auth uses **OIDC** (no stored credentials). Configure once (see
 [specs/012-cicd-container-deploy/quickstart.md](specs/012-cicd-container-deploy/quickstart.md)):
 
-- **Variables**: `AZURE_ENV_NAME`, `AZURE_LOCATION`.
+- **Variables**: `AZURE_ENV_NAME`, `AZURE_LOCATION`, `AZURE_BUDGET_AMOUNT`,
+  `AZURE_BUDGET_CONTACT`, `AZURE_DEPLOYER_PRINCIPAL_NAME`. `AZURE_ENV_NAME` seeds every
+  resource name and the `rg-<env-name>` resource group, so changing it repoints the
+  whole deployment.
 - **Secrets**: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`,
-  `POSTGRES_PASSWORD`, `AZURE_ENTRA_WEB_CLIENT_ID`, `AZURE_ENTRA_API_CLIENT_ID`.
+  `POSTGRES_PASSWORD`, `AZURE_ENTRA_WEB_CLIENT_ID`, `AZURE_ENTRA_API_CLIENT_ID`,
+  `AZURE_ENTRA_WEB_CLIENT_SECRET`, plus `VERIFICATION_ACCESS_TOKEN` and
+  `VERIFICATION_SECONDARY_ACCESS_TOKEN` for the authenticated verification checks.
 - A GitHub **`production` environment** (federated credential subjects for `main` and the
   environment), plus an Entra app registration granted `Contributor` +
-  `User Access Administrator` on the subscription.
+  `User Access Administrator` on the target scope.
 
-> **Database caveat**: the container-hosted Postgres has **no managed backups or HA**.
-> The image is version-pinned; for durability add a scheduled `pg_dump` to Blob storage.
+Runtime secrets are never passed to containers as literals — every one is a **Key Vault
+reference resolved by a user-assigned managed identity**, so rotation needs no rebuild.
+The API holds no database password at all: it authenticates to PostgreSQL with its managed
+identity, and `POSTGRES_PASSWORD` is a bootstrap and break-glass credential only.
+
+> **Database caveat**: the Burstable tier has **no platform HA**, so a zone failure means
+> downtime. Durability is covered by **point-in-time restore over a 7-day window** — RPO is
+> effectively seconds, not a nightly snapshot. Geo-redundant backup is **disabled** and can
+> only be enabled by rebuilding the server, so region loss is not covered.
+>
+> **First-deploy step**: after the first `azd provision`, a PostgreSQL role for the API's
+> managed identity must be created by hand — Bicep cannot create database roles. See
+> [§2.0 of the runbook](docs/operations/production-runbook.md).
 
 ## Constitution & follow-ups
 
