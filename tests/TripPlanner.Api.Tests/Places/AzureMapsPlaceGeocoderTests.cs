@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Azure.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using TripPlanner.Api.Features.Places;
@@ -9,18 +10,18 @@ namespace TripPlanner.Api.Tests.Places;
 
 public class AzureMapsPlaceGeocoderTests
 {
-    private static IConfiguration Config(string? key)
+    private static IConfiguration Config(string? clientId)
         => new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["AzureMaps:SubscriptionKey"] = key })
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["AzureMaps:ClientId"] = clientId })
             .Build();
 
-    private static AzureMapsPlaceSuggestionLookup Create(HttpStatusCode status, string body, string? key = "test-key")
-        => new(new StubHttpClientFactory(new FakeHandler(status, body)), Config(key), NullLogger<AzureMapsPlaceSuggestionLookup>.Instance);
+    private static AzureMapsPlaceSuggestionLookup Create(HttpStatusCode status, string body, string? clientId = "test-client-id")
+        => new(new StubHttpClientFactory(new FakeHandler(status, body)), Config(clientId), new StubTokenCredential(), NullLogger<AzureMapsPlaceSuggestionLookup>.Instance);
 
     [Fact]
     public async Task NotConfigured_ReturnsNull()
     {
-        var geocoder = (IPlaceGeocoder)Create(HttpStatusCode.OK, "{}", key: null);
+        var geocoder = (IPlaceGeocoder)Create(HttpStatusCode.OK, "{}", clientId: null);
         Assert.False(geocoder.IsConfigured);
         Assert.Null(await geocoder.GeocodeAsync("Louvre", CancellationToken.None));
     }
@@ -64,6 +65,15 @@ public class AzureMapsPlaceGeocoderTests
         Assert.NotNull(point);
         Assert.Equal(48.8606, point!.Value.Latitude, 4);
         Assert.Equal(2.3376, point.Value.Longitude, 4);
+    }
+
+    private sealed class StubTokenCredential : TokenCredential
+    {
+        public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
+            => new("stub-access-token", DateTimeOffset.UtcNow.AddHours(1));
+
+        public override ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken)
+            => ValueTask.FromResult(GetToken(requestContext, cancellationToken));
     }
 
     private sealed class StubHttpClientFactory : IHttpClientFactory

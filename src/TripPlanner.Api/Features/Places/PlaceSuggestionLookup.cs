@@ -1,14 +1,16 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using Azure.Core;
 using TripPlanner.Contracts.Places;
 
 namespace TripPlanner.Api.Features.Places;
 
 /// <summary>
 /// Provides address/place suggestions for the location typeahead. Backed by Azure Maps Search
-/// (fuzzy, typeahead mode). The subscription key is read from environment-driven configuration
-/// (<c>AzureMaps:SubscriptionKey</c>, e.g. user-secrets or Key Vault) and never embedded. When the
-/// key is missing or a call fails, the lookup degrades to an empty result so the form keeps working.
+/// (fuzzy, typeahead mode). Authenticates with Entra ID — the managed identity when hosted, the
+/// developer sign-in locally — so no shared key exists to leak or rotate. The account is selected
+/// by <c>AzureMaps:ClientId</c>; when that is missing or a call fails, the lookup degrades to an
+/// empty result so the form keeps working.
 /// </summary>
 public interface IPlaceSuggestionLookup
 {
@@ -21,8 +23,8 @@ public readonly record struct GeoPoint(double Latitude, double Longitude);
 
 /// <summary>
 /// Resolves free-text location text to coordinates for the built-in trip map. Backed by Azure Maps
-/// Search and degrades to <c>null</c> (never throws) when the key is missing, the query is blank,
-/// the call fails, or no result is found.
+/// Search and degrades to <c>null</c> (never throws) when the account is unconfigured, the query is
+/// blank, the call fails, or no result is found.
 /// </summary>
 public interface IPlaceGeocoder
 {
@@ -36,24 +38,41 @@ public sealed class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPl
 
     private const int MaxResults = 6;
 
+    private static readonly string[] MapsScopes = ["https://atlas.microsoft.com/.default"];
+
     private readonly IHttpClientFactory _httpFactory;
+    private readonly TokenCredential _credential;
     private readonly ILogger<AzureMapsPlaceSuggestionLookup> _logger;
-    private readonly string? _subscriptionKey;
+    private readonly string? _clientId;
     private readonly string? _countrySet;
 
     public AzureMapsPlaceSuggestionLookup(
         IHttpClientFactory httpFactory,
         IConfiguration configuration,
+        TokenCredential credential,
         ILogger<AzureMapsPlaceSuggestionLookup> logger)
     {
         _httpFactory = httpFactory;
+        _credential = credential;
         _logger = logger;
-        _subscriptionKey = configuration["AzureMaps:SubscriptionKey"];
+        // The account's unique id, which tells Azure Maps which account the Entra token applies to.
+        _clientId = configuration["AzureMaps:ClientId"];
         // Optional ISO country codes (e.g. "US,CA") to bias/limit results. Empty means worldwide.
         _countrySet = configuration["AzureMaps:CountrySet"];
     }
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(_subscriptionKey);
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_clientId);
+
+    private async Task<HttpRequestMessage> CreateRequestAsync(string requestUri, CancellationToken ct)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        // Azure.Identity caches the token internally, so this is a cheap lookup once warm.
+        var token = await _credential.GetTokenAsync(new TokenRequestContext(MapsScopes), ct);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+        request.Headers.TryAddWithoutValidation("x-ms-client-id", _clientId);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        return request;
+    }
 
     public async Task<IReadOnlyList<PlaceSuggestion>> SearchAsync(string query, CancellationToken ct)
     {
@@ -73,16 +92,13 @@ public sealed class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPl
                 requestUri += $"&countrySet={Uri.EscapeDataString(_countrySet)}";
             }
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-            // The subscription key travels as a header (kept out of URLs/logs).
-            request.Headers.TryAddWithoutValidation("subscription-key", _subscriptionKey);
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            using var request = await CreateRequestAsync(requestUri, ct);
 
             using var response = await http.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning(
-                    "Azure Maps search returned {StatusCode} for a place suggestion. A 401/403 usually means AzureMaps:SubscriptionKey is missing or invalid.",
+                    "Azure Maps search returned {StatusCode} for a place suggestion. A 401/403 usually means the identity lacks the Azure Maps Search and Render Data Reader role, or AzureMaps:ClientId is wrong.",
                     (int)response.StatusCode);
                 return Array.Empty<PlaceSuggestion>();
             }
@@ -143,15 +159,13 @@ public sealed class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPl
                 requestUri += $"&countrySet={Uri.EscapeDataString(_countrySet)}";
             }
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-            request.Headers.TryAddWithoutValidation("subscription-key", _subscriptionKey);
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            using var request = await CreateRequestAsync(requestUri, ct);
 
             using var response = await http.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning(
-                    "Azure Maps geocode returned {StatusCode}. A 401/403 usually means AzureMaps:SubscriptionKey is missing or invalid.",
+                    "Azure Maps geocode returned {StatusCode}. A 401/403 usually means the identity lacks the Azure Maps Search and Render Data Reader role, or AzureMaps:ClientId is wrong.",
                     (int)response.StatusCode);
                 return null;
             }

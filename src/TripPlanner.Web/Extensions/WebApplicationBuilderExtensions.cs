@@ -10,6 +10,7 @@ using TripPlanner.Web.Features.Maps;
 using TripPlanner.Web.Features.Notifications;
 using TripPlanner.Web.Features.EmailIngestion;
 using TripPlanner.Web.Features.InboxHistory;
+using TripPlanner.Web.Health;
 
 namespace TripPlanner.Web.Extensions;
 
@@ -19,6 +20,7 @@ public static class WebApplicationBuilderExtensions
     {
         builder.AddServiceDefaults();
         builder.AddTripPlannerAuthentication();
+        builder.AddTripPlannerDataProtection();
 
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
@@ -70,6 +72,19 @@ public static class WebApplicationBuilderExtensions
             client.BaseAddress = new Uri("https+http://api");
         })
         .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
+
+        // Unauthenticated probe client: no token handler, because /alive is anonymous.
+        builder.Services.AddHttpClient(ApiReachabilityHealthCheck.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri("https+http://api");
+            client.Timeout = TimeSpan.FromSeconds(5);
+        });
+
+        // Readiness checks. None are tagged "live", so /alive stays dependency-free.
+        builder.Services.AddHealthChecks()
+            .AddCheck<ApiReachabilityHealthCheck>(ApiReachabilityHealthCheck.Name, tags: ["ready"])
+            .AddCheck<AuthenticationConfigurationHealthCheck>(AuthenticationConfigurationHealthCheck.Name, tags: ["ready"])
+            .AddCheck<DataProtectionHealthCheck>(DataProtectionHealthCheck.Name, tags: ["ready"]);
 
         return builder;
     }

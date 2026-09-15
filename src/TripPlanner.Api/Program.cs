@@ -1,4 +1,5 @@
 using TripPlanner.Api.Extensions;
+using TripPlanner.Database.Initialization;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddTripPlannerApi();
@@ -12,6 +13,11 @@ app.UseTripPlannerApi();
 if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("RunDatabaseMigrations"))
 {
     await app.InitializeDatabaseAsync();
+}
+else
+{
+    // This replica is not responsible for migrating; readiness must not wait on it.
+    app.Services.GetRequiredService<DatabaseMigrationState>().MarkCompleted();
 }
 
 app.Run();

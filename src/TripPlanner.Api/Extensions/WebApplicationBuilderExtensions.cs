@@ -6,6 +6,7 @@ using Azure.AI.OpenAI;
 using Azure.Core;
 using Azure.Identity;
 using TripPlanner.Api.Features.EmailIngestion;
+using TripPlanner.Api.Health;
 using TripPlanner.Api.Security;
 using TripPlanner.Database.Connections;
 using TripPlanner.Database.Sql;
@@ -47,7 +48,9 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton<IClock, SystemClock>();
 
         builder.Services.AddSingleton<ISqlFileProvider>(_ => new SqlFileProvider());
-        builder.Services.AddScoped<IPostgresConnectionFactory, PostgresConnectionFactory>();
+        // Singleton: the factory owns an NpgsqlDataSource, and a per-scope instance would
+        // create a separate connection pool and token cache for every request.
+        builder.Services.AddSingleton<IPostgresConnectionFactory, PostgresConnectionFactory>();
         builder.Services.AddScoped<ITripReadRepository, TripReadRepository>();
         builder.Services.AddScoped<ITripCommandRepository, TripCommandRepository>();
         builder.Services.AddScoped<ITripItemRepository, TripItemRepository>();
@@ -83,17 +86,35 @@ public static class WebApplicationBuilderExtensions
         });
         builder.Services.AddScoped<IUserDirectoryLookup, GraphUserDirectoryLookup>();
 
-        // Azure Maps address/place typeahead + geocoding. The subscription key is environment-driven
-        // (AzureMaps:SubscriptionKey) and both capabilities degrade gracefully when it is unset.
+        // Azure Maps address/place typeahead + geocoding, authenticated with Entra ID rather than a
+        // shared key. The credential is keyed so it stays separate from the Graph credential above,
+        // which may be a client secret that carries no Maps role. Both capabilities degrade
+        // gracefully when AzureMaps:ClientId is unset.
+        builder.Services.AddKeyedSingleton<TokenCredential>(
+            AzureMapsPlaceSuggestionLookup.HttpClientName,
+            (_, _) => new DefaultAzureCredential());
         builder.Services.AddHttpClient(AzureMapsPlaceSuggestionLookup.HttpClientName, client =>
         {
-            client.BaseAddress = new Uri("https://atlas.microsoft.com/");
+            var endpoint = builder.Configuration["AzureMaps:Endpoint"];
+            client.BaseAddress = new Uri(string.IsNullOrWhiteSpace(endpoint) ? "https://atlas.microsoft.com/" : endpoint);
         });
-        builder.Services.AddScoped<AzureMapsPlaceSuggestionLookup>();
+        builder.Services.AddScoped<AzureMapsPlaceSuggestionLookup>(sp => new AzureMapsPlaceSuggestionLookup(
+            sp.GetRequiredService<IHttpClientFactory>(),
+            builder.Configuration,
+            sp.GetRequiredKeyedService<TokenCredential>(AzureMapsPlaceSuggestionLookup.HttpClientName),
+            sp.GetRequiredService<ILogger<AzureMapsPlaceSuggestionLookup>>()));
         builder.Services.AddScoped<IPlaceSuggestionLookup>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
         builder.Services.AddScoped<IPlaceGeocoder>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
 
         builder.Services.AddSingleton<DatabaseInitializer>();
+        builder.Services.AddSingleton<DatabaseMigrationState>();
+
+        // Readiness checks. None are tagged "live", so /alive stays dependency-free and a
+        // failing dependency removes the replica from traffic instead of restarting it.
+        builder.Services.AddHealthChecks()
+            .AddCheck<DatabaseHealthCheck>(DatabaseHealthCheck.Name, tags: ["ready"])
+            .AddCheck<MigrationHealthCheck>(MigrationHealthCheck.Name, tags: ["ready"])
+            .AddCheck<AzureOpenAIConfigurationHealthCheck>(AzureOpenAIConfigurationHealthCheck.Name, tags: ["ready"]);
 
         // Email ingestion: repositories, deduplication, sender resolution, attachment text
         // extraction, and the recognition parser (Azure OpenAI via managed identity).

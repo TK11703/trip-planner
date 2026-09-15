@@ -56,7 +56,22 @@ public static class WebApplicationExtensions
     {
         using var scope = app.Services.CreateScope();
         var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
-        await initializer.InitializeAsync(scope.ServiceProvider, cancellationToken);
+        var state = app.Services.GetRequiredService<DatabaseMigrationState>();
+        // Recorded against each migration so a schema change can be traced back to a release.
+        var releaseId = app.Configuration["ReleaseId"] ?? "unknown";
+
+        try
+        {
+            await initializer.InitializeAsync(scope.ServiceProvider, releaseId, cancellationToken);
+            state.MarkCompleted();
+        }
+        catch
+        {
+            // Readiness stays unhealthy so Container Apps holds the revision out of traffic.
+            state.MarkFailed();
+            throw;
+        }
+
         return app;
     }
 

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Azure.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using TripPlanner.Api.Features.Places;
@@ -9,19 +10,19 @@ namespace TripPlanner.Api.Tests.Places;
 
 public class AzureMapsPlaceSuggestionLookupTests
 {
-    private static IConfiguration Config(string? key, string? countrySet = null)
+    private static IConfiguration Config(string? clientId, string? countrySet = null)
         => new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["AzureMaps:SubscriptionKey"] = key,
+                ["AzureMaps:ClientId"] = clientId,
                 ["AzureMaps:CountrySet"] = countrySet
             })
             .Build();
 
-    private static AzureMapsPlaceSuggestionLookup Create(HttpStatusCode status, string body, string? key = "test-key")
+    private static AzureMapsPlaceSuggestionLookup Create(HttpStatusCode status, string body, string? clientId = "test-client-id")
     {
         var factory = new StubHttpClientFactory(new FakeHandler(status, body));
-        return new AzureMapsPlaceSuggestionLookup(factory, Config(key), NullLogger<AzureMapsPlaceSuggestionLookup>.Instance);
+        return new AzureMapsPlaceSuggestionLookup(factory, Config(clientId), new StubTokenCredential(), NullLogger<AzureMapsPlaceSuggestionLookup>.Instance);
     }
 
     [Fact]
@@ -29,7 +30,8 @@ public class AzureMapsPlaceSuggestionLookupTests
     {
         var lookup = new AzureMapsPlaceSuggestionLookup(
             new StubHttpClientFactory(new FakeHandler(HttpStatusCode.OK, "{}")),
-            Config(key: null),
+            Config(clientId: null),
+            new StubTokenCredential(),
             NullLogger<AzureMapsPlaceSuggestionLookup>.Instance);
 
         Assert.False(lookup.IsConfigured);
@@ -71,6 +73,36 @@ public class AzureMapsPlaceSuggestionLookupTests
             r => Assert.Equal("Louvre-Rivoli, Paris", r.Description));
     }
 
+    [Fact]
+    public async Task SendsEntraBearerTokenAndClientId()
+    {
+        var handler = new FakeHandler(HttpStatusCode.OK, "{}");
+        var lookup = new AzureMapsPlaceSuggestionLookup(
+            new StubHttpClientFactory(handler),
+            Config("account-unique-id"),
+            new StubTokenCredential(),
+            NullLogger<AzureMapsPlaceSuggestionLookup>.Instance);
+
+        await lookup.SearchAsync("Louvre", CancellationToken.None);
+
+        Assert.NotNull(handler.LastRequest);
+        Assert.Equal("Bearer", handler.LastRequest!.Headers.Authorization?.Scheme);
+        Assert.Equal(StubTokenCredential.Token, handler.LastRequest.Headers.Authorization?.Parameter);
+        Assert.Equal("account-unique-id", Assert.Single(handler.LastRequest.Headers.GetValues("x-ms-client-id")));
+        Assert.DoesNotContain("subscription-key", handler.LastRequest.Headers.Select(h => h.Key));
+    }
+
+    private sealed class StubTokenCredential : TokenCredential
+    {
+        public const string Token = "stub-access-token";
+
+        public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
+            => new(Token, DateTimeOffset.UtcNow.AddHours(1));
+
+        public override ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken)
+            => ValueTask.FromResult(GetToken(requestContext, cancellationToken));
+    }
+
     private sealed class StubHttpClientFactory : IHttpClientFactory
     {
         private readonly HttpMessageHandler _handler;
@@ -84,10 +116,15 @@ public class AzureMapsPlaceSuggestionLookupTests
         private readonly string _body;
         public FakeHandler(HttpStatusCode status, string body) { _status = status; _body = body; }
 
+        public HttpRequestMessage? LastRequest { get; private set; }
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(new HttpResponseMessage(_status)
+        {
+            LastRequest = request;
+            return Task.FromResult(new HttpResponseMessage(_status)
             {
                 Content = new StringContent(_body, Encoding.UTF8, "application/json")
             });
+        }
     }
 }
