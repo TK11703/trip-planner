@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tripplanner.local/contracts/readiness-report.schema.json",
+  "title": "Trip Planner Deployment Readiness Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "releaseId",
+    "environmentName",
+    "generatedAtUtc",
+    "overallStatus",
+    "checks",
+    "acceptedRisks"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "releaseId": { "type": "string", "minLength": 7 },
+    "environmentName": { "type": "string", "minLength": 1 },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "overallStatus": { "enum": ["pass", "fail"] },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "acceptedRisks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/acceptedRisk" }
+    }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "required", "status", "summary", "correctiveAction", "evidenceReference"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "category": {
+          "enum": [
+            "azure-context",
+            "resource-provider",
+            "quota-policy",
+            "configuration",
+            "identity",
+            "secret-reference",
+            "entra",
+            "data-protection",
+            "artifact",
+            "infrastructure-preview",
+            "database-recovery",
+            "security"
+          ]
+        },
+        "required": { "type": "boolean" },
+        "status": { "enum": ["pass", "fail", "not-applicable"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "correctiveAction": { "type": ["string", "null"] },
+        "evidenceReference": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "fail" } }, "required": ["status"] },
+          "then": { "properties": { "correctiveAction": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "acceptedRisk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["riskId", "checkId", "owner", "rationale", "acceptedAtUtc", "reviewAtUtc", "expiresAtUtc"],
+      "properties": {
+        "riskId": { "type": "string", "minLength": 1 },
+        "checkId": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "acceptedAtUtc": { "type": "string", "format": "date-time" },
+        "reviewAtUtc": { "type": "string", "format": "date-time" },
+        "expiresAtUtc": { "type": ["string", "null"], "format": "date-time" }
+      }
+    }
+  }
+}

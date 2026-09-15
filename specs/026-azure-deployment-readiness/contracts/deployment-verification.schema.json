@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tripplanner.local/contracts/deployment-verification.schema.json",
+  "title": "Trip Planner Deployment Verification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "releaseId",
+    "environmentName",
+    "startedAtUtc",
+    "completedAtUtc",
+    "overallStatus",
+    "checks",
+    "failureCategory",
+    "recoveryAction"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "releaseId": { "type": "string", "minLength": 7 },
+    "environmentName": { "type": "string", "minLength": 1 },
+    "startedAtUtc": { "type": "string", "format": "date-time" },
+    "completedAtUtc": { "type": "string", "format": "date-time" },
+    "overallStatus": { "enum": ["pass", "fail"] },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "failureCategory": { "type": ["string", "null"] },
+    "recoveryAction": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "overallStatus": { "const": "fail" } }, "required": ["overallStatus"] },
+      "then": {
+        "properties": {
+          "failureCategory": { "type": "string", "minLength": 1 },
+          "recoveryAction": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "status", "durationMilliseconds", "summary", "evidenceReference"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "category": {
+          "enum": [
+            "secure-reachability",
+            "liveness",
+            "readiness",
+            "sign-in",
+            "authenticated-api",
+            "data-access",
+            "core-trip-workflow",
+            "persistence-after-restart"
+          ]
+        },
+        "status": { "enum": ["pass", "fail", "not-run"] },
+        "durationMilliseconds": { "type": "integer", "minimum": 0 },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidenceReference": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
