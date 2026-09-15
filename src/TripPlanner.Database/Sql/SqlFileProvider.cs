@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 
 namespace TripPlanner.Database.Sql;
 
@@ -27,14 +28,45 @@ public sealed class SqlFileProvider : ISqlFileProvider
         });
     }
 
+    /// <summary>
+    /// Returns every script in <paramref name="relativeDirectory"/> in a stable total order.
+    /// </summary>
+    /// <remarks>
+    /// Ordering is by the leading numeric prefix, then by ordinal file name. Several scripts
+    /// share a prefix (for example <c>003_theme_preferences.sql</c> and
+    /// <c>003_user_profiles.sql</c>), so the name is the tie-breaker. Ordinal comparison is
+    /// used deliberately: a culture-sensitive sort would let the same commit produce a
+    /// different migration order on a different machine.
+    /// </remarks>
     public IReadOnlyList<(string Name, string Sql)> GetAllInDirectory(string relativeDirectory)
     {
         var directory = ResolveFullPath(relativeDirectory);
         if (!Directory.Exists(directory)) return Array.Empty<(string, string)>();
         return Directory.GetFiles(directory, "*.sql")
-            .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
-            .Select(f => (Path.GetFileName(f), File.ReadAllText(f)))
+            .Select(Path.GetFileName)
+            .OfType<string>()
+            .OrderBy(GetOrderingPrefix)
+            .ThenBy(name => name, StringComparer.Ordinal)
+            .Select(name => (name, File.ReadAllText(Path.Combine(directory, name))))
             .ToArray();
+    }
+
+    /// <summary>
+    /// Extracts the leading numeric prefix of a script name, or <see cref="int.MaxValue"/>
+    /// when the name is not numbered so unnumbered scripts sort last rather than first.
+    /// </summary>
+    private static int GetOrderingPrefix(string fileName)
+    {
+        var separator = fileName.IndexOf('_');
+        if (separator <= 0) return int.MaxValue;
+
+        return int.TryParse(
+            fileName.AsSpan(0, separator),
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out var prefix)
+            ? prefix
+            : int.MaxValue;
     }
 
     private string ResolveFullPath(string relative)
