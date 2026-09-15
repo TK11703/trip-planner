@@ -8,6 +8,15 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
+    "deployerPrincipalId": {
+      "value": "${AZURE_PRINCIPAL_ID}"
+    },
+    "deployerPrincipalName": {
+      "value": "${AZURE_PRINCIPAL_NAME}"
+    },
+    "deployerPrincipalType": {
+      "value": "${AZURE_PRINCIPAL_TYPE=User}"
+    },
     "postgresPassword": {
       "value": "${POSTGRES_PASSWORD}"
     },
@@ -19,6 +28,48 @@
     },
     "entraApiClientId": {
       "value": "${AZURE_ENTRA_API_CLIENT_ID}"
+    },
+    "entraWebClientSecret": {
+      "value": "${AZURE_ENTRA_WEB_CLIENT_SECRET}"
+    },
+    "entraDomain": {
+      "value": "${AZURE_ENTRA_DOMAIN}"
+    },
+    "entraApiScope": {
+      "value": "${AZURE_ENTRA_API_SCOPE}"
+    },
+    "releaseId": {
+      "value": "${RELEASE_ID}"
+    },
+    "webImage": {
+      "value": "${WEB_IMAGE=mcr.microsoft.com/k8se/quickstart:latest}"
+    },
+    "apiImage": {
+      "value": "${API_IMAGE=mcr.microsoft.com/k8se/quickstart:latest}"
+    },
+    "azureOpenAiEndpoint": {
+      "value": "${AZURE_OPENAI_ENDPOINT}"
+    },
+    "azureOpenAiDeploymentName": {
+      "value": "${AZURE_OPENAI_DEPLOYMENT_NAME}"
+    },
+    "azureOpenAiResourceId": {
+      "value": "${AZURE_OPENAI_RESOURCE_ID}"
+    },
+    "azureMapsClientId": {
+      "value": "${AZURE_MAPS_CLIENT_ID}"
+    },
+    "azureMapsEndpoint": {
+      "value": "${AZURE_MAPS_ENDPOINT}"
+    },
+    "azureMapsResourceId": {
+      "value": "${AZURE_MAPS_RESOURCE_ID}"
+    },
+    "budgetAmount": {
+      "value": "${AZURE_BUDGET_AMOUNT}"
+    },
+    "budgetContact": {
+      "value": "${AZURE_BUDGET_CONTACT}"
     }
   }
 }

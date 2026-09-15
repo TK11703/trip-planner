@@ -1,0 +1,29 @@
+# Azure Developer CLI project definition for Trip Planner.
+# Infrastructure is the existing modular Bicep under infra/ (resource-group scoped,
+# so the environment must set AZURE_RESOURCE_GROUP).
+# Both services publish via the .NET SDK container support and are matched to their
+# container apps through the `azd-service-name` tags applied in infra/.
+name: trip-planner
+metadata:
+  template: trip-planner@1.0.0
+
+infra:
+  provider: bicep
+  path: infra
+  module: main
+
+services:
+  api:
+    project: ./src/TripPlanner.Api/TripPlanner.Api.csproj
+    language: dotnet
+    host: containerapp
+    docker:
+      # Use the SDK's built-in container publish rather than a hand-written Dockerfile.
+      remoteBuild: false
+
+  web:
+    project: ./src/TripPlanner.Web/TripPlanner.Web.csproj
+    language: dotnet
+    host: containerapp
+    docker:
+      remoteBuild: false

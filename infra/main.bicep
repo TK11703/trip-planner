@@ -1,6 +1,6 @@
 // Root deployment for the Trip Planner production environment.
-// Deployed at resource-group scope (the workflow creates the RG first).
-// Incremental/idempotent: create-if-missing, preserves the postgres Azure Files data.
+// Deployed at resource-group scope, so the azd environment must set AZURE_RESOURCE_GROUP.
+// Incremental/idempotent: create-if-missing, preserves the PostgreSQL server and its data.
 targetScope = 'resourceGroup'
 
 @description('Naming seed for all resources (from AZURE_ENV_NAME).')
@@ -8,14 +8,42 @@ param environmentName string
 
 param location string = resourceGroup().location
 
+@description('Object id of the principal running the deployment. Used only to grant secret rotation rights.')
+param deployerPrincipalId string = ''
+
+@description('Display name of the deploying principal, recorded as the PostgreSQL Entra administrator.')
+param deployerPrincipalName string = ''
+
+@allowed([
+  'User'
+  'Group'
+  'ServicePrincipal'
+])
+@description('Principal type of the deploying principal. CI deploys as a ServicePrincipal.')
+param deployerPrincipalType string = 'User'
+
 @description('Full image reference for the web app, e.g. <acr>.azurecr.io/web:<sha>.')
 param webImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Full image reference for the api app, e.g. <acr>.azurecr.io/api:<sha>.')
 param apiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
+@description('PostgreSQL administrator password. Used for schema bootstrap and break-glass; stored in Key Vault, never surfaced as an output.')
 @secure()
 param postgresPassword string
+
+@description('Entra client secret for the web app confidential OIDC flow.')
+@secure()
+param entraWebClientSecret string
+
+@description('Client id (unique id) of the Azure Maps account. Optional — place lookup degrades gracefully when blank.')
+param azureMapsClientId string = ''
+
+@description('Azure Maps endpoint. Blank uses the shared https://atlas.microsoft.com/ endpoint.')
+param azureMapsEndpoint string = ''
+
+@description('Resource id of the Azure Maps account, used to scope the search role assignment.')
+param azureMapsResourceId string = ''
 
 param entraInstance string = environment().authentication.loginEndpoint
 param entraTenantId string
@@ -27,9 +55,64 @@ param entraApiAudience string = entraApiClientId
 
 param entraDomain string = ''
 
+@description('Scope the web app requests when calling the API on behalf of the user. Blank derives <audience>/access_as_user.')
+param entraApiScope string = ''
+
+@description('Release identifier (commit SHA) recorded against migrations and telemetry.')
+param releaseId string = ''
+
+@description('Azure OpenAI endpoint used by email ingestion parsing.')
+param azureOpenAiEndpoint string
+
+@description('Azure OpenAI chat deployment name.')
+param azureOpenAiDeploymentName string = ''
+
+@description('Resource id of the Azure OpenAI account, used to scope the inference role assignment.')
+param azureOpenAiResourceId string = ''
+
+@description('Monthly cost threshold in subscription currency. Blank disables the budget alert.')
+param budgetAmount string = ''
+
+@description('Email address notified when the budget threshold is crossed.')
+param budgetContact string = ''
+
 var tags = {
   'azd-env-name': environmentName
   workload: 'trip-planner'
+  environment: 'production'
+  costCenter: 'trip-planner'
+}
+
+// The API authenticates to PostgreSQL with its managed identity, so the connection string
+// carries no password: Npgsql supplies an Entra access token in its place. The username is
+// the identity name, which must exist as a database role (see the runbook bootstrap step).
+var postgresConnectionString = 'Host=${postgres.outputs.fqdn};Port=5432;Database=${postgres.outputs.databaseName};Username=${identity.outputs.api.name};SSL Mode=Require'
+
+// azd substitutes an empty string for unset environment variables, which would otherwise
+// win over the parameter default.
+var effectiveApiScope = empty(entraApiScope) ? '${entraApiAudience}/access_as_user' : entraApiScope
+var effectiveOpenAiDeployment = empty(azureOpenAiDeploymentName) ? 'gpt-4o' : azureOpenAiDeploymentName
+
+module storage 'storage.bicep' = {
+  name: 'storage'
+  params: {
+    environmentName: environmentName
+    location: location
+    tags: tags
+  }
+}
+
+module keyVault 'key-vault.bicep' = {
+  name: 'key-vault'
+  params: {
+    environmentName: environmentName
+    location: location
+    tags: tags
+    deployerPrincipalId: deployerPrincipalId
+    postgresPassword: postgresPassword
+    postgresConnectionString: postgresConnectionString
+    entraWebClientSecret: entraWebClientSecret
+  }
 }
 
 module appEnvironment 'environment.bicep' = {
@@ -56,57 +139,128 @@ module registry 'registry.bicep' = {
     environmentName: environmentName
     location: location
     tags: tags
-    principalId: identity.outputs.principalId
+  }
+}
+
+module rbac 'rbac.bicep' = {
+  name: 'rbac'
+  params: {
+    registryName: registry.outputs.name
+    keyVaultName: keyVault.outputs.name
+    storageAccountName: storage.outputs.name
+    dataProtectionContainerName: storage.outputs.dataProtectionContainerName
+    azureOpenAiResourceId: azureOpenAiResourceId
+    azureMapsResourceId: azureMapsResourceId
+    acrPullPrincipalId: identity.outputs.acrPull.principalId
+    webPrincipalId: identity.outputs.web.principalId
+    apiPrincipalId: identity.outputs.api.principalId
   }
 }
 
 module postgres 'postgres.bicep' = {
   name: 'postgres'
   params: {
+    environmentName: environmentName
     location: location
     tags: tags
-    environmentId: appEnvironment.outputs.environmentId
-    pgStorageName: appEnvironment.outputs.pgStorageName
-    postgresPassword: postgresPassword
+    administratorPassword: postgresPassword
+    entraTenantId: entraTenantId
+    entraAdminObjectId: deployerPrincipalId
+    entraAdminPrincipalName: deployerPrincipalName
+    entraAdminPrincipalType: deployerPrincipalType
   }
 }
 
 module api 'api.bicep' = {
   name: 'api'
   params: {
+    appName: 'ca-api-${environmentName}'
     location: location
     tags: tags
     environmentId: appEnvironment.outputs.environmentId
+    environmentDefaultDomain: appEnvironment.outputs.defaultDomain
     containerImage: apiImage
-    identityId: identity.outputs.id
     registryLoginServer: registry.outputs.loginServer
-    connectionString: 'Host=${postgres.outputs.name};Port=5432;Database=tripplanner;Username=postgres;Password=${postgresPassword};SSL Mode=Disable'
+    acrPullIdentityId: identity.outputs.acrPull.id
+    apiIdentityId: identity.outputs.api.id
+    apiIdentityClientId: identity.outputs.api.clientId
+    keyVaultUri: keyVault.outputs.uri
+    postgresConnectionSecretName: keyVault.outputs.postgresConnectionSecretName
+    azureMapsClientId: azureMapsClientId
+    azureMapsEndpoint: azureMapsEndpoint
     entraInstance: entraInstance
     entraTenantId: entraTenantId
     entraApiClientId: entraApiClientId
     entraApiAudience: entraApiAudience
+    azureOpenAiEndpoint: azureOpenAiEndpoint
+    azureOpenAiDeploymentName: effectiveOpenAiDeployment
+    releaseId: releaseId
   }
+  dependsOn: [
+    rbac
+  ]
 }
 
 module web 'web.bicep' = {
   name: 'web'
   params: {
+    appName: 'ca-web-${environmentName}'
     location: location
     tags: tags
     environmentId: appEnvironment.outputs.environmentId
+    environmentDefaultDomain: appEnvironment.outputs.defaultDomain
     containerImage: webImage
-    identityId: identity.outputs.id
     registryLoginServer: registry.outputs.loginServer
+    acrPullIdentityId: identity.outputs.acrPull.id
+    webIdentityId: identity.outputs.web.id
+    webIdentityClientId: identity.outputs.web.clientId
+    keyVaultUri: keyVault.outputs.uri
+    entraWebClientSecretName: keyVault.outputs.entraWebClientSecretName
+    dataProtectionBlobUri: '${storage.outputs.dataProtectionContainerUri}/keys.xml'
+    dataProtectionKeyUri: keyVault.outputs.dataProtectionKeyUri
     apiAppName: api.outputs.name
     entraInstance: entraInstance
     entraTenantId: entraTenantId
     entraWebClientId: entraWebClientId
     entraDomain: entraDomain
+    entraApiScope: effectiveApiScope
+    releaseId: releaseId
+  }
+  dependsOn: [
+    rbac
+  ]
+}
+
+// Skipped until the budget inputs are supplied.
+module budget 'budget.bicep' = if (!empty(budgetAmount) && !empty(budgetContact)) {
+  name: 'budget'
+  params: {
+    environmentName: environmentName
+    amount: int(budgetAmount)
+    contactEmail: budgetContact
   }
 }
 
-output acrLoginServer string = registry.outputs.loginServer
-output acrName string = registry.outputs.name
-output webUrl string = web.outputs.url
-output apiName string = api.outputs.name
-output webName string = web.outputs.name
+// --- azd conventional outputs ------------------------------------------------
+
+output AZURE_LOCATION string = location
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = registry.outputs.loginServer
+output AZURE_CONTAINER_REGISTRY_NAME string = registry.outputs.name
+output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = appEnvironment.outputs.environmentId
+output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = appEnvironment.outputs.environmentName
+output AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = appEnvironment.outputs.defaultDomain
+output AZURE_KEY_VAULT_NAME string = keyVault.outputs.name
+output AZURE_KEY_VAULT_ENDPOINT string = keyVault.outputs.uri
+output AZURE_STORAGE_ACCOUNT_NAME string = storage.outputs.name
+output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = appEnvironment.outputs.logAnalyticsWorkspaceId
+output AZURE_OPENAI_ENDPOINT string = azureOpenAiEndpoint
+output AZURE_OPENAI_DEPLOYMENT_NAME string = effectiveOpenAiDeployment
+output SERVICE_WEB_NAME string = web.outputs.name
+output SERVICE_WEB_URI string = web.outputs.url
+output SERVICE_API_NAME string = api.outputs.name
+output SERVICE_POSTGRES_NAME string = postgres.outputs.name
+output SERVICE_POSTGRES_FQDN string = postgres.outputs.fqdn
+output SERVICE_POSTGRES_DATABASE string = postgres.outputs.databaseName
+output WEB_IDENTITY_CLIENT_ID string = identity.outputs.web.clientId
+output API_IDENTITY_CLIENT_ID string = identity.outputs.api.clientId
+output API_IDENTITY_NAME string = identity.outputs.api.name
