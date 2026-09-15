@@ -190,10 +190,11 @@ jobs:
         id: readiness
         shell: pwsh
         run: |
-          $arguments = @(
-            '-ReleaseId', '${{ github.event.inputs.rollback_sha || github.sha }}'
-          )
-          if ('${{ vars.AZURE_FIRST_RELEASE }}' -eq 'true') { $arguments += '-FirstRelease' }
+          # Must be a hashtable: array splatting binds positionally and ignores the -Name prefixes.
+          $arguments = @{
+            ReleaseId = '${{ github.event.inputs.rollback_sha || github.sha }}'
+          }
+          if ('${{ vars.AZURE_FIRST_RELEASE }}' -eq 'true') { $arguments['FirstRelease'] = $true }
           ./scripts/deployment-readiness.ps1 @arguments
 
       - name: Upload readiness report
