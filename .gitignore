@@ -67,3 +67,11 @@ Thumbs.db
 *.suo
 packages/
 .env*
+
+# Azure Developer CLI local environment state.
+# `.azure/deployment-plan.md` is intentionally tracked; per-environment folders are not.
+.azure/*/
+.azure/config.json
+
+# Deployment evidence is regenerated per release and may reference live resources.
+artifacts/deployment-evidence/

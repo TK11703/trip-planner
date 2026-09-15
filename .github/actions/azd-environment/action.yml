@@ -1,0 +1,73 @@
+# Shared azd bootstrap: installs the Azure Developer CLI, authenticates with the same
+# OIDC federated credential used by azure/login, and materializes the azd environment
+# so every job (readiness, provision, verification) sees identical parameter values.
+name: Configure azd environment
+description: Install azd, sign in with OIDC, and populate the shared azd environment.
+
+inputs:
+  client-id:
+    description: Entra application (client) id of the federated deployment identity.
+    required: true
+  tenant-id:
+    description: Entra tenant id.
+    required: true
+  subscription-id:
+    description: Target Azure subscription id.
+    required: true
+  env-name:
+    description: azd environment name (AZURE_ENV_NAME).
+    required: true
+  location:
+    description: Azure region.
+    required: true
+  resource-group:
+    description: Resource group the resource-group-scoped Bicep deploys into.
+    required: true
+  release-id:
+    description: Immutable release identifier (commit SHA).
+    required: true
+  registry-login-server:
+    description: Container registry login server. Blank leaves the image parameters at their defaults.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Setup azd
+      uses: Azure/setup-azd@v2
+
+    - name: azd auth login (OIDC)
+      shell: bash
+      run: |
+        azd auth login \
+          --client-id "${{ inputs.client-id }}" \
+          --federated-credential-provider github \
+          --tenant-id "${{ inputs.tenant-id }}"
+
+    - name: Select or create environment
+      shell: bash
+      run: |
+        azd env select "${{ inputs.env-name }}" 2>/dev/null || \
+          azd env new "${{ inputs.env-name }}" \
+            --subscription "${{ inputs.subscription-id }}" \
+            --location "${{ inputs.location }}" \
+            --no-prompt
+
+    - name: Populate environment values
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry-login-server }}
+        TAG: ${{ inputs.release-id }}
+      run: |
+        # Non-secret values. Secrets stay in the job environment and are read by
+        # main.parameters.json at provision time, so they are never written to .azure/.
+        azd env set AZURE_SUBSCRIPTION_ID "${{ inputs.subscription-id }}"
+        azd env set AZURE_LOCATION "${{ inputs.location }}"
+        azd env set AZURE_RESOURCE_GROUP "${{ inputs.resource-group }}"
+        azd env set RELEASE_ID "$TAG"
+        if [ -n "$REGISTRY" ]; then
+          # Immutable, commit-pinned image references — never `latest`.
+          azd env set WEB_IMAGE "$REGISTRY/web:$TAG"
+          azd env set API_IMAGE "$REGISTRY/api:$TAG"
+        fi

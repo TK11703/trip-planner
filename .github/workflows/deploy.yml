@@ -24,11 +24,15 @@ permissions:
 
 concurrency:
   group: deploy-${{ github.ref }}
+  # Release serialization: only one production release per ref may be in flight, so two
+  # releases can never race the migration advisory lock or overwrite each other's images.
   # Cancel superseded PR runs; never cancel an in-flight production deploy.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   DOTNET_VERSION: '10.0.x'
+  # The Bicep deployment is resource-group scoped, so every job resolves the same group.
+  AZURE_RESOURCE_GROUP: rg-${{ vars.AZURE_ENV_NAME }}
 
 jobs:
   build-test:
@@ -51,24 +55,193 @@ jobs:
       - name: Test
         run: dotnet test TripPlanner.slnx -c Release --no-build --verbosity normal
 
+  package:
+    name: Build & Push Images
+    # Runs before the approval gate so the readiness report can reference the exact
+    # images that will be deployed. Skipped for rollbacks, which reuse an existing tag.
+    if: github.event_name != 'pull_request' && github.event.inputs.rollback_sha == ''
+    needs: build-test
+    runs-on: ubuntu-latest
+    outputs:
+      login_server: ${{ steps.registry.outputs.login_server }}
+      acr_name: ${{ steps.registry.outputs.acr_name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure resource group
+        run: |
+          # This job runs before the readiness gate validates configuration, so an unset
+          # variable would otherwise reach the CLI as the bare prefix `rg-`.
+          if [ -z "${{ vars.AZURE_ENV_NAME }}" ]; then
+            echo "::error::Repository variable AZURE_ENV_NAME is not set."
+            exit 1
+          fi
+          az group create -n "${{ env.AZURE_RESOURCE_GROUP }}" -l "${{ vars.AZURE_LOCATION }}" --only-show-errors
+
+      - name: Provision registry
+        # Registry-only bootstrap: the images must exist before `azd provision` can point
+        # the container apps at them, and before the readiness gate verifies the tags.
+        id: registry
+        run: |
+          outputs=$(az deployment group create \
+            -g "${{ env.AZURE_RESOURCE_GROUP }}" \
+            -n "registry-${{ github.run_id }}" \
+            -f infra/registry.bicep \
+            -p environmentName="${{ vars.AZURE_ENV_NAME }}" location="${{ vars.AZURE_LOCATION }}" \
+            --query properties.outputs -o json)
+          echo "login_server=$(echo "$outputs" | jq -r '.loginServer.value')" >> "$GITHUB_OUTPUT"
+          echo "acr_name=$(echo "$outputs" | jq -r '.name.value')" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push images
+        # Same .NET SDK container publish that `azd package` uses for dotnet/containerapp
+        # services, pinned to the commit SHA so the tag is immutable and reproducible.
+        env:
+          ACR: ${{ steps.registry.outputs.login_server }}
+          TAG: ${{ github.sha }}
+        run: |
+          az acr login -n "${{ steps.registry.outputs.acr_name }}"
+          dotnet publish src/TripPlanner.Api/TripPlanner.Api.csproj -c Release \
+            -t:PublishContainer \
+            -p:ContainerRegistry="$ACR" \
+            -p:ContainerRepository=api \
+            -p:ContainerImageTag="$TAG"
+          dotnet publish src/TripPlanner.Web/TripPlanner.Web.csproj -c Release \
+            -t:PublishContainer \
+            -p:ContainerRegistry="$ACR" \
+            -p:ContainerRepository=web \
+            -p:ContainerImageTag="$TAG"
+
+  readiness:
+    name: Deployment Readiness
+    # Deliberately has no `environment:` so it runs BEFORE the production approval gate.
+    # The reviewer approves with the readiness report already in hand.
+    if: github.event_name != 'pull_request' && !cancelled() && !failure()
+    needs: [build-test, package]
+    runs-on: ubuntu-latest
+    env:
+      # Read by infra/main.parameters.json during `azd provision --preview`. Kept in the
+      # job environment rather than `azd env set` so no secret is written to .azure/.
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_PRINCIPAL_ID: ${{ secrets.AZURE_DEPLOYER_PRINCIPAL_ID }}
+      # Recorded as the PostgreSQL Entra administrator. CI federates as an app registration,
+      # so this must match the service principal's display name exactly.
+      AZURE_PRINCIPAL_NAME: ${{ vars.AZURE_DEPLOYER_PRINCIPAL_NAME }}
+      AZURE_PRINCIPAL_TYPE: ServicePrincipal
+      AZURE_ENTRA_WEB_CLIENT_ID: ${{ secrets.AZURE_ENTRA_WEB_CLIENT_ID }}
+      AZURE_ENTRA_API_CLIENT_ID: ${{ secrets.AZURE_ENTRA_API_CLIENT_ID }}
+      AZURE_ENTRA_WEB_CLIENT_SECRET: ${{ secrets.AZURE_ENTRA_WEB_CLIENT_SECRET }}
+      AZURE_ENTRA_DOMAIN: ${{ vars.AZURE_ENTRA_DOMAIN }}
+      AZURE_ENTRA_API_SCOPE: ${{ vars.AZURE_ENTRA_API_SCOPE }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      AZURE_MAPS_CLIENT_ID: ${{ vars.AZURE_MAPS_CLIENT_ID }}
+      AZURE_MAPS_ENDPOINT: ${{ vars.AZURE_MAPS_ENDPOINT }}
+      AZURE_MAPS_RESOURCE_ID: ${{ vars.AZURE_MAPS_RESOURCE_ID }}
+      AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_DEPLOYMENT_NAME: ${{ vars.AZURE_OPENAI_DEPLOYMENT_NAME }}
+      AZURE_OPENAI_RESOURCE_ID: ${{ vars.AZURE_OPENAI_RESOURCE_ID }}
+      AZURE_BUDGET_AMOUNT: ${{ vars.AZURE_BUDGET_AMOUNT }}
+      AZURE_BUDGET_CONTACT: ${{ vars.AZURE_BUDGET_CONTACT }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve registry
+        # On a rollback run the package job is skipped, so fall back to the existing registry.
+        id: registry
+        run: |
+          login_server="${{ needs.package.outputs.login_server }}"
+          if [ -z "$login_server" ]; then
+            login_server=$(az acr list -g "${{ env.AZURE_RESOURCE_GROUP }}" --query '[0].loginServer' -o tsv 2>/dev/null || echo "")
+          fi
+          echo "login_server=$login_server" >> "$GITHUB_OUTPUT"
+
+      - name: Configure azd environment
+        uses: ./.github/actions/azd-environment
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          env-name: ${{ vars.AZURE_ENV_NAME }}
+          location: ${{ vars.AZURE_LOCATION }}
+          resource-group: ${{ env.AZURE_RESOURCE_GROUP }}
+          release-id: ${{ github.event.inputs.rollback_sha || github.sha }}
+          registry-login-server: ${{ steps.registry.outputs.login_server }}
+
+      - name: Run readiness gate
+        id: readiness
+        shell: pwsh
+        run: |
+          $arguments = @(
+            '-ReleaseId', '${{ github.event.inputs.rollback_sha || github.sha }}'
+          )
+          if ('${{ vars.AZURE_FIRST_RELEASE }}' -eq 'true') { $arguments += '-FirstRelease' }
+          ./scripts/deployment-readiness.ps1 @arguments
+
+      - name: Upload readiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: readiness-${{ github.event.inputs.rollback_sha || github.sha }}
+          path: artifacts/deployment-evidence/readiness-*.json
+          if-no-files-found: error
+          retention-days: 90
+
   deploy:
     name: Provision & Deploy
     # Deploy only on push to main or manual dispatch — never on pull_request (fork-safe).
-    if: github.event_name != 'pull_request'
-    needs: build-test
+    if: github.event_name != 'pull_request' && !cancelled() && !failure()
+    needs: [build-test, package, readiness]
     runs-on: ubuntu-latest
     # Manual approval gate: the `production` environment's "Required reviewers" protection
-    # rule pauses this job (before any infra/deploy step runs) until a reviewer approves.
+    # rule pauses this job (after readiness, before any infra change) until a reviewer approves.
     environment: production
+    env:
+      # Same parameter surface the preview used, so the approved plan is what gets applied.
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_PRINCIPAL_ID: ${{ secrets.AZURE_DEPLOYER_PRINCIPAL_ID }}
+      AZURE_PRINCIPAL_NAME: ${{ vars.AZURE_DEPLOYER_PRINCIPAL_NAME }}
+      AZURE_PRINCIPAL_TYPE: ServicePrincipal
+      AZURE_ENTRA_WEB_CLIENT_ID: ${{ secrets.AZURE_ENTRA_WEB_CLIENT_ID }}
+      AZURE_ENTRA_API_CLIENT_ID: ${{ secrets.AZURE_ENTRA_API_CLIENT_ID }}
+      AZURE_ENTRA_WEB_CLIENT_SECRET: ${{ secrets.AZURE_ENTRA_WEB_CLIENT_SECRET }}
+      AZURE_ENTRA_DOMAIN: ${{ vars.AZURE_ENTRA_DOMAIN }}
+      AZURE_ENTRA_API_SCOPE: ${{ vars.AZURE_ENTRA_API_SCOPE }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      AZURE_MAPS_CLIENT_ID: ${{ vars.AZURE_MAPS_CLIENT_ID }}
+      AZURE_MAPS_ENDPOINT: ${{ vars.AZURE_MAPS_ENDPOINT }}
+      AZURE_MAPS_RESOURCE_ID: ${{ vars.AZURE_MAPS_RESOURCE_ID }}
+      AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_DEPLOYMENT_NAME: ${{ vars.AZURE_OPENAI_DEPLOYMENT_NAME }}
+      AZURE_OPENAI_RESOURCE_ID: ${{ vars.AZURE_OPENAI_RESOURCE_ID }}
+      AZURE_BUDGET_AMOUNT: ${{ vars.AZURE_BUDGET_AMOUNT }}
+      AZURE_BUDGET_CONTACT: ${{ vars.AZURE_BUDGET_CONTACT }}
     steps:
       - uses: actions/checkout@v5
 
       - name: Validate required configuration
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
         run: |
           missing=()
@@ -80,11 +253,6 @@ jobs:
             exit 1
           fi
           echo "All required variables are present."
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
@@ -104,74 +272,97 @@ jobs:
             echo "rollback=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Ensure resource group
-        run: az group create -n "rg-${{ vars.AZURE_ENV_NAME }}" -l "${{ vars.AZURE_LOCATION }}" --only-show-errors
-
-      - name: Provision registry (pre-push)
+      - name: Resolve registry
         id: registry
         run: |
-          outputs=$(az deployment group create \
-            -g "rg-${{ vars.AZURE_ENV_NAME }}" \
-            -n "registry-${{ github.run_id }}" \
-            -f infra/registry.bicep \
-            -p environmentName="${{ vars.AZURE_ENV_NAME }}" location="${{ vars.AZURE_LOCATION }}" \
-            --query properties.outputs -o json)
-          echo "login_server=$(echo "$outputs" | jq -r '.loginServer.value')" >> "$GITHUB_OUTPUT"
-          echo "acr_name=$(echo "$outputs" | jq -r '.name.value')" >> "$GITHUB_OUTPUT"
+          login_server=$(az acr list -g "${{ env.AZURE_RESOURCE_GROUP }}" --query '[0].loginServer' -o tsv)
+          echo "login_server=$login_server" >> "$GITHUB_OUTPUT"
 
-      - name: Build & push images
-        if: steps.tag.outputs.rollback == 'false'
-        env:
-          ACR: ${{ steps.registry.outputs.login_server }}
-          TAG: ${{ steps.tag.outputs.value }}
-        run: |
-          az acr login -n "${{ steps.registry.outputs.acr_name }}"
-          dotnet publish src/TripPlanner.Api/TripPlanner.Api.csproj -c Release \
-            -t:PublishContainer \
-            -p:ContainerRegistry="$ACR" \
-            -p:ContainerImageTags="\"$TAG;latest\""
-          dotnet publish src/TripPlanner.Web/TripPlanner.Web.csproj -c Release \
-            -t:PublishContainer \
-            -p:ContainerRegistry="$ACR" \
-            -p:ContainerImageTags="\"$TAG;latest\""
+      - name: Configure azd environment
+        uses: ./.github/actions/azd-environment
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          env-name: ${{ vars.AZURE_ENV_NAME }}
+          location: ${{ vars.AZURE_LOCATION }}
+          resource-group: ${{ env.AZURE_RESOURCE_GROUP }}
+          release-id: ${{ steps.tag.outputs.value }}
+          registry-login-server: ${{ steps.registry.outputs.login_server }}
 
-      - name: Provision infrastructure & deploy apps
+      - name: Provision infrastructure & release images
+        # `azd provision` applies infra/main.bicep and, because WEB_IMAGE/API_IMAGE are
+        # commit-pinned, promotes the already-built images in the same pass. A rollback
+        # is the same command with an earlier SHA.
         id: deploy
-        env:
-          ACR: ${{ steps.registry.outputs.login_server }}
-          TAG: ${{ steps.tag.outputs.value }}
-        run: |
-          outputs=$(az deployment group create \
-            -g "rg-${{ vars.AZURE_ENV_NAME }}" \
-            -n "main-${{ github.run_id }}" \
-            -f infra/main.bicep \
-            -p environmentName="${{ vars.AZURE_ENV_NAME }}" \
-               location="${{ vars.AZURE_LOCATION }}" \
-               postgresPassword="${{ secrets.POSTGRES_PASSWORD }}" \
-               entraTenantId="${{ secrets.AZURE_TENANT_ID }}" \
-               entraWebClientId="${{ secrets.AZURE_ENTRA_WEB_CLIENT_ID }}" \
-               entraApiClientId="${{ secrets.AZURE_ENTRA_API_CLIENT_ID }}" \
-               webImage="$ACR/web:$TAG" \
-               apiImage="$ACR/api:$TAG" \
-            --query properties.outputs -o json)
-          web_url=$(echo "$outputs" | jq -r '.webUrl.value')
-          echo "web_url=$web_url" >> "$GITHUB_OUTPUT"
+        run: azd provision --no-prompt
+
+      - name: Capture deployment outputs
+        id: outputs
+        run: echo "web_url=$(azd env get-value SERVICE_WEB_URI)" >> "$GITHUB_OUTPUT"
 
       - name: Health check
+        # Warm-up only: scale-from-zero means the first request may land while the replica
+        # is still starting. The verification gate below is what actually decides the release.
         run: |
-          url="${{ steps.deploy.outputs.web_url }}"
+          url="${{ steps.outputs.outputs.web_url }}"
           echo "Checking $url ..."
           for i in $(seq 1 10); do
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$url" || echo "000")
             if [ "$code" = "200" ] || [ "$code" = "302" ]; then
-              echo "Web app healthy (HTTP $code)."
+              echo "Web app responding (HTTP $code)."
               exit 0
             fi
             echo "Attempt $i: HTTP $code — retrying in 15s"
             sleep 15
           done
-          echo "::error::Web app did not become healthy at $url"
+          echo "::error::Web app did not respond at $url"
           exit 1
+
+      - name: Post-deployment verification
+        # Blocking gate: the release is not complete until every mandatory check passes.
+        # A `not-run` check counts as a failure, so a release can never be signed off
+        # on the basis of checks that were skipped.
+        id: verify
+        shell: pwsh
+        env:
+          SERVICE_WEB_URI: ${{ steps.outputs.outputs.web_url }}
+          VERIFICATION_ACCESS_TOKEN: ${{ secrets.VERIFICATION_ACCESS_TOKEN }}
+          VERIFICATION_SECONDARY_ACCESS_TOKEN: ${{ secrets.VERIFICATION_SECONDARY_ACCESS_TOKEN }}
+        run: ./scripts/deployment-verify.ps1 -ReleaseId '${{ steps.tag.outputs.value }}'
+
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-${{ steps.tag.outputs.value }}
+          path: artifacts/deployment-evidence/verification-*.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Summarize verification
+        if: always()
+        shell: pwsh
+        run: |
+          $report = Get-ChildItem artifacts/deployment-evidence/verification-*.json -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $report) { return }
+          $data = Get-Content $report.FullName -Raw | ConvertFrom-Json
+          $lines = @(
+            '## Post-deployment verification'
+            ''
+            "Overall status: **$($data.overallStatus)**"
+            ''
+            '| Check | Category | Status | Duration (ms) |'
+            '| --- | --- | --- | --- |'
+          )
+          foreach ($check in $data.checks) {
+            $lines += "| $($check.id) | $($check.category) | $($check.status) | $($check.durationMilliseconds) |"
+          }
+          if ($data.failureCategory) {
+            $lines += @('', "Failure category: **$($data.failureCategory)**", '', $data.recoveryAction)
+          }
+          $lines -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
       - name: Deployment summary
         if: always()
@@ -181,15 +372,74 @@ jobs:
             echo ""
             echo "- Commit / image tag: \`${{ steps.tag.outputs.value }}\`"
             echo "- Rollback run: \`${{ steps.tag.outputs.rollback }}\`"
-            echo "- Web URL: ${{ steps.deploy.outputs.web_url }}"
+            echo "- Web URL: ${{ steps.outputs.outputs.web_url }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   notify-failure:
     name: Notify on failure
-    needs: [build-test, deploy]
+    needs: [build-test, package, readiness, deploy]
     if: failure()
     runs-on: ubuntu-latest
     steps:
+      - name: Download verification evidence
+        # Best effort: a failure before deployment produces no verification report.
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-${{ github.event.inputs.rollback_sha || github.sha }}'
+          path: evidence
+          merge-multiple: true
+
       - name: Report failure
+        # A failure notice is only useful if it names the release, the component that
+        # failed, why it failed, and where the sanitized evidence lives.
+        shell: pwsh
+        env:
+          RELEASE_ID: ${{ github.event.inputs.rollback_sha || github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          echo "::error::Pipeline failed for ${{ github.sha }} (event: ${{ github.event_name }}). Review the failed job above."
+          $failingComponent = switch ('failure') {
+            default {
+              if ('${{ needs.build-test.result }}' -eq 'failure') { 'build-test' }
+              elseif ('${{ needs.package.result }}' -eq 'failure') { 'package (container images)' }
+              elseif ('${{ needs.readiness.result }}' -eq 'failure') { 'readiness gate' }
+              elseif ('${{ needs.deploy.result }}' -eq 'failure') { 'deploy / post-deployment verification' }
+              else { 'unknown' }
+            }
+          }
+
+          $causeCategory = 'pipeline'
+          $recovery = 'Open the failing job in the run log and address the first reported error.'
+
+          $report = Get-ChildItem evidence/verification-*.json -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($report) {
+            $data = Get-Content $report.FullName -Raw | ConvertFrom-Json
+            if ($data.failureCategory) {
+              $causeCategory = $data.failureCategory
+              $recovery = $data.recoveryAction
+            }
+          }
+          else {
+            $readiness = Get-ChildItem evidence/readiness-*.json -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($readiness) {
+              $data = Get-Content $readiness.FullName -Raw | ConvertFrom-Json
+              $failed = @($data.checks | Where-Object { $_.status -eq 'fail' })
+              if ($failed.Count -gt 0) {
+                $causeCategory = $failed[0].category
+                $recovery = $failed[0].correctiveAction
+              }
+            }
+          }
+
+          $lines = @(
+            '## Release failed'
+            ''
+            "- Release id: ``$env:RELEASE_ID``"
+            "- Failing component: **$failingComponent**"
+            "- Cause category: **$causeCategory**"
+            "- Recovery: $recovery"
+            "- Run log and sanitized evidence artifacts: $env:RUN_URL"
+          )
+          $lines -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+          Write-Host "::error::Release $env:RELEASE_ID failed in $failingComponent (cause: $causeCategory). $recovery See $env:RUN_URL"
