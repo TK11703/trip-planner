@@ -47,7 +47,26 @@ because an accidental `azd down` must never delete the identity users have conse
    client id in `aud`, matching the default.
 5. **API permissions**: add `Microsoft Graph → User.Read` (delegated) only if directory
    lookup is enabled (`AzureEntra:DirectoryLookupEnabled`). Grant admin consent.
-6. **Token configuration**: no optional claims are required.
+6. **Token configuration → Add optional claim → Access → `given_name` and `family_name`.**
+   Entra omits both from access tokens by default. `CurrentUser.FirstName`/`LastName` read
+   exactly these claims to seed a profile on first sign-in, so without them a new user is
+   created with a blank first and last name. Nothing fails; the names are simply never
+   populated.
+
+   ```powershell
+   # Equivalent to the portal steps, against the API app's object id.
+   $obj = az ad app show --id $env:AZURE_ENTRA_API_CLIENT_ID --query id -o tsv
+   $body = @{ optionalClaims = @{ accessToken = @(@{ name = 'given_name' }, @{ name = 'family_name' }) } } |
+       ConvertTo-Json -Depth 6 -Compress
+   Set-Content -LiteralPath "$env:TEMP\claims.json" -Value $body -Encoding utf8
+   az rest --method PATCH --url "https://graph.microsoft.com/v1.0/applications/$obj" `
+       --headers "Content-Type=application/json" --body "@$env:TEMP\claims.json"
+   ```
+
+   Profiles are seeded once and never re-seeded, so that users keep names they edit
+   themselves. Adding the claims therefore only affects users who sign in for the first
+   time afterwards; anyone already created with blank names must set them on the profile
+   page.
 7. Record the **Application (client) ID** as the `AZURE_ENTRA_API_CLIENT_ID` secret.
 
 > The API registration needs **no client secret**. It only validates inbound tokens; all
@@ -114,6 +133,9 @@ az ad app show --id $env:AZURE_ENTRA_WEB_CLIENT_ID --query "web.redirectUris" -o
 
 # Confirm the API exposes the expected scope.
 az ad app show --id $env:AZURE_ENTRA_API_CLIENT_ID --query "api.oauth2PermissionScopes[].value" -o tsv
+
+# Confirm the name claims are requested. Empty output means new users get blank names.
+az ad app show --id $env:AZURE_ENTRA_API_CLIENT_ID --query "optionalClaims.accessToken[].name" -o tsv
 ```
 
 A mismatch between the redirect URI and `$webUrl` produces `AADSTS50011` at sign-in.
