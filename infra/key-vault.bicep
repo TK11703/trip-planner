@@ -17,10 +17,6 @@ param postgresPassword string
 @secure()
 param postgresConnectionString string
 
-@description('Entra client secret used by the web app for the confidential OIDC flow.')
-@secure()
-param entraWebClientSecret string
-
 var resourceToken = uniqueString(resourceGroup().id, environmentName)
 var vaultName = take(toLower(replace('kv-${environmentName}-${resourceToken}', '--', '-')), 24)
 
@@ -59,14 +55,6 @@ resource postgresPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' =
   name: 'postgres-password'
   properties: {
     value: postgresPassword
-  }
-}
-
-resource entraWebClientSecretValue 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: vault
-  name: 'entra-web-client-secret'
-  properties: {
-    value: entraWebClientSecret
   }
 }
 
@@ -113,5 +101,3 @@ output dataProtectionKeyUri string = dataProtectionKey.properties.keyUriWithVers
 output postgresPasswordSecretName string = postgresPasswordSecret.name
 #disable-next-line outputs-should-not-contain-secrets
 output postgresConnectionSecretName string = postgresConnectionSecret.name
-#disable-next-line outputs-should-not-contain-secrets
-output entraWebClientSecretName string = entraWebClientSecretValue.name

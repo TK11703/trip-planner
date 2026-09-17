@@ -438,14 +438,29 @@ function Test-SecretReferences {
     }
 
     # Names only. Secret values are never read by the readiness gate.
-    $secretNames = @(Invoke-AzCommand -Argument @('keyvault', 'secret', 'list', '--vault-name', "$vaultName", '--query', '[].name', '-o', 'json'))
+    #
+    # The result is wrapped in an object rather than queried as a bare list, because a bare
+    # '[].name' returns nothing both when the vault is empty and when the call fails outright.
+    # A vault the caller cannot read would then look exactly like a vault missing every secret,
+    # and the gate would tell an operator to re-provision secrets that are already there.
+    $secretQuery = Invoke-AzCommand -Argument @(
+        'keyvault', 'secret', 'list', '--vault-name', "$vaultName", '--query', '{names: [].name}', '-o', 'json')
+
+    if ($null -eq $secretQuery) {
+        Add-Check -Id 'secret-references-present' -Category 'secret-reference' -Status 'fail' `
+            -Summary "Could not enumerate the secrets in '$vaultName'." `
+            -CorrectiveAction "Grant the deploying identity the 'Key Vault Secrets User' role on '$vaultName'. This is a data-plane permission: subscription Owner alone does not grant it, and the secrets themselves may be perfectly healthy."
+        return
+    }
+
+    $secretNames = @($secretQuery.names)
     $requiredSecrets = @($contract.SecretReferences | Where-Object { $_.Required } | ForEach-Object { $_.LogicalName })
     $missing = @($requiredSecrets | Where-Object { $secretNames -notcontains $_ })
 
     if ($missing.Count -eq 0) {
         Add-Check -Id 'secret-references-present' -Category 'secret-reference' -Status 'pass' `
             -Summary "All required secrets exist in '$vaultName'." `
-            -EvidenceReference "az keyvault secret list --vault-name $vaultName --query '[].name'"
+            -EvidenceReference "az keyvault secret list --vault-name $vaultName --query '{names: [].name}'"
     }
     else {
         Add-Check -Id 'secret-references-present' -Category 'secret-reference' -Status 'fail' `
@@ -488,6 +503,45 @@ function Test-Entra {
         Add-Check -Id 'entra-app-registrations' -Category 'entra' -Status 'fail' `
             -Summary "Entra application registration(s) not found: $($missingApps -join ', ')." `
             -CorrectiveAction 'Confirm the client ids belong to the deployment tenant and that the deploying identity can read directory objects.'
+    }
+
+    # The web app holds no client secret: its managed identity is federated onto the app
+    # registration and MSAL signs a client assertion with it. Nothing else catches a broken
+    # trust -- the app starts fine and only fails when a user tries to sign in -- so it is
+    # checked here rather than discovered in production.
+    if (-not $deployedResourcesExpected) {
+        Add-SkippedCheck -Id 'entra-web-federated-credential' -Category 'entra' -Reason 'First release or offline: the web managed identity is created by this deployment.'
+        return
+    }
+
+    $webPrincipalId = Invoke-AzCommand -Argument @(
+        'identity', 'show', '--resource-group', $ResourceGroup, '--name', "id-$EnvironmentName-web",
+        '--query', 'principalId', '-o', 'tsv')
+
+    if ([string]::IsNullOrWhiteSpace("$webPrincipalId")) {
+        Add-Check -Id 'entra-web-federated-credential' -Category 'entra' -Status 'fail' `
+            -Summary "Could not read the principal id of 'id-$EnvironmentName-web', so its federation could not be confirmed." `
+            -CorrectiveAction "Confirm the identity exists in '$ResourceGroup' and that the deploying identity has reader access."
+        return
+    }
+
+    $credentials = Invoke-AzCommand -Argument @(
+        'ad', 'app', 'federated-credential', 'list', '--id', $webClientId, '-o', 'json')
+
+    $match = @($credentials | Where-Object {
+        $_.subject -eq "$webPrincipalId" -and @($_.audiences) -contains 'api://AzureADTokenExchange'
+    })
+
+    if ($match.Count -gt 0) {
+        Add-Check -Id 'entra-web-federated-credential' -Category 'entra' -Status 'pass' `
+            -Summary "The web managed identity is federated onto the web app registration as '$($match[0].name)'." `
+            -EvidenceReference "az ad app federated-credential list --id $webClientId"
+    }
+    else {
+        Add-Check -Id 'entra-web-federated-credential' -Category 'entra' -Status 'fail' `
+            -Summary "No federated credential on the web app registration trusts 'id-$EnvironmentName-web' ($webPrincipalId)." `
+            -CorrectiveAction 'Add the credential as described in docs/operations/production-runbook.md. Without it the web app cannot redeem the sign-in code and every sign-in fails.' `
+            -EvidenceReference "az ad app federated-credential list --id $webClientId"
     }
 }
 

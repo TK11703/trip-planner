@@ -15,7 +15,7 @@
     back onto it. The script never deletes a secret version.
 
 .PARAMETER SecretName
-    Key Vault secret to rotate, for example entra-web-client-secret.
+    Key Vault secret to rotate, for example postgres-connection-string.
 
 .PARAMETER KeyVaultName
     Key Vault holding the secret.
@@ -39,14 +39,14 @@
     Leaves the previous version enabled. Use when an external system still needs it.
 
 .EXAMPLE
-    ./scripts/rotate-production-secret.ps1 -SecretName entra-web-client-secret `
+    ./scripts/rotate-production-secret.ps1 -SecretName postgres-connection-string `
         -KeyVaultName kv-tripplanner-prod -ResourceGroup rg-trip-planner `
-        -WebUrl https://ca-web-trip-planner.eastus2.azurecontainerapps.io
+        -WebUrl https://ca-web-trip-planner.centralus.azurecontainerapps.io
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('postgres-password', 'postgres-connection-string', 'entra-web-client-secret')]
+    [ValidateSet('postgres-password', 'postgres-connection-string')]
     [string] $SecretName,
 
     [Parameter(Mandatory = $true)]
@@ -77,7 +77,6 @@ Import-Module (Join-Path $PSScriptRoot 'TripPlanner.Deployment.psm1') -Force
 $SecretConsumers = @{
     'postgres-password'          = @()
     'postgres-connection-string' = @('api')
-    'entra-web-client-secret'    = @('web')
 }
 
 if ($null -eq $ConsumingApp -or $ConsumingApp.Count -eq 0) {

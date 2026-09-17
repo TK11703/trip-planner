@@ -16,12 +16,6 @@ param webIdentityId string
 @description('Client id of the runtime identity, so the Azure SDK selects the right UAMI.')
 param webIdentityClientId string
 
-@description('Key Vault base URI, for example https://kv-example.vault.azure.net/.')
-param keyVaultUri string
-
-@description('Key Vault secret holding the Entra client secret used by the OIDC flow.')
-param entraWebClientSecretName string
-
 @description('Blob URI the ASP.NET data-protection key ring is persisted to.')
 param dataProtectionBlobUri string
 
@@ -83,15 +77,6 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
           identity: acrPullIdentityId
         }
       ]
-      secrets: [
-        {
-          // Key Vault reference: the client secret never enters the template or the
-          // deployment history.
-          name: 'entra-client-secret'
-          keyVaultUrl: '${keyVaultUri}secrets/${entraWebClientSecretName}'
-          identity: webIdentityId
-        }
-      ]
     }
     template: {
       containers: [
@@ -144,8 +129,15 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
               value: entraDomain
             }
             {
-              name: 'AzureEntra__ClientSecret'
-              secretRef: 'entra-client-secret'
+              // The web identity is registered as a federated credential on the app
+              // registration, so MSAL signs a client assertion with it instead of
+              // presenting a secret. Nothing to store, rotate, or leak into a log.
+              name: 'AzureEntra__ClientCredentials__0__SourceType'
+              value: 'SignedAssertionFromManagedIdentity'
+            }
+            {
+              name: 'AzureEntra__ClientCredentials__0__ManagedIdentityClientId'
+              value: webIdentityClientId
             }
             {
               // Array setting: .NET binds indexed keys to AzureEntra:ApiScopes[0].

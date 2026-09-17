@@ -32,10 +32,6 @@ param apiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @secure()
 param postgresPassword string
 
-@description('Entra client secret for the web app confidential OIDC flow.')
-@secure()
-param entraWebClientSecret string
-
 @description('Client id (unique id) of the Azure Maps account. Optional — place lookup degrades gracefully when blank.')
 param azureMapsClientId string = ''
 
@@ -111,7 +107,6 @@ module keyVault 'key-vault.bicep' = {
     deployerPrincipalId: deployerPrincipalId
     postgresPassword: postgresPassword
     postgresConnectionString: postgresConnectionString
-    entraWebClientSecret: entraWebClientSecret
   }
 }
 
@@ -214,8 +209,6 @@ module web 'web.bicep' = {
     acrPullIdentityId: identity.outputs.acrPull.id
     webIdentityId: identity.outputs.web.id
     webIdentityClientId: identity.outputs.web.clientId
-    keyVaultUri: keyVault.outputs.uri
-    entraWebClientSecretName: keyVault.outputs.entraWebClientSecretName
     dataProtectionBlobUri: '${storage.outputs.dataProtectionContainerUri}/keys.xml'
     dataProtectionKeyUri: keyVault.outputs.dataProtectionKeyUri
     apiFqdn: api.outputs.fqdn

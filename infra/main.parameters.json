@@ -29,9 +29,6 @@
     "entraApiClientId": {
       "value": "${AZURE_ENTRA_API_CLIENT_ID}"
     },
-    "entraWebClientSecret": {
-      "value": "${AZURE_ENTRA_WEB_CLIENT_SECRET}"
-    },
     "entraDomain": {
       "value": "${AZURE_ENTRA_DOMAIN}"
     },

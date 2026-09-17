@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Identity.Abstractions;
+using Microsoft.Identity.Web;
 using TripPlanner.Web.Extensions;
 using TripPlanner.Web.Health;
 
@@ -135,6 +137,22 @@ public class ProductionConfigurationTests
         var result = await check.CheckHealthAsync(Context);
 
         Assert.Equal(HealthStatus.Degraded, result.Status);
+    }
+
+    [Fact]
+    public void Authentication_BindsManagedIdentityFederation_FromIndexedCredentialKeys()
+    {
+        // Container Apps supplies this as AzureEntra__ClientCredentials__0__SourceType.
+        var configuration = Configuration(
+            ("AzureEntra:ClientCredentials:0:SourceType", "SignedAssertionFromManagedIdentity"),
+            ("AzureEntra:ClientCredentials:0:ManagedIdentityClientId", "00000000-0000-0000-0000-000000000003"));
+
+        var options = new MicrosoftIdentityOptions();
+        configuration.GetSection("AzureEntra").Bind(options);
+
+        var credential = Assert.Single(options.ClientCredentials!);
+        Assert.Equal(CredentialSource.SignedAssertionFromManagedIdentity, credential.SourceType);
+        Assert.Equal("00000000-0000-0000-0000-000000000003", credential.ManagedIdentityClientId);
     }
 
     private sealed class UnreachableHttpClientFactory : IHttpClientFactory

@@ -98,10 +98,10 @@ $script:RequiredApiConfigKeys = @(
 # Logical Key Vault secret names. Container Apps resolves these as versionless references.
 # The Postgres admin password is no longer an application credential: the API authenticates
 # to Flexible Server with its managed identity. It survives only for schema bootstrap and
-# break-glass access, so nothing consumes it at runtime.
+# break-glass access, so nothing consumes it at runtime. The web app likewise holds no
+# client secret -- its managed identity is federated onto the app registration instead.
 $script:SecretReferences = @(
     [pscustomobject]@{ LogicalName = 'postgres-password'; Consumers = @(); Required = $true }
-    [pscustomobject]@{ LogicalName = 'entra-web-client-secret'; Consumers = @('web'); Required = $true }
 )
 
 # Azure resource providers the deployment depends on.

@@ -71,12 +71,29 @@ because an accidental `azd down` must never delete the identity users have conse
    these — a registration may hold multiple redirect URIs.
 3. **Implicit grant and hybrid flows**: leave **both** ID tokens and access tokens
    **unchecked**. The app uses the confidential authorization-code flow with PKCE.
-4. **Certificates & secrets → New client secret**
-   - Description: `production-<yyyy-MM>`
-   - Expiry: **6 months** (rotation is scheduled; see §3).
-   - Copy the value immediately into the `AZURE_ENTRA_WEB_CLIENT_SECRET` GitHub secret.
-     Provisioning seeds it into Key Vault as `entra-web-client-secret`; the container app
-     reads it through a Key Vault reference and never sees a literal value.
+4. **Certificates & secrets → leave empty.** The web app holds no client secret. Its
+   user-assigned managed identity is federated onto this registration instead, so MSAL
+   signs a client assertion with the identity and Entra trusts it. There is nothing to
+   store, rotate, or leak into a log. Add the credential after the first provision has
+   created the identity:
+
+   ```bash
+   # Object id of the *registration* (not the client id), and the principal id of the identity.
+   APP_OBJECT_ID=$(az ad app show --id "$AZURE_ENTRA_WEB_CLIENT_ID" --query id -o tsv)
+   PRINCIPAL_ID=$(az identity show -g "$AZURE_RESOURCE_GROUP" -n "id-$AZURE_ENV_NAME-web" --query principalId -o tsv)
+
+   az ad app federated-credential create --id "$APP_OBJECT_ID" --parameters "{
+     \"name\": \"trip-planner-web-managed-identity\",
+     \"issuer\": \"https://login.microsoftonline.com/$AZURE_TENANT_ID/v2.0\",
+     \"subject\": \"$PRINCIPAL_ID\",
+     \"audiences\": [\"api://AzureADTokenExchange\"]
+   }"
+   ```
+
+   The subject is the identity's **principal (object) id**, not its client id — a client id
+   here produces a credential that looks correct and fails every sign-in. The readiness
+   gate's `entra-web-federated-credential` check compares the two, because nothing else
+   catches this: the app starts normally and only breaks when a user signs in.
 5. **API permissions → Add a permission → My APIs → `trip-planner-api` → Delegated →
    `access_as_user`.** Then **Grant admin consent for \<tenant\>**.
 6. Record the **Application (client) ID** as `AZURE_ENTRA_WEB_CLIENT_ID`.
@@ -317,10 +334,8 @@ az containerapp revision restart -n ca-web-<environment-name> -g <resource-group
 
 ### Secret-specific notes
 
-- **`entra-web-client-secret`** — create the new secret in the Entra app registration
-  first (§1.2), name it `production-<yyyy-MM>`, then rotate. Update the
-  `AZURE_ENTRA_WEB_CLIENT_SECRET` GitHub secret in the same window. Delete the old Entra
-  secret only after the release that used it is no longer a rollback candidate.
+- **The web app's Entra credential is not in this list.** It is a federated managed
+  identity (§1.2), which has no expiry and nothing to rotate.
 - **`postgres-password`** — the Flexible Server administrator login, used for schema
   bootstrap and break-glass only. Change it on the server first, then write the new value
   to Key Vault. No app restart is needed, because nothing reads it at runtime:

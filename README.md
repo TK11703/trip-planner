@@ -167,8 +167,7 @@ Cloud auth uses **OIDC** (no stored credentials). Configure once (see
   resource name and the `rg-<env-name>` resource group, so changing it repoints the
   whole deployment.
 - **Secrets**: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`,
-  `POSTGRES_PASSWORD`, `AZURE_ENTRA_WEB_CLIENT_ID`, `AZURE_ENTRA_API_CLIENT_ID`,
-  `AZURE_ENTRA_WEB_CLIENT_SECRET`.
+  `POSTGRES_PASSWORD`, `AZURE_ENTRA_WEB_CLIENT_ID`, `AZURE_ENTRA_API_CLIENT_ID`.
 - A GitHub **`production` environment** (federated credential subjects for `main` and the
   environment), plus an Entra app registration granted `Contributor` +
   `User Access Administrator` on the target scope.
