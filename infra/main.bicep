@@ -218,7 +218,7 @@ module web 'web.bicep' = {
     entraWebClientSecretName: keyVault.outputs.entraWebClientSecretName
     dataProtectionBlobUri: '${storage.outputs.dataProtectionContainerUri}/keys.xml'
     dataProtectionKeyUri: keyVault.outputs.dataProtectionKeyUri
-    apiAppName: api.outputs.name
+    apiFqdn: api.outputs.fqdn
     entraInstance: entraInstance
     entraTenantId: entraTenantId
     entraWebClientId: entraWebClientId

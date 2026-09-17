@@ -119,29 +119,64 @@ like a networking or secret problem rather than a missing role.
 1. Collect the two values the statements need:
 
    ```powershell
-   $server = az postgres flexible-server list -g rg-trip-planner --query '[0].fqdn' -o tsv
+   $server = az postgres flexible-server list -g rg-trip-planner --query '[0].fullyQualifiedDomainName' -o tsv
    $apiOid = az identity show -g rg-trip-planner -n id-trip-planner-api --query principalId -o tsv
    $apiName = 'id-trip-planner-api'
    ```
 
-2. Connect **as the Entra administrator** — the principal that ran the deployment, which
-   `infra/main.bicep` registered via `deployerPrincipalId`. Ordinary admin-password logins
+2. Connect **as an Entra administrator of the server**. Ordinary admin-password logins
    cannot create Entra-backed roles.
 
+   When the deployment runs in CI, `deployerPrincipalId` is the GitHub OIDC *service
+   principal* — nobody can interactively sign in as it, so it cannot be used here. Add
+   yourself as a second administrator first:
+
    ```powershell
-   $token = az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv
-   $env:PGPASSWORD = $token
-   psql "host=$server port=5432 dbname=tripplanner user=<your-entra-upn> sslmode=require"
+   $me = az ad signed-in-user show --query id -o tsv
+   az postgres flexible-server ad-admin create -g rg-trip-planner -s <server-name> `
+     --object-id $me --display-name (az ad signed-in-user show --query userPrincipalName -o tsv) --type User
    ```
 
-3. Create the role and grant it exactly what the migration runner and repositories need.
+   Then connect. Note that PostgreSQL truncates role names to 63 characters
+   (`NAMEDATALEN`), so a long guest UPN is stored — and must be supplied — in its
+   truncated form. Read the stored value rather than assuming it:
+
+   ```powershell
+   az postgres flexible-server ad-admin list -g rg-trip-planner -s <server-name> `
+     --query "[].principalName" -o tsv
+
+   $env:PGPASSWORD = az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv
+   psql "host=$server port=5432 dbname=tripplanner user=<principal-name-as-stored> sslmode=require"
+   ```
+
+   Connections come from your workstation, which the `AllowAllAzureServicesAndResourcesWithinAzureIps`
+   rule does not cover. Add a temporary firewall rule for your public IP and delete it when
+   you are done.
+
+3. Create the role. The `pgaadauth` functions are installed **only in the `postgres`
+   maintenance database**, not in `tripplanner`, so connect to `postgres` for this
+   statement. Roles are cluster-wide, so the role is visible from every database:
+
+   ```sql
+   -- Maps the managed identity's object id onto a PostgreSQL role of the same name.
+   SELECT pgaadauth_create_principal_with_oid('id-trip-planner-api', '<apiOid>', 'service', false, false);
+   ```
+
+4. Reconnect to `tripplanner` and install `pgcrypto`. `000_init.sql` declares
+   `CREATE EXTENSION IF NOT EXISTS "pgcrypto"`, but the API role holds no `CREATE` privilege
+   on the database, so it cannot create the extension itself. Creating it here turns that
+   statement into a no-op. (`infra/postgres.bicep` sets the `azure.extensions` server
+   parameter, without which Flexible Server rejects the statement for *any* caller.)
+
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS pgcrypto;
+   ```
+
+5. Grant the role exactly what the migration runner and repositories need.
    `RunDatabaseMigrations` executes DDL, so the API role must own the schema — this is why
    the grants go further than a read/write application role would:
 
    ```sql
-   -- Maps the managed identity's object id onto a PostgreSQL role of the same name.
-   SELECT * FROM pgaad.create_principal_with_oid('id-trip-planner-api', '<apiOid>', 'service', false, false);
-
    GRANT CONNECT ON DATABASE tripplanner TO "id-trip-planner-api";
    GRANT USAGE, CREATE ON SCHEMA public TO "id-trip-planner-api";
    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "id-trip-planner-api";
@@ -152,7 +187,7 @@ like a networking or secret problem rather than a missing role.
      GRANT USAGE, SELECT ON SEQUENCES TO "id-trip-planner-api";
    ```
 
-4. Confirm the role exists before moving on:
+6. Confirm the role exists before moving on:
 
    ```sql
    SELECT rolname FROM pg_roles WHERE rolname = 'id-trip-planner-api';
@@ -411,6 +446,9 @@ a storage key, a registry password, or a Key Vault access policy.
 | Email ingestion fails with a 403 from Azure OpenAI | API identity lacks the inference role on the OpenAI account | The OpenAI account is often in another resource group; confirm `AZURE_OPENAI_RESOURCE_ID` is set so `infra/rbac-openai.bicep` can scope the assignment. |
 | `api` fails every database call with `password authentication failed for user "id-<env>-api"` | The PostgreSQL role for the API's managed identity was never created | Run the one-time bootstrap in §2.0. This is not a networking or secret problem, and re-provisioning will not fix it — Bicep cannot create database roles. |
 | `api` connects but migrations fail with `permission denied for schema public` | The API role exists but lacks `CREATE` on `public` | Re-apply the grants in §2.0 as the Entra administrator. |
+| `api` crashes on `000_init.sql` with `extension "pgcrypto" is not allow-listed` | The `azure.extensions` server parameter does not list `pgcrypto` | Re-run `azd provision` — `infra/postgres.bicep` sets it. The parameter is dynamic, so no restart is needed. |
+| `api` crashes on `000_init.sql` with `permission denied to create extension "pgcrypto"` | The extension is allow-listed but not yet created, and the API role has no `CREATE` on the database | Create it once as the Entra administrator (§2.0 step 4); `CREATE EXTENSION IF NOT EXISTS` then becomes a no-op. |
+| `web` is `Unhealthy` with `api-reachability` timing out after ~5s | `services__api__https__0` points at the bare app name instead of the API's internal ingress FQDN | The bare name is not covered by the ingress certificate, so the TLS handshake never completes. `infra/web.bicep` must pass `api.outputs.fqdn`. |
 | Database calls start failing ~1 hour after a long idle period | Entra access token expired and was not refreshed | The connection factory refreshes at 45 minutes. If this recurs, confirm `AZURE_CLIENT_ID` on `api` names the API identity so `DefaultAzureCredential` resolves the right one. |
 
 Role assignments are declared in `infra/rbac.bicep` and are idempotent. **Never grant a

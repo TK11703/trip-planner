@@ -28,8 +28,8 @@ param dataProtectionBlobUri string
 @description('Key Vault key URI used to encrypt the data-protection key ring.')
 param dataProtectionKeyUri string
 
-@description('Internal hostname of the API container app, reached over the environment network.')
-param apiAppName string
+@description('Internal ingress FQDN of the API container app, reached over the environment network.')
+param apiFqdn string
 
 param entraInstance string = environment().authentication.loginEndpoint
 param entraTenantId string
@@ -104,14 +104,15 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             {
-              // The key stays `api` because the web app resolves `https+http://api`; only the
-              // value follows the container app's actual name.
+              // The key stays `api` because the web app resolves `https+http://api`. The value
+              // must be the full internal FQDN: the bare app name is not what the ingress
+              // certificate covers, so an HTTPS call to it never completes the handshake.
               name: 'services__api__http__0'
-              value: 'http://${apiAppName}'
+              value: 'http://${apiFqdn}'
             }
             {
               name: 'services__api__https__0'
-              value: 'https://${apiAppName}'
+              value: 'https://${apiFqdn}'
             }
             {
               name: 'ASPNETCORE_FORWARDEDHEADERS_ENABLED'

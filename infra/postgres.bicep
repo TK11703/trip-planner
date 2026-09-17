@@ -135,6 +135,20 @@ resource entraAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@20
   ]
 }
 
+// 000_init.sql needs pgcrypto. Flexible Server rejects CREATE EXTENSION for any extension
+// absent from this allow-list, whoever runs it.
+resource extensionAllowList 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  parent: server
+  name: 'azure.extensions'
+  properties: {
+    value: 'pgcrypto'
+    source: 'user-override'
+  }
+  dependsOn: [
+    entraAdmin
+  ]
+}
+
 output name string = server.name
 output fqdn string = server.properties.fullyQualifiedDomainName
 output databaseName string = database.name
