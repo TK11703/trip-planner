@@ -79,6 +79,10 @@ $script:RequiredWebConfigKeys = @(
     'AzureEntra__TenantId'
     'AzureEntra__ClientId'
     'AzureEntra__ApiScopes__0'
+    # Losing these silently downgrades the app to having no client credential at all, which
+    # breaks every sign-in. Nothing else fails first, so the gate has to catch it.
+    'AzureEntra__ClientCredentials__0__SourceType'
+    'AzureEntra__ClientCredentials__0__ManagedIdentityClientId'
     'ASPNETCORE_FORWARDEDHEADERS_ENABLED'
     'DataProtection__BlobUri'
     'DataProtection__KeyVaultKeyUri'
