@@ -54,10 +54,7 @@
             "liveness",
             "readiness",
             "sign-in",
-            "authenticated-api",
-            "data-access",
-            "core-trip-workflow",
-            "persistence-after-restart"
+            "authenticated-api"
           ]
         },
         "status": { "enum": ["pass", "fail", "not-run"] },

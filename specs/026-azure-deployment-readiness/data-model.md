@@ -149,7 +149,9 @@ A sanitized post-deployment record conforming to `contracts/deployment-verificat
 | `failureCategory` | string/null | Required when overall status is `fail` |
 | `recoveryAction` | string/null | Required when overall status is `fail` |
 
-Mandatory categories: `secure-reachability`, `liveness`, `readiness`, `sign-in`, `authenticated-api`, `data-access`, `core-trip-workflow`, and `persistence-after-restart` for first deployment/rehearsal. Routine releases may record the persistence restart check from the scheduled recovery/reliability run rather than restart production on every release.
+Mandatory categories: `secure-reachability`, `liveness`, `readiness`, `sign-in`, and `authenticated-api`.
+
+The `data-access`, `core-trip-workflow`, and `persistence-after-restart` categories were removed. They required an authenticated user session, which no external caller can obtain: the API has internal-only ingress and the web app is Blazor Server, so sessions are cookie-based rather than bearer. Retaining them would have meant either giving the API public ingress or adding an endpoint that acts on a user's behalf, both of which widen the production attack surface more than the checks are worth. That coverage lives in `tests/TripPlanner.E2E.Tests` instead.
 
 ## Secret Reference
 

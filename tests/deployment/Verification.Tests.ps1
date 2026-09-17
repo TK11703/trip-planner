@@ -148,7 +148,7 @@ Describe 'Failure classification' {
     It 'classifies by the first failing check, not the last' {
         $checks = @(
             New-VerificationCheck -Id 'a' -Category 'sign-in' -Status 'fail' -Summary 'no'
-            New-VerificationCheck -Id 'b' -Category 'data-access' -Status 'fail' -Summary 'no'
+            New-VerificationCheck -Id 'b' -Category 'authenticated-api' -Status 'fail' -Summary 'no'
         )
         (Get-VerificationFailureClassification -Check $checks).failureCategory | Should -Be 'authentication'
     }
@@ -165,7 +165,7 @@ Describe 'Failure classification' {
 
 Describe 'Secret hygiene' {
     It 'redacts credential-shaped text from check summaries' {
-        $check = New-VerificationCheck -Id 'x' -Category 'data-access' -Status 'fail' `
+        $check = New-VerificationCheck -Id 'x' -Category 'readiness' -Status 'fail' `
             -Summary 'Host=postgres;Password=hunter2;Database=tripplanner'
         $check.summary | Should -Not -Match 'hunter2'
         $check.summary | Should -Match 'REDACTED'

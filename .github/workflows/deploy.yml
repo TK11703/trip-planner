@@ -328,8 +328,6 @@ jobs:
         shell: pwsh
         env:
           SERVICE_WEB_URI: ${{ steps.outputs.outputs.web_url }}
-          VERIFICATION_ACCESS_TOKEN: ${{ secrets.VERIFICATION_ACCESS_TOKEN }}
-          VERIFICATION_SECONDARY_ACCESS_TOKEN: ${{ secrets.VERIFICATION_SECONDARY_ACCESS_TOKEN }}
         run: ./scripts/deployment-verify.ps1 -ReleaseId '${{ steps.tag.outputs.value }}'
 
       - name: Upload verification report

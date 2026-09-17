@@ -217,9 +217,8 @@ releases can never race the migration advisory lock.
 ### Post-deployment verification
 
 `deploy` finishes with [`scripts/deployment-verify.ps1`](../../scripts/deployment-verify.ps1),
-which exercises the live release across eight mandatory categories: `secure-reachability`,
-`liveness`, `readiness`, `sign-in`, `authenticated-api`, `data-access`,
-`core-trip-workflow`, and `persistence-after-restart`.
+which exercises the live release across five mandatory categories: `secure-reachability`,
+`liveness`, `readiness`, `sign-in`, and `authenticated-api`.
 
 - A check that could not run counts as a **failure**. An unverified release is never
   reported as verified.
@@ -228,10 +227,19 @@ which exercises the live release across eight mandatory categories: `secure-reac
 - Every failure carries a `failureCategory` and a `recoveryAction`; the `notify-failure`
   job surfaces both along with the release id and a link to the evidence.
 
-The authenticated categories need two verification test users. Store their bearer tokens
-as the `VERIFICATION_ACCESS_TOKEN` and `VERIFICATION_SECONDARY_ACCESS_TOKEN` repository
-secrets. The second user is what proves cross-user isolation: if either user can see the
-other's trips, the run fails with `failureCategory: authorization`.
+**What this gate deliberately does not cover.** It runs as an anonymous caller on the
+public internet, so it proves only what such a caller can observe. It does not exercise
+authenticated data access, trip creation, or cross-user isolation.
+
+That is a consequence of the architecture, not an oversight. The API has internal-only
+ingress and is unreachable from a CI runner, and the web app is Blazor Server, so sessions
+are cookie-based rather than bearer — no external caller can obtain one. The two ways to
+close the gap are to give the API public ingress, or to add an endpoint that acts on a
+user's behalf; both widen the production attack surface more than the check is worth.
+
+Authenticated behaviour is covered by `tests/TripPlanner.E2E.Tests` instead. Treat a green
+verification gate as "the release is serving and enforcing authentication", not as "the
+release can read and write user data".
 
 ### Rollback
 
@@ -251,7 +259,7 @@ at the existing images.
    `az acr repository show-tags -n <acr> --repository web` (and `api`).
 3. Run the workflow with `rollback_sha` set to that SHA and approve the `production` gate.
 4. Confirm the post-deployment verification gate passes on the rolled-back release.
-5. If verification fails on `data-access` or `core-trip-workflow`, the schema and the code
+5. If verification fails on `readiness`, the schema and the code
    have diverged. Stop rolling back and follow §4.2.
 
 **When rollback is the wrong tool**

@@ -10,9 +10,16 @@
     unproven and must not be marked complete. `not-run` is deliberately treated as a
     failure: an unverified release is not a verified one.
 
-    The script is read-mostly. It creates and then deletes a single throwaway trip through
-    the public API to prove the core workflow and persistence; it never mutates
-    infrastructure and never touches another user's data.
+    The script is strictly read-only and unauthenticated. It verifies what an anonymous
+    caller on the public internet can observe: that the site serves over HTTPS, reports
+    itself live and ready, and challenges anonymous callers on protected routes.
+
+    It deliberately does not exercise authenticated data access. The API has internal-only
+    ingress and the web app is Blazor Server, so sessions are cookie-based rather than
+    bearer; no external caller can obtain one. Proving authenticated behaviour from here
+    would require either exposing the API publicly or adding a privileged endpoint that
+    acts on a user's behalf, and both trade away more than the check is worth. Authenticated
+    behaviour is covered by tests/TripPlanner.E2E.Tests instead.
 
 .PARAMETER ReleaseId
     Immutable release identifier, normally the full commit SHA.
@@ -22,14 +29,6 @@
 
 .PARAMETER WebUrl
     Public HTTPS base URL of the web app, for example https://web.<domain>.
-
-.PARAMETER AccessToken
-    Bearer token for a verification test user, scoped to the API. When omitted, the
-    authenticated checks report `not-run` and the release is reported unverified.
-
-.PARAMETER SecondaryAccessToken
-    Bearer token for a second, unrelated verification user. Used to prove cross-user
-    isolation. When omitted, the isolation check reports `not-run`.
 
 .PARAMETER Offline
     Skips every network call. Intended for contract tests and for validating report shape
@@ -47,12 +46,6 @@ param(
     [string] $EnvironmentName = $env:AZURE_ENV_NAME,
 
     [string] $WebUrl = $env:SERVICE_WEB_URI,
-
-    [string] $AccessToken = $env:VERIFICATION_ACCESS_TOKEN,
-
-    [string] $SecondaryAccessToken = $env:VERIFICATION_SECONDARY_ACCESS_TOKEN,
-
-    [string] $ResourceGroup = $env:AZURE_RESOURCE_GROUP,
 
     [string] $OutputPath,
 
@@ -76,10 +69,9 @@ $startedAt = Get-DeploymentUtcNow
 $online = -not $Offline
 $checks = [System.Collections.Generic.List[object]]::new()
 
-# Populated by the sign-in/authenticated-api checks and reused by later checks so the
-# workflow checks do not repeat work that has already failed.
+# Populated by the reachability check and reused by later checks so they do not repeat
+# work that has already failed.
 $script:ApiReachable = $false
-$script:CreatedTripId = $null
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -127,31 +119,44 @@ function Invoke-VerificationRequest {
     )
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $headers = @{}
-    if (-not [string]::IsNullOrWhiteSpace($Token)) { $headers['Authorization'] = "Bearer $Token" }
 
-    $parameters = @{
-        Uri                = $Uri
-        Method             = $Method
-        Headers            = $headers
-        TimeoutSec         = $TimeoutSeconds
-        SkipHttpErrorCheck = $true
-        ErrorAction        = 'Stop'
-    }
-    if (-not $AllowRedirect) { $parameters['MaximumRedirection'] = 0 }
-    if ($null -ne $Body) {
-        $parameters['Body'] = ($Body | ConvertTo-Json -Depth 8)
-        $parameters['ContentType'] = 'application/json'
-    }
+    # Invoke-WebRequest is not usable here. `-MaximumRedirection 0` throws on PowerShell
+    # 7.6 ("Operation is not valid due to the current state of the object") instead of
+    # handing back the 3xx, and dropping it lets the client follow the redirect so a
+    # sign-in challenge arrives as a 200 from login.microsoftonline.com -- which reads as
+    # "authentication is not being enforced". HttpClient gives us the unfollowed response.
+    $handler = [System.Net.Http.HttpClientHandler]::new()
+    $handler.AllowAutoRedirect = [bool]$AllowRedirect
+    $client = [System.Net.Http.HttpClient]::new($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
 
     try {
-        $response = Invoke-WebRequest @parameters
+        $request = [System.Net.Http.HttpRequestMessage]::new(
+            [System.Net.Http.HttpMethod]::new($Method), $Uri)
+
+        if (-not [string]::IsNullOrWhiteSpace($Token)) {
+            $request.Headers.Authorization =
+                [System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', $Token)
+        }
+
+        if ($null -ne $Body) {
+            $request.Content = [System.Net.Http.StringContent]::new(
+                ($Body | ConvertTo-Json -Depth 8), [System.Text.Encoding]::UTF8, 'application/json')
+        }
+
+        $response = $client.SendAsync($request).GetAwaiter().GetResult()
+        $content = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
         $stopwatch.Stop()
+
+        $headers = @{}
+        foreach ($header in $response.Headers) { $headers[$header.Key] = @($header.Value) }
+        foreach ($header in $response.Content.Headers) { $headers[$header.Key] = @($header.Value) }
+
         [pscustomobject]@{
             Succeeded  = $true
             StatusCode = [int]$response.StatusCode
-            Content    = [string]$response.Content
-            Headers    = $response.Headers
+            Content    = [string]$content
+            Headers    = $headers
             Elapsed    = [int]$stopwatch.ElapsedMilliseconds
             Error      = $null
         }
@@ -166,6 +171,9 @@ function Invoke-VerificationRequest {
             Elapsed    = [int]$stopwatch.ElapsedMilliseconds
             Error      = Protect-DeploymentSecret -InputText $_.Exception.Message
         }
+    }
+    finally {
+        $client.Dispose()
     }
 }
 
@@ -330,202 +338,30 @@ function Test-SignIn {
 function Test-AuthenticatedApi {
     if (-not $online) {
         Add-NotRun -Id 'authenticated-api-rejects-anonymous' -Category 'authenticated-api' -Reason 'Offline mode: the API was not contacted.'
-        Add-NotRun -Id 'authenticated-api-accepts-token' -Category 'authenticated-api' -Reason 'Offline mode: the API was not contacted.'
         return
     }
 
     if (-not $script:ApiReachable) {
         Add-NotRun -Id 'authenticated-api-rejects-anonymous' -Category 'authenticated-api' -Reason 'Skipped: the web app was not reachable.'
-        Add-NotRun -Id 'authenticated-api-accepts-token' -Category 'authenticated-api' -Reason 'Skipped: the web app was not reachable.'
         return
     }
 
-    $uri = "$($WebUrl.TrimEnd('/'))/api/trips"
+    # `/profile` is an API-backed page carrying [Authorize]: rendering it forces a call to
+    # the API for the caller's own record. Probing it anonymously therefore exercises the
+    # authorization boundary in front of the API without needing a public API surface.
+    $uri = "$($WebUrl.TrimEnd('/'))/profile"
 
     $anonymous = Invoke-VerificationRequest -Uri $uri
     if (@(401, 403, 302) -contains $anonymous.StatusCode) {
         Add-Result -Id 'authenticated-api-rejects-anonymous' -Category 'authenticated-api' -Status 'pass' `
-            -Summary "The API rejected an anonymous call with status $($anonymous.StatusCode)." `
+            -Summary "An API-backed page rejected an anonymous caller with status $($anonymous.StatusCode)." `
             -DurationMilliseconds $anonymous.Elapsed -EvidenceReference "GET $uri (anonymous)"
     }
     else {
         Add-Result -Id 'authenticated-api-rejects-anonymous' -Category 'authenticated-api' -Status 'fail' `
-            -Summary "The API answered an anonymous call with status $($anonymous.StatusCode); authorization is not being enforced." `
+            -Summary "An API-backed page answered an anonymous caller with status $($anonymous.StatusCode); authorization is not being enforced." `
             -DurationMilliseconds $anonymous.Elapsed -EvidenceReference "GET $uri (anonymous)"
     }
-
-    if ([string]::IsNullOrWhiteSpace($AccessToken)) {
-        Add-NotRun -Id 'authenticated-api-accepts-token' -Category 'authenticated-api' `
-            -Reason 'No verification access token was supplied, so the authenticated path is unproven.'
-        return
-    }
-
-    $authenticated = Invoke-VerificationRequest -Uri $uri -Token $AccessToken
-    if ($authenticated.StatusCode -eq 200) {
-        Add-Result -Id 'authenticated-api-accepts-token' -Category 'authenticated-api' -Status 'pass' `
-            -Summary 'The API accepted a correctly scoped bearer token.' `
-            -DurationMilliseconds $authenticated.Elapsed -EvidenceReference "GET $uri (authenticated)"
-    }
-    else {
-        Add-Result -Id 'authenticated-api-accepts-token' -Category 'authenticated-api' -Status 'fail' `
-            -Summary "The API rejected a correctly scoped token with status $($authenticated.StatusCode)." `
-            -DurationMilliseconds $authenticated.Elapsed -EvidenceReference "GET $uri (authenticated)"
-    }
-}
-
-# ---------------------------------------------------------------------------
-# Category: data-access
-# ---------------------------------------------------------------------------
-
-function Test-DataAccess {
-    if (-not $online) {
-        Add-NotRun -Id 'data-access-read' -Category 'data-access' -Reason 'Offline mode: no data was read.'
-        Add-NotRun -Id 'data-access-cross-user-isolation' -Category 'data-access' -Reason 'Offline mode: isolation was not exercised.'
-        return
-    }
-
-    if ([string]::IsNullOrWhiteSpace($AccessToken) -or -not $script:ApiReachable) {
-        Add-NotRun -Id 'data-access-read' -Category 'data-access' -Reason 'Skipped: no authenticated session was available.'
-        Add-NotRun -Id 'data-access-cross-user-isolation' -Category 'data-access' -Reason 'Skipped: no authenticated session was available.'
-        return
-    }
-
-    $uri = "$($WebUrl.TrimEnd('/'))/api/trips"
-    $read = Invoke-VerificationRequest -Uri $uri -Token $AccessToken
-    if ($read.StatusCode -eq 200) {
-        Add-Result -Id 'data-access-read' -Category 'data-access' -Status 'pass' `
-            -Summary 'The API read through to PostgreSQL and returned the caller''s trips.' `
-            -DurationMilliseconds $read.Elapsed -EvidenceReference "GET $uri"
-    }
-    else {
-        Add-Result -Id 'data-access-read' -Category 'data-access' -Status 'fail' `
-            -Summary "Reading trips failed with status $($read.StatusCode); the database path is broken." `
-            -DurationMilliseconds $read.Elapsed -EvidenceReference "GET $uri"
-        return
-    }
-
-    if ([string]::IsNullOrWhiteSpace($SecondaryAccessToken)) {
-        Add-NotRun -Id 'data-access-cross-user-isolation' -Category 'data-access' `
-            -Reason 'No secondary verification token was supplied, so cross-user isolation is unproven.'
-        return
-    }
-
-    # The second user must not see the first user's trips. Compare returned identifiers:
-    # any overlap means the ownership filter is not being applied.
-    $secondary = Invoke-VerificationRequest -Uri $uri -Token $SecondaryAccessToken
-    if ($secondary.StatusCode -ne 200) {
-        Add-Result -Id 'data-access-cross-user-isolation' -Category 'data-access' -Status 'fail' `
-            -Summary "The secondary verification user could not read their own trips (status $($secondary.StatusCode))." `
-            -DurationMilliseconds $secondary.Elapsed -EvidenceReference "GET $uri (secondary user)"
-        return
-    }
-
-    $primaryIds = @()
-    $secondaryIds = @()
-    try {
-        $primaryIds = @(($read.Content | ConvertFrom-Json) | ForEach-Object { $_.id })
-        $secondaryIds = @(($secondary.Content | ConvertFrom-Json) | ForEach-Object { $_.id })
-    }
-    catch {
-        Add-Result -Id 'data-access-cross-user-isolation' -Category 'data-access' -Status 'fail' `
-            -Summary 'The trips response could not be parsed, so cross-user isolation could not be confirmed.' `
-            -DurationMilliseconds $secondary.Elapsed -EvidenceReference "GET $uri (secondary user)"
-        return
-    }
-
-    $overlap = @($primaryIds | Where-Object { $secondaryIds -contains $_ })
-    if ($overlap.Count -eq 0) {
-        Add-Result -Id 'data-access-cross-user-isolation' -Category 'data-access' -Status 'pass' `
-            -Summary 'Two verification users see disjoint trip sets; ownership filtering holds.' `
-            -DurationMilliseconds $secondary.Elapsed -EvidenceReference "GET $uri (two users)"
-    }
-    else {
-        Add-Result -Id 'data-access-cross-user-isolation' -Category 'data-access' -Status 'fail' `
-            -Summary "$($overlap.Count) trip(s) were visible to both verification users; ownership filtering is not being applied." `
-            -DurationMilliseconds $secondary.Elapsed -EvidenceReference "GET $uri (two users)"
-    }
-}
-
-# ---------------------------------------------------------------------------
-# Category: core-trip-workflow
-# ---------------------------------------------------------------------------
-
-function Test-CoreTripWorkflow {
-    if (-not $online) {
-        Add-NotRun -Id 'core-trip-workflow-create' -Category 'core-trip-workflow' -Reason 'Offline mode: no trip was created.'
-        return
-    }
-
-    if ([string]::IsNullOrWhiteSpace($AccessToken) -or -not $script:ApiReachable) {
-        Add-NotRun -Id 'core-trip-workflow-create' -Category 'core-trip-workflow' -Reason 'Skipped: no authenticated session was available.'
-        return
-    }
-
-    $uri = "$($WebUrl.TrimEnd('/'))/api/trips"
-    $payload = @{
-        name      = "verification-$ReleaseId"
-        startDate = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')
-        endDate   = (Get-Date).ToUniversalTime().AddDays(1).ToString('yyyy-MM-dd')
-    }
-
-    $created = Invoke-VerificationRequest -Uri $uri -Method 'POST' -Token $AccessToken -Body $payload
-    if (@(200, 201) -contains $created.StatusCode) {
-        try { $script:CreatedTripId = ($created.Content | ConvertFrom-Json).id } catch { $script:CreatedTripId = $null }
-        Add-Result -Id 'core-trip-workflow-create' -Category 'core-trip-workflow' -Status 'pass' `
-            -Summary 'A trip was created through the public API.' `
-            -DurationMilliseconds $created.Elapsed -EvidenceReference "POST $uri"
-    }
-    else {
-        Add-Result -Id 'core-trip-workflow-create' -Category 'core-trip-workflow' -Status 'fail' `
-            -Summary "Creating a trip failed with status $($created.StatusCode); the core workflow is broken." `
-            -DurationMilliseconds $created.Elapsed -EvidenceReference "POST $uri"
-    }
-}
-
-# ---------------------------------------------------------------------------
-# Category: persistence-after-restart
-# ---------------------------------------------------------------------------
-
-function Test-PersistenceAfterRestart {
-    if (-not $online) {
-        Add-NotRun -Id 'persistence-after-restart-trip' -Category 'persistence-after-restart' -Reason 'Offline mode: persistence was not exercised.'
-        return
-    }
-
-    if ([string]::IsNullOrWhiteSpace($script:CreatedTripId)) {
-        Add-NotRun -Id 'persistence-after-restart-trip' -Category 'persistence-after-restart' `
-            -Reason 'Skipped: no verification trip was created, so persistence could not be observed.'
-        return
-    }
-
-    # The API scales to zero, so a second request after the replica has been recycled reads
-    # from PostgreSQL rather than from in-process state. Restarting the API revision is the
-    # cheapest way to force that without waiting out the scale-to-zero window.
-    if (-not [string]::IsNullOrWhiteSpace($ResourceGroup)) {
-        $apiApp = "ca-api-$EnvironmentName"
-        $revision = Invoke-AzCommand -Argument @(
-            'containerapp', 'revision', 'list', '-n', $apiApp, '-g', $ResourceGroup,
-            '--query', '[?properties.active].name | [0]', '-o', 'tsv')
-        if (-not [string]::IsNullOrWhiteSpace("$revision")) {
-            Invoke-AzCommand -Argument @('containerapp', 'revision', 'restart', '-n', $apiApp, '-g', $ResourceGroup, '--revision', "$revision") | Out-Null
-        }
-    }
-
-    $uri = "$($WebUrl.TrimEnd('/'))/api/trips/$($script:CreatedTripId)"
-    $response = Invoke-VerificationRequest -Uri $uri -Token $AccessToken
-    if ($response.StatusCode -eq 200) {
-        Add-Result -Id 'persistence-after-restart-trip' -Category 'persistence-after-restart' -Status 'pass' `
-            -Summary 'The verification trip survived an API replica restart; the Azure Files volume is durable.' `
-            -DurationMilliseconds $response.Elapsed -EvidenceReference "GET $uri"
-    }
-    else {
-        Add-Result -Id 'persistence-after-restart-trip' -Category 'persistence-after-restart' -Status 'fail' `
-            -Summary "The verification trip was not readable after a restart (status $($response.StatusCode)); data is not durable." `
-            -DurationMilliseconds $response.Elapsed -EvidenceReference "GET $uri"
-    }
-
-    # Clean up so verification never accumulates data in production.
-    Invoke-VerificationRequest -Uri $uri -Method 'DELETE' -Token $AccessToken | Out-Null
 }
 
 # ---------------------------------------------------------------------------
@@ -539,9 +375,6 @@ Test-Liveness
 Test-Readiness
 Test-SignIn
 Test-AuthenticatedApi
-Test-DataAccess
-Test-CoreTripWorkflow
-Test-PersistenceAfterRestart
 
 $checkArray = $checks.ToArray()
 $overallStatus = Get-VerificationOverallStatus -Check $checkArray
@@ -563,8 +396,7 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Get-DeploymentEvidencePath -Kind 'verification' -ReleaseId $ReleaseId -Root (Join-Path $repoRoot 'artifacts/deployment-evidence')
 }
 
-$written = Write-DeploymentEvidence -Evidence $report -Path $OutputPath -SchemaPath $schemaPath `
-    -KnownSecret @($AccessToken, $SecondaryAccessToken)
+$written = Write-DeploymentEvidence -Evidence $report -Path $OutputPath -SchemaPath $schemaPath
 
 Write-Host ""
 Write-Host "Deployment verification: $overallStatus" -ForegroundColor $(if ($overallStatus -eq 'pass') { 'Green' } else { 'Red' })

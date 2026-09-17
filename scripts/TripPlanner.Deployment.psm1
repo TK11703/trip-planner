@@ -39,9 +39,6 @@ $script:VerificationCategories = @(
     'readiness'
     'sign-in'
     'authenticated-api'
-    'data-access'
-    'core-trip-workflow'
-    'persistence-after-restart'
 )
 
 # Maps a failing verification category to the cause category and the first recovery step.
@@ -66,19 +63,7 @@ $script:VerificationFailureClassification = [ordered]@{
     }
     'authenticated-api'         = @{
         FailureCategory = 'authorization'
-        RecoveryAction  = 'Verify the API audience, the exposed access_as_user scope, and that admin consent has been granted for the web registration.'
-    }
-    'data-access'               = @{
-        FailureCategory = 'data-access'
-        RecoveryAction  = 'Check the PostgreSQL replica, the Key Vault connection-string reference, and the API identity role assignments. Do not roll forward until data access is restored.'
-    }
-    'core-trip-workflow'        = @{
-        FailureCategory = 'application'
-        RecoveryAction  = 'The release is reachable but a core trip workflow failed. Roll back to the previous commit SHA and reproduce the failure in a non-production environment.'
-    }
-    'persistence-after-restart' = @{
-        FailureCategory = 'persistence'
-        RecoveryAction  = 'Data did not survive a replica restart. Confirm the postgres app still mounts the Azure Files volume and remains pinned to exactly one replica, then restore from the latest recovery point.'
+        RecoveryAction  = 'A protected route did not challenge an anonymous caller. Verify the API audience, the exposed access_as_user scope, and that admin consent has been granted for the web registration.'
     }
 }
 
@@ -342,7 +327,7 @@ function New-VerificationCheck {
         [Parameter(Mandatory = $true)][string] $Id,
         [Parameter(Mandatory = $true)][ValidateSet(
             'secure-reachability', 'liveness', 'readiness', 'sign-in',
-            'authenticated-api', 'data-access', 'core-trip-workflow', 'persistence-after-restart')]
+            'authenticated-api')]
         [string] $Category,
         [Parameter(Mandatory = $true)][ValidateSet('pass', 'fail', 'not-run')][string] $Status,
         [Parameter(Mandatory = $true)][string] $Summary,
