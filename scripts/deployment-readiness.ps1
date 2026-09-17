@@ -385,18 +385,30 @@ function Test-Identity {
             -CorrectiveAction 'Re-run provisioning so infra/identity.bicep creates the missing identities.'
     }
 
+    # `--all` is subscription-wide and the CLI rejects it alongside `--resource-group`.
+    # Scoping with `--resource-group` alone is no good either: it matches only assignments
+    # made at the group scope, and every assignment here sits on a child resource.
     $assignments = Invoke-AzCommand -Argument @(
-        'role', 'assignment', 'list', '--resource-group', $ResourceGroup, '--all',
-        '--query', '[].roleDefinitionName', '-o', 'json')
-    $roleNames = @($assignments)
+        'role', 'assignment', 'list', '--all',
+        '--query', '[].{role:roleDefinitionName,scope:scope}', '-o', 'json')
+
+    $groupScope = "/resourceGroups/$ResourceGroup/"
+    $roleNames = @($assignments |
+        Where-Object { "$($_.scope)/" -like "*$groupScope*" } |
+        ForEach-Object { $_.role })
 
     $requiredRoles = @('AcrPull', 'Key Vault Secrets User', 'Storage Blob Data Contributor')
     $missingRoles = @($requiredRoles | Where-Object { $roleNames -notcontains $_ })
 
-    if ($missingRoles.Count -eq 0) {
+    if ($null -eq $assignments) {
+        Add-Check -Id 'identity-role-assignments' -Category 'identity' -Status 'fail' `
+            -Summary 'Could not read role assignments; the lookup itself failed.' `
+            -CorrectiveAction 'Confirm the deploying principal can read role assignments (Reader on the subscription is enough) and re-run. This is a failed query, not a missing assignment.'
+    }
+    elseif ($missingRoles.Count -eq 0) {
         Add-Check -Id 'identity-role-assignments' -Category 'identity' -Status 'pass' `
             -Summary 'Least-privilege role assignments for registry, Key Vault, and storage are in place.' `
-            -EvidenceReference "az role assignment list --resource-group $ResourceGroup --all"
+            -EvidenceReference 'az role assignment list --all'
     }
     else {
         Add-Check -Id 'identity-role-assignments' -Category 'identity' -Status 'fail' `
