@@ -9,6 +9,10 @@ namespace TripPlanner.Web.Health;
 /// <remarks>
 /// Probes the API's own liveness endpoint, which does not touch remote dependencies, so a
 /// slow database does not cascade into Web replicas being pulled from traffic.
+/// Reports Degraded rather than Unhealthy: the API runs at minReplicas 0, so an unreachable
+/// API usually means "cold, activating" rather than "broken", and Web still serves its
+/// anonymous pages. Unhealthy would return 503 and fail the Container Apps readiness probe,
+/// taking the front end out of rotation because a dependency was asleep.
 /// </remarks>
 public sealed class ApiReachabilityHealthCheck(IHttpClientFactory httpClientFactory) : IHealthCheck
 {
@@ -26,11 +30,11 @@ public sealed class ApiReachabilityHealthCheck(IHttpClientFactory httpClientFact
 
             return response.IsSuccessStatusCode
                 ? HealthCheckResult.Healthy()
-                : HealthCheckResult.Unhealthy("The API liveness endpoint returned a failure status.");
+                : HealthCheckResult.Degraded("The API liveness endpoint returned a failure status.");
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy("The API is not reachable.", ex);
+            return HealthCheckResult.Degraded("The API is not reachable.", ex);
         }
     }
 }

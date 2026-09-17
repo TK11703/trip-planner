@@ -152,9 +152,10 @@ Hosting is cheap by design: `web` and `api` run on **Container Apps Consumption*
 `minReplicas: 0`, which keeps their combined consumption inside the Container Apps free
 grant; images live in a **Basic** ACR; telemetry goes to the **managed Aspire dashboard**
 (no extra compute); Log Analytics is capped at 1 GB/day. The **Azure Database for
-PostgreSQL Flexible Server** (Burstable `Standard_B1ms`) is the only always-on cost.
-Estimated cost in `eastus2` is **≈ $24/month** — see
-[.azure/deployment-plan.md](.azure/deployment-plan.md) for the full breakdown.
+PostgreSQL Flexible Server** (Burstable `Standard_B1ms`) is the only always-on cost,
+at **≈ $24/month**. The full line-item breakdown is generated locally into
+`.azure/deployment-plan.md`, which is not committed because it carries subscription
+identifiers.
 
 ### Required GitHub configuration
 

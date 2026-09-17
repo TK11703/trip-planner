@@ -51,6 +51,11 @@ param(
 
     [int] $TimeoutSeconds = 30,
 
+    # Both container apps run at minReplicas 0, so the first request of a run may have to
+    # wait out a cold start. Three attempts at the 30s timeout gives activation ~90s.
+    [ValidateRange(1, 10)]
+    [int] $ActivationAttempts = 3,
+
     [switch] $Offline
 )
 
@@ -203,7 +208,22 @@ function Test-SecureReachability {
     }
 
     # A sign-in redirect (302) is a healthy response for an authenticated app.
-    $response = Invoke-VerificationRequest -Uri $WebUrl
+    #
+    # This is the first request of the run, so it is the one that pays for activation: both
+    # container apps scale to zero, and a cold start can outlast a single request timeout.
+    # Without the retry the gate fails at random on an app that is merely asleep, so a
+    # release outcome would depend on whether anyone happened to browse the site recently.
+    # Only a transport failure is retried -- an answer of any status is a real answer.
+    $response = $null
+    for ($attempt = 1; $attempt -le $ActivationAttempts; $attempt++) {
+        $response = Invoke-VerificationRequest -Uri $WebUrl
+        if ($response.Succeeded) { break }
+
+        if ($attempt -lt $ActivationAttempts) {
+            Write-Verbose "Web app unreachable on attempt $attempt of $ActivationAttempts; retrying while the revision activates."
+        }
+    }
+
     if ($response.Succeeded -and @(200, 302) -contains $response.StatusCode) {
         Add-Result -Id 'secure-reachability-https' -Category 'secure-reachability' -Status 'pass' `
             -Summary "The web app answered over HTTPS with status $($response.StatusCode)." `
@@ -281,7 +301,8 @@ function Test-Readiness {
     # data-protection key ring; the API's own /health covers PostgreSQL and migrations.
     $uri = "$($WebUrl.TrimEnd('/'))/health"
     $response = Invoke-VerificationRequest -Uri $uri
-    if ($response.Succeeded -and $response.StatusCode -eq 200 -and $response.Content -match 'Healthy') {
+    # Anchored to the JSON field: a bare 'Healthy' substring also matches 'Unhealthy'.
+    if ($response.Succeeded -and $response.StatusCode -eq 200 -and $response.Content -match '"status"\s*:\s*"Healthy"') {
         Add-Result -Id 'readiness-web' -Category 'readiness' -Status 'pass' `
             -Summary 'All web dependencies report healthy.' `
             -DurationMilliseconds $response.Elapsed -EvidenceReference "GET $uri"

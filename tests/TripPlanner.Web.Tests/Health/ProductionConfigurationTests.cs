@@ -125,6 +125,32 @@ public class ProductionConfigurationTests
         Assert.Contains(builder.Services, d => d.ServiceType == typeof(IKeyManager));
     }
 
+    [Fact]
+    public async Task ApiReachability_IsDegradedRatherThanUnhealthy_WhenTheApiIsUnreachable()
+    {
+        // Degraded keeps /health answering 200, so a cold scale-to-zero API cannot fail the
+        // Container Apps readiness probe and pull Web replicas out of rotation.
+        var check = new ApiReachabilityHealthCheck(new UnreachableHttpClientFactory());
+
+        var result = await check.CheckHealthAsync(Context);
+
+        Assert.Equal(HealthStatus.Degraded, result.Status);
+    }
+
+    private sealed class UnreachableHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) =>
+            new(new UnreachableHandler()) { BaseAddress = new Uri("https://api.invalid") };
+
+        private sealed class UnreachableHandler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken) =>
+                throw new HttpRequestException("The API is not reachable.");
+        }
+    }
+
     private sealed class ThrowingDataProtectionProvider : IDataProtectionProvider
     {
         public IDataProtector CreateProtector(string purpose) =>

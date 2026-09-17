@@ -77,7 +77,9 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddHttpClient(ApiReachabilityHealthCheck.HttpClientName, client =>
         {
             client.BaseAddress = new Uri("https+http://api");
-            client.Timeout = TimeSpan.FromSeconds(5);
+            // Must stay well under the Container Apps readiness probe's 5s timeout, or a cold
+            // API makes /health time out rather than answer Degraded.
+            client.Timeout = TimeSpan.FromSeconds(2);
         });
 
         // Readiness checks. None are tagged "live", so /alive stays dependency-free.

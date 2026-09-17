@@ -69,7 +69,8 @@ packages/
 .env*
 
 # Azure Developer CLI local environment state.
-# `.azure/deployment-plan.md` is intentionally tracked; per-environment folders are not.
+# `.azure/accepted-risks.json` is intentionally tracked (see `.azure/.gitignore`);
+# per-environment folders, azd config, and the locally generated deployment plan are not.
 .azure/*/
 .azure/config.json
 

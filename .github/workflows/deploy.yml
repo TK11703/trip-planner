@@ -55,6 +55,17 @@ jobs:
       - name: Test
         run: dotnet test TripPlanner.slnx -c Release --no-build --verbosity normal
 
+      # The readiness and verification gates are PowerShell, so `dotnet test` never touched
+      # them. Without this step a broken gate only surfaces mid-release, against production.
+      - name: Test deployment gates
+        shell: pwsh
+        run: |
+          Install-Module Pester -MinimumVersion 6.2.0 -Force -Scope CurrentUser -SkipPublisherCheck
+          $result = Invoke-Pester -Path tests/deployment -Output Detailed -PassThru
+          if ($result.FailedCount -gt 0) {
+            throw "$($result.FailedCount) deployment gate test(s) failed."
+          }
+
   package:
     name: Build & Push Images
     # Runs before the approval gate so the readiness report can reference the exact
