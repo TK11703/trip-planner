@@ -50,7 +50,7 @@ This is a distributed .NET application with Bicep infrastructure:
 - [X] T006 [P] Create `infra/storage.bicep` that owns the storage account and adds the private `dataprotection` blob container (the `backups` container and its 30-day lifecycle rule were dropped when PostgreSQL moved to a managed Flexible Server with point-in-time restore)
 - [X] T007 Rewrite `infra/identity.bicep` to create three user-assigned managed identities (ACR pull, Web runtime, API runtime) and output each id, principalId, and clientId (the backup runtime identity was dropped with the nightly-dump job)
 - [X] T008 Create `infra/rbac.bicep` assigning `AcrPull`, `Key Vault Secrets User`, `Storage Blob Data Contributor`, and `Cognitive Services OpenAI User` at the narrowest supported resource scope per identity
-- [X] T009 Update `infra/environment.bicep` to consume the extracted storage account from `infra/storage.bicep` while preserving the existing Azure Files share wiring used by PostgreSQL
+- [X] T009 Update `infra/environment.bicep` to drop the storage account and the Azure Files share it wired for the self-managed PostgreSQL container app, leaving Log Analytics and the managed environment (the share became unnecessary once PostgreSQL moved to a managed Flexible Server; the storage account moved to `infra/storage.bicep`, which now serves data protection only)
 - [X] T010 Update `infra/main.bicep` to compose the key-vault, storage, identity, and rbac modules and pass per-workload identities to each application module
 - [X] T011 Add `azd`-convention outputs to `infra/main.bicep` for registry endpoint, Key Vault endpoint, service URIs, environment id, and resource names consumed by deployment scripts
 - [X] T012 [P] Add cost/ownership resource tags and `budgetAmount`/`budgetContact` parameters to `infra/main.bicep`
@@ -111,7 +111,7 @@ This is a distributed .NET application with Bicep infrastructure:
 - [X] T035 [US2] Persist ASP.NET data-protection keys to the `dataprotection` blob container and protect the key ring with Key Vault in `src/TripPlanner.Web/Extensions/WebApplicationBuilderExtensions.cs`
 - [X] T036 [US2] Update `infra/api.bicep` to use the API identity, Key Vault secret references, startup/liveness/readiness probes, an explicit HTTP scale rule with `minReplicas: 0`, and Azure OpenAI configuration
 - [X] T037 [US2] Update `infra/web.bicep` to use the Web identity, Key Vault secret references, health probes, an explicit HTTP scale rule with `minReplicas: 0`, the production base URI, and data-protection settings
-- [X] T038 [US2] Update `infra/postgres.bicep` to source its password from a Key Vault reference and retain exactly one replica with the persistent Azure Files volume
+- [X] T038 [US2] Replace the self-managed PostgreSQL container app in `infra/postgres.bicep` with a Burstable Flexible Server that takes its administrator password as a secure parameter (stored in Key Vault by `infra/key-vault.bicep`, never an output) and enables Entra authentication so the API connects with its managed identity and no password in the connection string
 - [X] T039 [US2] Document the production Entra registration steps, redirect/sign-out URIs, API scope, and consent requirements in `docs/operations/production-runbook.md`
 - [X] T040 [US2] Convert the provisioning and image steps in `.github/workflows/deploy.yml` to the shared `azd` flow while preserving OIDC, the production approval gate, immutable commit-SHA tags, and release serialization
 
