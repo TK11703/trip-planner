@@ -7,7 +7,7 @@ namespace TripPlanner.Api.Features.Notifications;
 /// reports success when an address is present, or suppression when it is missing. This keeps in-app
 /// delivery reliable and lets a real transport be substituted via configuration later.
 /// </summary>
-public sealed class DevelopmentNotificationEmailSender : INotificationEmailSender
+public sealed partial class DevelopmentNotificationEmailSender : INotificationEmailSender
 {
     private readonly ILogger<DevelopmentNotificationEmailSender> _logger;
 
@@ -17,11 +17,17 @@ public sealed class DevelopmentNotificationEmailSender : INotificationEmailSende
     {
         if (string.IsNullOrWhiteSpace(email.RecipientEmail))
         {
-            _logger.LogInformation("Suppressing notification email {NotificationId}: no recipient address.", email.NotificationId);
+            LogSuppressed(email.NotificationId);
             return Task.FromResult(EmailSendResult.SuppressedResult("No recipient email address."));
         }
 
-        _logger.LogInformation("Notification email {NotificationId} to {Recipient}: {Subject}", email.NotificationId, email.RecipientEmail, email.Subject);
+        LogSent(email.NotificationId, email.RecipientEmail, email.Subject);
         return Task.FromResult(EmailSendResult.Success());
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Suppressing notification email {NotificationId}: no recipient address.")]
+    private partial void LogSuppressed(Guid notificationId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Notification email {NotificationId} to {Recipient}: {Subject}")]
+    private partial void LogSent(Guid notificationId, string recipient, string subject);
 }

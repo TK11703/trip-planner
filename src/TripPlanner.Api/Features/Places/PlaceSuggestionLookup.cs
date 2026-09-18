@@ -32,7 +32,7 @@ public interface IPlaceGeocoder
     Task<GeoPoint?> GeocodeAsync(string query, CancellationToken ct);
 }
 
-public sealed class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPlaceGeocoder
+public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPlaceGeocoder
 {
     public const string HttpClientName = "azuremaps";
 
@@ -97,9 +97,7 @@ public sealed class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPl
             using var response = await http.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning(
-                    "Azure Maps search returned {StatusCode} for a place suggestion. A 401/403 usually means the identity lacks the Azure Maps Search and Render Data Reader role, or AzureMaps:ClientId is wrong.",
-                    (int)response.StatusCode);
+                LogSearchFailed((int)response.StatusCode);
                 return Array.Empty<PlaceSuggestion>();
             }
 
@@ -136,7 +134,7 @@ public sealed class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPl
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Azure Maps place suggestion lookup failed.");
+            LogSearchError(ex);
             return Array.Empty<PlaceSuggestion>();
         }
     }
@@ -164,9 +162,7 @@ public sealed class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPl
             using var response = await http.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning(
-                    "Azure Maps geocode returned {StatusCode}. A 401/403 usually means the identity lacks the Azure Maps Search and Render Data Reader role, or AzureMaps:ClientId is wrong.",
-                    (int)response.StatusCode);
+                LogGeocodeFailed((int)response.StatusCode);
                 return null;
             }
 
@@ -199,8 +195,20 @@ public sealed class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPl
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Azure Maps geocode failed.");
+            LogGeocodeError(ex);
             return null;
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps search returned {StatusCode} for a place suggestion. A 401/403 usually means the identity lacks the Azure Maps Search and Render Data Reader role, or AzureMaps:ClientId is wrong.")]
+    private partial void LogSearchFailed(int statusCode);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps place suggestion lookup failed.")]
+    private partial void LogSearchError(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps geocode returned {StatusCode}. A 401/403 usually means the identity lacks the Azure Maps Search and Render Data Reader role, or AzureMaps:ClientId is wrong.")]
+    private partial void LogGeocodeFailed(int statusCode);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps geocode failed.")]
+    private partial void LogGeocodeError(Exception exception);
 }

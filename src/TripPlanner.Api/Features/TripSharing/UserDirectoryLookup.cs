@@ -18,7 +18,7 @@ public interface IUserDirectoryLookup
     Task<IReadOnlyList<DirectoryUserResult>> SearchAsync(string query, CancellationToken ct);
 }
 
-public sealed class GraphUserDirectoryLookup : IUserDirectoryLookup
+public sealed partial class GraphUserDirectoryLookup : IUserDirectoryLookup
 {
     public const string HttpClientName = "graph";
     private static readonly string[] GraphScopes = ["https://graph.microsoft.com/.default"];
@@ -67,10 +67,7 @@ public sealed class GraphUserDirectoryLookup : IUserDirectoryLookup
             if (!response.IsSuccessStatusCode)
             {
                 var body = await response.Content.ReadAsStringAsync(ct);
-                _logger.LogWarning(
-                    "Directory lookup returned {StatusCode}. A 403 usually means the app is missing the Microsoft Graph application permission User.ReadBasic.All with admin consent. Graph response: {Body}",
-                    (int)response.StatusCode,
-                    body);
+                LogLookupFailed((int)response.StatusCode, body);
                 return Array.Empty<DirectoryUserResult>();
             }
 
@@ -99,17 +96,24 @@ public sealed class GraphUserDirectoryLookup : IUserDirectoryLookup
         }
         catch (AuthenticationFailedException ex)
         {
-            _logger.LogWarning(
-                ex,
-                "Directory lookup could not acquire a Microsoft Graph token. Configure AzureEntra:ClientSecret (with the User.ReadBasic.All application permission, admin-consented) or sign in locally (for example `az login`).");
+            LogTokenAcquisitionFailed(ex);
             return Array.Empty<DirectoryUserResult>();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Directory lookup failed for a share search.");
+            LogLookupError(ex);
             return Array.Empty<DirectoryUserResult>();
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Directory lookup returned {StatusCode}. A 403 usually means the app is missing the Microsoft Graph application permission User.ReadBasic.All with admin consent. Graph response: {Body}")]
+    private partial void LogLookupFailed(int statusCode, string body);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Directory lookup could not acquire a Microsoft Graph token. Configure AzureEntra:ClientSecret (with the User.ReadBasic.All application permission, admin-consented) or sign in locally (for example `az login`).")]
+    private partial void LogTokenAcquisitionFailed(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Directory lookup failed for a share search.")]
+    private partial void LogLookupError(Exception exception);
 
     private static string? GetString(JsonElement element, string property)
         => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String

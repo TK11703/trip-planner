@@ -19,7 +19,7 @@ public sealed record RelayIngestionResult(int StatusCode, IngestRelayMessageResp
 /// validate → resolve traveler from sender → compute dedupe hash → decode attachments →
 /// insert message → insert attachments → recognize → persist drafts and notify → return.
 /// </summary>
-public sealed class RelayMessageProcessor
+public sealed partial class RelayMessageProcessor
 {
     private readonly IInboxEmailRepository _emails;
     private readonly IEmailAttachmentRepository _attachments;
@@ -112,7 +112,7 @@ public sealed class RelayMessageProcessor
         var resolution = await _senderResolver.ResolveAsync(request.Sender, ct);
         if (resolution.Outcome != SenderResolutionOutcome.Resolved)
         {
-            _logger.LogWarning("Rejected relayed message: sender could not be attributed ({Outcome}).", resolution.Outcome);
+            LogSenderNotAttributed(resolution.Outcome);
             var detail = resolution.Outcome == SenderResolutionOutcome.Ambiguous
                 ? "The sender address matches more than one traveler."
                 : "The sender address does not match any traveler.";
@@ -153,7 +153,7 @@ public sealed class RelayMessageProcessor
 
         if (stored is null)
         {
-            _logger.LogInformation("Relayed message for traveler {UserId} was already ingested; no new drafts created.", userId);
+            LogDuplicateMessage(userId);
             return new RelayIngestionResult(StatusCodes.Status200OK,
                 new IngestRelayMessageResponse(EmailIngestionOutcome.Duplicate, null, [], "This message was already ingested."));
         }
@@ -189,7 +189,7 @@ public sealed class RelayMessageProcessor
         if (recognition.ParseStatus == InboxEmailParseStatus.Failed)
         {
             await _emails.UpdateParseStatusAsync(inboxEmailId, userId, InboxEmailParseStatus.Failed, ct);
-            _logger.LogWarning("Recognition failed for inbox email {InboxEmailId} (traveler {UserId}).", inboxEmailId, userId);
+            LogRecognitionFailed(inboxEmailId, userId);
             return new RelayIngestionResult(StatusCodes.Status502BadGateway,
                 new IngestRelayMessageResponse(EmailIngestionOutcome.ProcessingFailed, inboxEmailId, [], "Recognition is unavailable; retry later."));
         }
@@ -209,7 +209,7 @@ public sealed class RelayMessageProcessor
 
         if (draftIds.Count == 0)
         {
-            _logger.LogInformation("Inbox email {InboxEmailId} (traveler {UserId}) contained nothing recognizable.", inboxEmailId, userId);
+            LogNothingRecognized(inboxEmailId, userId);
             return new RelayIngestionResult(StatusCodes.Status200OK,
                 new IngestRelayMessageResponse(EmailIngestionOutcome.NoContent, inboxEmailId, [], "No trip item could be recognized."));
         }
@@ -224,10 +224,25 @@ public sealed class RelayMessageProcessor
             Message: "A relayed email was processed. Review and confirm the extracted items.",
             SourceEventKey: $"email-parsed:{inboxEmailId}"), ct);
 
-        _logger.LogInformation("Inbox email {InboxEmailId} (traveler {UserId}) produced {DraftCount} draft(s).", inboxEmailId, userId, draftIds.Count);
+        LogDraftsCreated(inboxEmailId, userId, draftIds.Count);
         return new RelayIngestionResult(StatusCodes.Status200OK,
             new IngestRelayMessageResponse(EmailIngestionOutcome.Parsed, inboxEmailId, draftIds, null));
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Rejected relayed message: sender could not be attributed ({Outcome}).")]
+    private partial void LogSenderNotAttributed(SenderResolutionOutcome outcome);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Relayed message for traveler {UserId} was already ingested; no new drafts created.")]
+    private partial void LogDuplicateMessage(string userId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Recognition failed for inbox email {InboxEmailId} (traveler {UserId}).")]
+    private partial void LogRecognitionFailed(Guid inboxEmailId, string userId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Inbox email {InboxEmailId} (traveler {UserId}) contained nothing recognizable.")]
+    private partial void LogNothingRecognized(Guid inboxEmailId, string userId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Inbox email {InboxEmailId} (traveler {UserId}) produced {DraftCount} draft(s).")]
+    private partial void LogDraftsCreated(Guid inboxEmailId, string userId, int draftCount);
 
     private static string AssembleText(string subject, string? bodyText, IReadOnlyList<string> attachmentText)
     {

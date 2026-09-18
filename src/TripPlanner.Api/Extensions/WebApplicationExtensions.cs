@@ -13,7 +13,7 @@ using TripPlanner.Database.Initialization;
 
 namespace TripPlanner.Api.Extensions;
 
-public static class WebApplicationExtensions
+public static partial class WebApplicationExtensions
 {
     public static WebApplication UseTripPlannerApi(this WebApplication app)
     {
@@ -97,7 +97,13 @@ public static class WebApplicationExtensions
         catch (Exception ex)
         {
             var logger = context.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("TripPlanner.Api.SecurityAudit");
-            logger?.LogDebug(ex, "Unable to record denied protected-data access outcome.");
+            if (logger is not null)
+            {
+                LogAuditRecordFailed(logger, ex);
+            }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Unable to record denied protected-data access outcome.")]
+    private static partial void LogAuditRecordFailed(ILogger logger, Exception exception);
 }

@@ -6,7 +6,7 @@ using TripPlanner.Contracts.Errors;
 
 namespace TripPlanner.Api.Extensions;
 
-public static class AuthenticationExtensions
+public static partial class AuthenticationExtensions
 {
     public const string AuthenticatedUserPolicy = "AuthenticatedUser";
 
@@ -29,7 +29,7 @@ public static class AuthenticationExtensions
                 var logger = context.HttpContext.RequestServices
                     .GetRequiredService<ILoggerFactory>()
                     .CreateLogger("TripPlanner.Api.JwtBearer");
-                logger.LogWarning(context.Exception, "JWT authentication failed: {Message}", context.Exception?.Message);
+                LogAuthenticationFailed(logger, context.Exception, context.Exception?.Message);
                 return Task.CompletedTask;
             };
             options.Events.OnChallenge = async context =>
@@ -37,8 +37,7 @@ public static class AuthenticationExtensions
                 var logger = context.HttpContext.RequestServices
                     .GetRequiredService<ILoggerFactory>()
                     .CreateLogger("TripPlanner.Api.JwtBearer");
-                logger.LogWarning("JWT challenge: error={Error}, description={Description}, failure={Failure}",
-                    context.Error, context.ErrorDescription, context.AuthenticateFailure?.Message);
+                LogChallenge(logger, context.Error, context.ErrorDescription, context.AuthenticateFailure?.Message);
                 context.HandleResponse();
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 context.Response.ContentType = "application/json";
@@ -49,7 +48,8 @@ public static class AuthenticationExtensions
                 var logger = context.HttpContext.RequestServices
                     .GetRequiredService<ILoggerFactory>()
                     .CreateLogger("TripPlanner.Api.JwtBearer");
-                logger.LogWarning("JWT forbidden for {Path}. Token had scopes: {Scopes}",
+                LogForbidden(
+                    logger,
                     context.HttpContext.Request.Path,
                     string.Join(" ", context.Principal?.FindAll("scp").Concat(context.Principal.FindAll("scope")).Select(c => c.Value) ?? Array.Empty<string>()));
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -100,4 +100,13 @@ public static class AuthenticationExtensions
 
         return grantedScopes.Any(scope => requiredScopes.Contains(scope));
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "JWT authentication failed: {Message}")]
+    private static partial void LogAuthenticationFailed(ILogger logger, Exception? exception, string? message);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "JWT challenge: error={Error}, description={Description}, failure={Failure}")]
+    private static partial void LogChallenge(ILogger logger, string? error, string? description, string? failure);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "JWT forbidden for {Path}. Token had scopes: {Scopes}")]
+    private static partial void LogForbidden(ILogger logger, string path, string scopes);
 }

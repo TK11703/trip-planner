@@ -102,7 +102,7 @@ public sealed partial class EmailParserService : IItemRecognizer
             var recognized = Deserialize(content);
             if (recognized is null)
             {
-                _logger.LogWarning("Recognition returned unusable output for inbox email {InboxEmailId}.", inboxEmailId);
+                LogRecognitionUnusable(inboxEmailId);
                 return RecognitionResult.Failed();
             }
 
@@ -114,7 +114,7 @@ public sealed partial class EmailParserService : IItemRecognizer
 
             if (drafts.Length == 0)
             {
-                _logger.LogInformation("Recognition found no usable booking in inbox email {InboxEmailId}.", inboxEmailId);
+                LogRecognitionEmpty(inboxEmailId);
                 return RecognitionResult.Unsupported();
             }
 
@@ -122,10 +122,19 @@ public sealed partial class EmailParserService : IItemRecognizer
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Recognition provider failed for inbox email {InboxEmailId}.", inboxEmailId);
+            LogRecognitionProviderFailed(ex, inboxEmailId);
             return RecognitionResult.Failed();
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Recognition returned unusable output for inbox email {InboxEmailId}.")]
+    private partial void LogRecognitionUnusable(Guid inboxEmailId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Recognition found no usable booking in inbox email {InboxEmailId}.")]
+    private partial void LogRecognitionEmpty(Guid inboxEmailId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Recognition provider failed for inbox email {InboxEmailId}.")]
+    private partial void LogRecognitionProviderFailed(Exception exception, Guid inboxEmailId);
 
     private static NewParsedItemDraft ToDraft(Guid inboxEmailId, string userId, RecognizedItem recognized) => new(
         InboxEmailId: inboxEmailId,

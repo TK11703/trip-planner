@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using TripPlanner.Database.Connections;
 using TripPlanner.Database.Sql;
 
@@ -16,11 +17,12 @@ namespace TripPlanner.Database.Initialization;
 /// transaction alongside its ledger entry, so a failure leaves the database on the last
 /// successfully applied migration rather than half-way through one.
 /// </remarks>
-public sealed class DatabaseInitializer
+public sealed partial class DatabaseInitializer
 {
-    private readonly ILogger<DatabaseInitializer>? _logger;
+    private readonly ILogger<DatabaseInitializer> _logger;
 
-    public DatabaseInitializer(ILogger<DatabaseInitializer>? logger = null) => _logger = logger;
+    public DatabaseInitializer(ILogger<DatabaseInitializer>? logger = null)
+        => _logger = logger ?? NullLogger<DatabaseInitializer>.Instance;
 
     /// <summary>
     /// Raised when an already-applied script has been edited. Startup must not continue:
@@ -45,7 +47,7 @@ public sealed class DatabaseInitializer
         var scripts = sql.GetAllInDirectory("Schema");
         if (scripts.Count == 0)
         {
-            _logger?.LogInformation("No schema scripts located; skipping database initialization.");
+            LogNoScripts();
             return;
         }
 
@@ -71,7 +73,7 @@ public sealed class DatabaseInitializer
                         throw new MigrationChecksumMismatchException(name);
                     }
 
-                    _logger?.LogDebug("Migration {Migration} already applied; skipping.", name);
+                    LogMigrationSkipped(name);
                     continue;
                 }
 
@@ -79,10 +81,7 @@ public sealed class DatabaseInitializer
                 appliedNow++;
             }
 
-            _logger?.LogInformation(
-                "Database initialization complete: {Applied} migration(s) applied, {Total} total.",
-                appliedNow,
-                scripts.Count);
+            LogInitializationComplete(appliedNow, scripts.Count);
         }
         finally
         {
@@ -99,7 +98,7 @@ public sealed class DatabaseInitializer
         string releaseId,
         CancellationToken cancellationToken)
     {
-        _logger?.LogInformation("Applying migration {Migration}", name);
+        LogApplyingMigration(name);
 
         var stopwatch = Stopwatch.StartNew();
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -125,4 +124,16 @@ public sealed class DatabaseInitializer
             throw;
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "No schema scripts located; skipping database initialization.")]
+    private partial void LogNoScripts();
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Migration {Migration} already applied; skipping.")]
+    private partial void LogMigrationSkipped(string migration);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Database initialization complete: {Applied} migration(s) applied, {Total} total.")]
+    private partial void LogInitializationComplete(int applied, int total);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Applying migration {Migration}")]
+    private partial void LogApplyingMigration(string migration);
 }
