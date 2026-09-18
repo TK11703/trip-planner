@@ -412,11 +412,28 @@ the running production server is not at risk during a restore.
 
    Pick a time **just before** the damaging change, not after it.
 
-3. Verify the restored copy before trusting it. Connect to the new server and confirm the
-   migration ledger and a representative table are intact:
+3. Verify the restored copy before trusting it. **A restored server inherits no firewall
+   rules**, so it starts unreachable even though the source was reachable. Add one for your
+   client address first:
+
+   ```powershell
+   az postgres flexible-server firewall-rule create -g <resource-group> `
+       -n <server>-restore-<yyyyMMdd> -r verify-client `
+       --start-ip-address <your-ip> --end-ip-address <your-ip>
+   ```
+
+   Authenticate as the Entra admin rather than `pgadmin` — the stored admin password
+   contains shell metacharacters that the CLI re-parses, so passing it on a command line
+   fails confusingly and can echo fragments of it:
+
+   ```powershell
+   $tok = az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv
+   ```
+
+   Then confirm the migration ledger and a representative table are intact:
 
    ```sql
-   SELECT migration_id, applied_at FROM schema_migrations ORDER BY applied_at DESC LIMIT 5;
+   SELECT migration_id, applied_at_utc FROM schema_migrations ORDER BY applied_at_utc DESC LIMIT 5;
    SELECT count(*) FROM trips;
    ```
 
@@ -425,9 +442,12 @@ the running production server is not at risk during a restore.
 
 4. Inspect the restored data and confirm it contains the records you expect to recover.
 5. Promoting a verified restore into production is a **separate, deliberate step**. Stop the
-   `api` app first so nothing writes during the swap, repoint
-   `AZURE_POSTGRES_FQDN` / the `tripplanner` connection string at the restored server,
-   restart `api`, and run `scripts/deployment-verify.ps1` before declaring the incident closed.
+   `api` app first so nothing writes during the swap. **Recreate the
+   `AllowAllAzureServicesAndResourcesWithinAzureIps` rule on the restored server** — without
+   it the Container Apps environment cannot reach the database, and this topology has no
+   VNet to fall back on. Then repoint `AZURE_POSTGRES_FQDN` / the `tripplanner` connection
+   string at the restored server, restart `api`, and run `scripts/deployment-verify.ps1`
+   before declaring the incident closed.
 6. **Delete the restored server once the incident is closed.** It bills at the same rate as
    production and is the most likely source of a surprise invoice after an incident.
 
@@ -438,6 +458,11 @@ the running production server is not at risk during a restore.
 - **RTO** — bounded by how long Azure takes to stand up the restored server, typically tens
   of minutes, plus verification. Slower than restoring a dump for a dataset this small, but
   it needs no operator-maintained tooling.
+- **Last rehearsed** — 2026-09-18. Restore of `psql-trip-planner-ggg3cumf6h2cs` to a
+  throwaway server took **8.1 minutes**; the ledger came back intact through
+  `014_trip_leg_modes.sql`. Entra admins and the `azure.extensions` allow-list were
+  inherited; firewall rules were not, which is why step 3 and step 5 now call that out.
+  Rehearse again after any change to the server's authentication or networking.
 - **Retention** — 7 days. Damage discovered on day 8 is unrecoverable. If that is too tight,
   raise `backupRetentionDays` in [`infra/postgres.bicep`](../../infra/postgres.bicep) (max 35);
   retention beyond provisioned storage is billed at $0.095/GB-month.
