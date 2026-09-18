@@ -8,17 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- AngleSharp is pulled by bunit and stays on 1.2.0, exposed to GHSA-pgww-w46g-26qg.
-         The 1.5.0 fix drops IHtmlCollection<T>.get_Item, which bunit 1.40.0 (latest) calls.
-         Test-only: the advisory concerns sanitizers parsing untrusted HTML, not rendering assertions. -->
-    <PackageReference Include="bunit" Version="1.40.0" />
-    <PackageReference Include="coverlet.collector" Version="6.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.9" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <!-- Pinned above the version Microsoft.NET.Test.Sdk resolves, for GHSA-g8r8-53c2-pm3f. -->
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.12" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="bunit" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="System.Security.Cryptography.Xml" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
   <ItemGroup>
