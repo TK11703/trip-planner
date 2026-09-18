@@ -56,7 +56,7 @@ description: "Task list for Trip Location Maps"
 - [x] T003 [P] [US1] Geocoder unit tests (parse `position`, null on no-result/failure/blank/not-configured) in `tests/TripPlanner.Api.Tests/Places/AzureMapsPlaceGeocoderTests.cs`.
 - [x] T004 [P] [US1] Trip-map endpoint tests (owner returns resolved points; unresolved texts omitted; shared text fans out; non-owner/unknown trip → not found; not-configured/provider-failure → empty/partial, 200 OK) in `tests/TripPlanner.Api.Tests/TripMaps/GetTripMapEndpointTests.cs`.
 - [x] T005 [P] [US1] bUnit: "View map" disabled when no tracked item has a location and enabled when one does; empty `Locations` renders the empty state without initializing interop, in `tests/TripPlanner.Web.Tests/Trips/TripMapModalTests.cs`.
-- [x] T006 [P] [US1] E2E (Playwright): open the built-in map for a trip with locations and assert markers render and the map is interactive, in `tests/TripPlanner.E2E.Tests/Trips/TripMapTests.cs`.
+- [ ] T006 [P] [US1] E2E (Playwright): open the built-in map for a trip with locations and assert markers render and the map is interactive, in `tests/TripPlanner.E2E.Tests/Trips/TripMapTests.cs`. (never created; only a skipped stub exists, in `tests/TripPlanner.E2E.Tests/TripLocationMapFlowTests.cs`)
 
 ### Implementation for User Story 1
 
@@ -85,7 +85,7 @@ description: "Task list for Trip Location Maps"
 - [x] T016 [P] [US2] API tests: `GET /api/profile` returns `Bing` for a new profile; `PUT` `Google` round-trips; `PUT` of an unknown value stores `Bing`; unrelated updates preserve `MapProvider`, in `tests/TripPlanner.Api.Tests/UserProfiles/UserProfileMapProviderTests.cs`.
 - [x] T017 [P] [US2] Database test: `map_provider` persists and reads back canonically, in `tests/TripPlanner.Database.Tests/UserProfiles/UserProfileMapProviderPersistenceTests.cs`.
 - [x] T018 [P] [US2] bUnit: with profile Bing (or unreadable) the globe href starts with `https://www.bing.com/maps?q=`; with Google it starts with `https://www.google.com/maps/search/?api=1&query=`; query is the escaped trimmed location; disabled state unchanged, in `tests/TripPlanner.Web.Tests/TripItems/TrackedItemFormMapProviderTests.cs`.
-- [x] T019 [P] [US2] E2E (Playwright): change the profile default map and confirm the event globe opens the chosen provider, in `tests/TripPlanner.E2E.Tests/Profile/MapProviderTests.cs`.
+- [ ] T019 [P] [US2] E2E (Playwright): change the profile default map and confirm the event globe opens the chosen provider, in `tests/TripPlanner.E2E.Tests/Profile/MapProviderTests.cs`. (never created; only a skipped stub exists, in `tests/TripPlanner.E2E.Tests/TripLocationMapFlowTests.cs`)
 
 ### Implementation for User Story 2
 
@@ -110,7 +110,7 @@ description: "Task list for Trip Location Maps"
 ### Tests for User Story 3
 
 - [x] T027 [P] [US3] bUnit: activating a marker invokes the modal's `OnMarkerActivated` and triggers event selection/open, in `tests/TripPlanner.Web.Tests/Trips/TripMapMarkerActivationTests.cs`.
-- [x] T028 [P] [US3] E2E (Playwright): select a marker and confirm the corresponding event's details open, in `tests/TripPlanner.E2E.Tests/Trips/TripMapMarkerTests.cs`.
+- [ ] T028 [P] [US3] E2E (Playwright): select a marker and confirm the corresponding event's details open, in `tests/TripPlanner.E2E.Tests/Trips/TripMapMarkerTests.cs`. (never created; only a skipped stub exists, in `tests/TripPlanner.E2E.Tests/TripLocationMapFlowTests.cs`)
 
 ### Implementation for User Story 3
 

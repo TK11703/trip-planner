@@ -135,7 +135,7 @@
 - [x] T051 [P] Add API coverage for owner-only share management and viewer/collaborator/no-access behavior in tests/TripPlanner.Api.Tests/TripSharing/TripSharingEndpointTests.cs
 - [x] T052 [P] Add database coverage for trip_shares persistence and owned/shared trip queries in tests/TripPlanner.Database.Tests/TripSharing/TripSharingRepositoryTests.cs
 - [x] T053 [P] Add Blazor component coverage for ShareTripModal states and trip card badges in tests/TripPlanner.Web.Tests/TripSharing/TripSharingComponentTests.cs
-- [x] T054 [P] Add E2E coverage for owner share, viewer read-only, collaborator edit, and revocation flows in tests/TripPlanner.E2E.Tests/TripSharing/TripSharingE2ETests.cs
+- [ ] T054 [P] Add E2E coverage for owner share, viewer read-only, collaborator edit, and revocation flows in tests/TripPlanner.E2E.Tests/TripSharing/TripSharingE2ETests.cs (never created; only skipped stubs exist, in tests/TripPlanner.E2E.Tests/TripSharingFlowTests.cs)
 - [x] T055 Review Microsoft Graph configuration for least-privilege scopes, no hardcoded credentials, and environment-driven settings in src/TripPlanner.Api/appsettings.json
 - [x] T056 Run API, database, web, and E2E validation commands from specs/010-trip-sharing/quickstart.md
 - [x] T057 Run full solution build for TripPlanner.slnx from TripPlanner.slnx

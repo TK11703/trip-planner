@@ -24,7 +24,7 @@
 - [X] T004 [P] Add or normalize non-secret Azure Entra configuration placeholders for `AzureEntra:TenantId`, `AzureEntra:ClientId`, and `AzureEntra:Audience` in `src/TripPlanner.Api/appsettings.json`
 - [X] T005 [P] Add authenticated-call test fixture placeholders for web token handler tests in `tests/TripPlanner.Web.Tests/Auth/AuthenticatedApiTokenHandlerTests.cs`
 - [X] T006 [P] Add authenticated-call test fixture placeholders for API bearer validation tests in `tests/TripPlanner.Api.Tests/Trips/AuthenticatedApiContractTests.cs`
-- [X] T007 [P] Add authenticated-call browser scenario placeholders for signed-in, anonymous, and cross-user validation in `tests/TripPlanner.E2E.Tests/AuthenticatedApiCallFlowTests.cs`
+- [ ] T007 [P] Add authenticated-call browser scenario placeholders for signed-in, anonymous, and cross-user validation in `tests/TripPlanner.E2E.Tests/AuthenticatedApiCallFlowTests.cs` (descoped: the placeholders were never implemented and the file was removed; browser-level authenticated API flows are not tested)
 
 ---
 
@@ -63,7 +63,7 @@
 - [X] T019 [P] [US1] Add web client test proving recent trip, trip detail, and trip mutation calls use the configured authenticated API client in `tests/TripPlanner.Web.Tests/Home/RecentTripsComponentTests.cs`
 - [X] T020 [P] [US1] Add API contract tests proving valid scoped bearer tokens can call `GET /api/trips/recent`, `POST /api/trips`, and `PUT /api/trips/{tripId}` in `tests/TripPlanner.Api.Tests/Trips/AuthenticatedApiContractTests.cs`
 - [ ] T021 [P] [US1] Add database integration tests proving recent trip and trip detail SQL filters return rows only for the supplied owner user ID in `tests/TripPlanner.Database.Tests/Trips/TripQueryOwnershipTests.cs`
-- [ ] T022 [P] [US1] Add browser validation for signed-in recent-trip load and create-trip flow using bearer-authenticated API calls in `tests/TripPlanner.E2E.Tests/AuthenticatedApiCallFlowTests.cs`
+- [ ] T022 [P] [US1] Add browser validation for signed-in recent-trip load and create-trip flow using bearer-authenticated API calls in `tests/TripPlanner.E2E.Tests/AuthenticatedApiCallFlowTests.cs` (descoped with T007: the file was removed)
 
 ### Implementation for User Story 1
 
@@ -126,7 +126,7 @@
 - [ ] T046 [P] [US3] Add timeline owner-isolation tests for direct timeline endpoint access with another user's trip ID in `tests/TripPlanner.Api.Tests/Timeline/TimelineEndpointTests.cs`
 - [ ] T047 [P] [US3] Add database command/query tests proving trip item, tracked item, and timeline SQL use owner-scoped predicates in `tests/TripPlanner.Database.Tests/Timeline/TimelineQueryTests.cs`
 - [ ] T048 [P] [US3] Add audit tests proving denied cross-user attempts record requester, target reference when safe, denied result, and no secrets in `tests/TripPlanner.Api.Tests/Audit/AuditEventTests.cs`
-- [ ] T049 [P] [US3] Add browser validation for signed-in User B attempting to open or mutate User A's trip by direct URL in `tests/TripPlanner.E2E.Tests/AuthenticatedApiCallFlowTests.cs`
+- [ ] T049 [P] [US3] Add browser validation for signed-in User B attempting to open or mutate User A's trip by direct URL in `tests/TripPlanner.E2E.Tests/AuthenticatedApiCallFlowTests.cs` (descoped with T007: the file was removed)
 
 ### Implementation for User Story 3
 
