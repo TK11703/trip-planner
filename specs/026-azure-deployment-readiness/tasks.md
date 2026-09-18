@@ -47,8 +47,8 @@ This is a distributed .NET application with Bicep infrastructure:
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
 - [X] T005 [P] Create `infra/key-vault.bicep` provisioning a Standard vault with Azure RBAC authorization, soft delete, and purge protection, outputting the vault id and URI
-- [X] T006 [P] Create `infra/storage.bicep` that owns the storage account and adds private `backups` and `dataprotection` blob containers plus a 30-day backup lifecycle rule
-- [X] T007 Rewrite `infra/identity.bicep` to create four user-assigned managed identities (ACR pull, Web runtime, API runtime, backup runtime) and output each id, principalId, and clientId
+- [X] T006 [P] Create `infra/storage.bicep` that owns the storage account and adds the private `dataprotection` blob container (the `backups` container and its 30-day lifecycle rule were dropped when PostgreSQL moved to a managed Flexible Server with point-in-time restore)
+- [X] T007 Rewrite `infra/identity.bicep` to create three user-assigned managed identities (ACR pull, Web runtime, API runtime) and output each id, principalId, and clientId (the backup runtime identity was dropped with the nightly-dump job)
 - [X] T008 Create `infra/rbac.bicep` assigning `AcrPull`, `Key Vault Secrets User`, `Storage Blob Data Contributor`, and `Cognitive Services OpenAI User` at the narrowest supported resource scope per identity
 - [X] T009 Update `infra/environment.bicep` to consume the extracted storage account from `infra/storage.bicep` while preserving the existing Azure Files share wiring used by PostgreSQL
 - [X] T010 Update `infra/main.bicep` to compose the key-vault, storage, identity, and rbac modules and pass per-workload identities to each application module
@@ -131,10 +131,10 @@ This is a distributed .NET application with Bicep infrastructure:
 
 ### Implementation for User Story 3
 
-- [X] T042 [P] [US3] Create the backup container image at `docker/backup/Dockerfile` with `scripts/backup-postgres.sh` performing `pg_dump` and managed-identity upload to the `backups` container
-- [X] T043 [US3] Create `infra/backup-job.bicep` defining a daily scheduled Container Apps Job using the backup identity and Key Vault credential reference
-- [X] T044 [US3] Wire the backup job and its identity into `infra/main.bicep` and expose the backup container name as an output
-- [X] T045 [P] [US3] Create `scripts/restore-postgres.ps1` that restores a selected recovery point into an isolated destination, verifies representative trip records, and never targets production
+- [ ] T042 [P] [US3] Create the backup container image at `docker/backup/Dockerfile` with `scripts/backup-postgres.sh` performing `pg_dump` and managed-identity upload to the `backups` container (obsolete, never created: the managed Flexible Server takes its own continuous backups — do not implement)
+- [ ] T043 [US3] Create `infra/backup-job.bicep` defining a daily scheduled Container Apps Job using the backup identity and Key Vault credential reference (obsolete with T042, never created)
+- [ ] T044 [US3] Wire the backup job and its identity into `infra/main.bicep` and expose the backup container name as an output (obsolete with T042, never created)
+- [X] T045 [P] [US3] Document the point-in-time restore procedure — selecting a recovery point, restoring to a new isolated server, verifying trip records and the migration ledger, and deleting the rehearsal server afterward — in `docs/operations/production-runbook.md` §4.2 (replaces the planned `scripts/restore-postgres.ps1`; the procedure is manual, so keeping production untargeted rests on the operator rather than on a coded guardrail)
 - [X] T046 [P] [US3] Add the `AspireDashboard` `dotNetComponents` resource to `infra/environment.bicep` using `Microsoft.App/managedEnvironments/dotNetComponents@2024-10-02-preview`
 - [X] T047 [US3] Wire OTLP exporter endpoints for Web and API to the managed dashboard in `infra/web.bicep` and `infra/api.bicep`
 - [X] T048 [US3] Emit the release id as a resource attribute on traces, metrics, and logs in `src/TripPlanner.ServiceDefaults/Extensions.cs`
