@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Trip Planner</title>
+  <desc id="desc">A white wire frame globe on a teal-to-indigo gradient disc, matching the navigation brand mark.</desc>
+  <defs>
+    <linearGradient id="tpFavicon" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1f7a8c"/>
+      <stop offset="1" stop-color="#4f5bd5"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="32" fill="url(#tpFavicon)"/>
+  <g fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round">
+    <circle cx="32" cy="32" r="15.9"/>
+    <ellipse cx="32" cy="32" rx="6.5" ry="15.9"/>
+    <path d="M16.1 32h31.8"/>
+    <path d="M19.9 23.6h24.2"/>
+    <path d="M19.9 40.4h24.2"/>
+  </g>
+</svg>

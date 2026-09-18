@@ -47,7 +47,12 @@
             <div class="col-6">
                 <label class="form-label" for="leg-origin">
                     Origin
-                    <span class="text-secondary" role="note" data-testid="leg-origin-help" title="@OriginHelp">&#9432;</span>
+                    <span class="text-secondary" role="note" data-testid="leg-origin-help" title="@OriginHelp">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="align-text-bottom" aria-hidden="true" focusable="false">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14Zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16Z" />
+                            <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588ZM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />
+                        </svg>
+                    </span>
                 </label>
                 <InputText id="leg-origin" class="form-control" placeholder="@PlacePlaceholder" @bind-Value="_model.Origin" />
                 <ValidationMessage For="@(() => _model.Origin)" />
@@ -56,7 +61,12 @@
         <div class="@(_model.Kind == LegKind.Travel ? "col-6" : "col-12")">
             <label class="form-label" for="leg-destination">
                 Destination
-                <span class="text-secondary" role="note" data-testid="leg-destination-help" title="@DestinationHelp">&#9432;</span>
+                <span class="text-secondary" role="note" data-testid="leg-destination-help" title="@DestinationHelp">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="align-text-bottom" aria-hidden="true" focusable="false">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14Zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16Z" />
+                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588ZM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />
+                    </svg>
+                </span>
             </label>
             <InputText id="leg-destination" class="form-control" placeholder="@DestinationPlaceholder" @bind-Value="_model.Destination" />
             <ValidationMessage For="@(() => _model.Destination)" />

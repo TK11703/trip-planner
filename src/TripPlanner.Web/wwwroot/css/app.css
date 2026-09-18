@@ -612,6 +612,9 @@ body {
 }
 
 .brand-mark-icon {
+    /* flex-shrink:0 keeps the circle at 2rem when a scrollbar narrows the navbar;
+       without it the disc squeezes and the globe slides off centre. */
+    flex: 0 0 auto;
     width: 2rem;
     height: 2rem;
     border-radius: 999px;
@@ -623,6 +626,7 @@ body {
 }
 
 .brand-globe {
+    flex: 0 0 auto;
     width: 1.4rem;
     height: 1.4rem;
 }
