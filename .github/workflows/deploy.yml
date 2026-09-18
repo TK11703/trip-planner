@@ -199,13 +199,7 @@ jobs:
       - name: Run readiness gate
         id: readiness
         shell: pwsh
-        run: |
-          # Must be a hashtable: array splatting binds positionally and ignores the -Name prefixes.
-          $arguments = @{
-            ReleaseId = '${{ github.event.inputs.rollback_sha || github.sha }}'
-          }
-          if ('${{ vars.AZURE_FIRST_RELEASE }}' -eq 'true') { $arguments['FirstRelease'] = $true }
-          ./scripts/deployment-readiness.ps1 @arguments
+        run: ./scripts/deployment-readiness.ps1 -ReleaseId '${{ github.event.inputs.rollback_sha || github.sha }}'
 
       - name: Upload readiness report
         if: always()

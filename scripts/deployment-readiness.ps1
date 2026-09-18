@@ -18,10 +18,6 @@
 .PARAMETER EnvironmentName
     The azd environment name (AZURE_ENV_NAME).
 
-.PARAMETER FirstRelease
-    Set for the very first deployment into an empty resource group. Checks that inspect
-    already-deployed resources report 'not-applicable' instead of failing.
-
 .PARAMETER Offline
     Skips every Azure CLI call. Intended for tests and for validating report shape
     without a subscription. Azure-dependent checks report 'not-applicable'.
@@ -44,8 +40,6 @@ param(
     [string] $AcceptedRiskPath = (Join-Path $PSScriptRoot '../.azure/accepted-risks.json'),
 
     [string] $OutputPath,
-
-    [switch] $FirstRelease,
 
     [switch] $SkipInfrastructurePreview,
 
@@ -83,8 +77,37 @@ if ([string]::IsNullOrWhiteSpace($EnvironmentName)) {
     $EnvironmentName = 'unknown'
 }
 
+function Test-FirstRelease {
+    <#
+    .SYNOPSIS
+        Detects whether this release is the initial deployment into an empty target.
+    .DESCRIPTION
+        Checks that inspect already-deployed resources cannot pass before anything
+        exists. Probing the resource group keeps that an observed fact rather than an
+        operator-maintained flag that would silently weaken the gate if left set.
+        An unreadable resource group is treated as already deployed so the checks run
+        and fail loudly instead of being skipped.
+    #>
+    if ($Offline) { return $true }
+    if ([string]::IsNullOrWhiteSpace($ResourceGroup)) { return $true }
+
+    $exists = "$(Invoke-AzCommand -Argument @('group', 'exists', '--name', $ResourceGroup))".Trim()
+    if ($exists -eq 'false') { return $true }
+    if ($exists -ne 'true') { return $false }
+
+    # An existing but empty group is still a first release: azd creates the group before
+    # any resource lands in it, and a failed initial provision leaves it behind.
+    $count = "$(Invoke-AzCommand -Argument @(
+            'resource', 'list', '--resource-group', $ResourceGroup,
+            '--query', 'length(@)', '-o', 'tsv'))".Trim()
+
+    if ([string]::IsNullOrWhiteSpace($count)) { return $false }
+    return $count -eq '0'
+}
+
 # Resources that only exist after a successful first deployment.
-$deployedResourcesExpected = -not ($FirstRelease -or $Offline)
+$firstRelease = Test-FirstRelease
+$deployedResourcesExpected = -not $firstRelease
 $azureAvailable = -not $Offline
 
 $checks = [System.Collections.Generic.List[object]]::new()
@@ -203,14 +226,14 @@ function Test-AzureContext {
 
     $group = Invoke-AzCommand -Argument @('group', 'show', '--name', $ResourceGroup, '-o', 'json')
     if ($null -eq $group) {
-        if ($FirstRelease) {
+        if ($firstRelease) {
             Add-Check -Id 'azure-context-resource-group' -Category 'azure-context' -Status 'pass' `
                 -Summary "Resource group '$ResourceGroup' does not exist yet and will be created by the first release."
         }
         else {
             Add-Check -Id 'azure-context-resource-group' -Category 'azure-context' -Status 'fail' `
-                -Summary "Resource group '$ResourceGroup' was not found." `
-                -CorrectiveAction "Create it with 'az group create --name $ResourceGroup --location <region>', or re-run with -FirstRelease if this is the initial deployment."
+                -Summary "Resource group '$ResourceGroup' could not be read." `
+                -CorrectiveAction "Confirm the deploying identity has reader access to '$ResourceGroup' in subscription '$SubscriptionId'. A group that simply does not exist yet is detected automatically as a first release."
         }
     }
     else {
@@ -341,7 +364,7 @@ function Test-Configuration {
         if ($present.Count -eq 0) {
             Add-Check -Id $target.Id -Category 'configuration' -Status 'fail' `
                 -Summary "Could not read configuration from container app '$($target.App)'." `
-                -CorrectiveAction "Confirm the app exists in '$ResourceGroup' and that the deploying identity has reader access, or re-run with -FirstRelease."
+                -CorrectiveAction "Confirm the app exists in '$ResourceGroup' and that the deploying identity has reader access."
             continue
         }
 

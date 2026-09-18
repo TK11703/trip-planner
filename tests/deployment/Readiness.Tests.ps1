@@ -39,7 +39,6 @@ BeforeAll {
                 '-NoProfile', '-NonInteractive', '-File', $script:ScriptPath,
                 '-ReleaseId', $script:ReleaseId,
                 '-Offline',
-                '-FirstRelease',
                 '-OutputPath', $outputPath
             ) + $ExtraArgument
 
