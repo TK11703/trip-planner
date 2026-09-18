@@ -8,8 +8,7 @@ namespace TripPlanner.Database.Tests.Infrastructure;
 
 public sealed class PostgresFixture : IAsyncLifetime
 {
-    public PostgreSqlContainer Container { get; } = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    public PostgreSqlContainer Container { get; } = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("tripplanner_tests")
         .WithUsername("test")
         .WithPassword("test")

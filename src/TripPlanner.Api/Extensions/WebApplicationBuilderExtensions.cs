@@ -134,7 +134,7 @@ public static class WebApplicationBuilderExtensions
         return builder;
     }
 
-    private static TokenCredential CreateDirectoryCredential(IConfiguration configuration)
+    private static TokenCredential CreateDirectoryCredential(ConfigurationManager configuration)
     {
         var tenantId = configuration["AzureEntra:TenantId"];
         var clientId = configuration["AzureEntra:ClientId"];
@@ -157,7 +157,7 @@ public static class WebApplicationBuilderExtensions
         return new DefaultAzureCredential(options);
     }
 
-    private static AzureOpenAIClient CreateOpenAIClient(IConfiguration configuration)
+    private static AzureOpenAIClient CreateOpenAIClient(ConfigurationManager configuration)
     {
         // AzureOpenAI:Endpoint must be set; credential uses DefaultAzureCredential —
         // managed identity when hosted in Azure Container Apps, developer sign-in locally.

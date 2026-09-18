@@ -2,3 +2,9 @@
 
 # Test method names use Method_Scenario_Expectation, so the underscores are intentional.
 dotnet_diagnostic.CA1707.severity = none
+
+# Tests deliberately hold values as the abstraction under test rather than the concrete type.
+dotnet_diagnostic.CA1859.severity = none
+
+# Expected-value arrays belong inline in the assertion that reads them.
+dotnet_diagnostic.CA1861.severity = none

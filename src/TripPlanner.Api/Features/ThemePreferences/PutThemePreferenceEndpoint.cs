@@ -24,12 +24,12 @@ public static class PutThemePreferenceEndpoint
         IClock clock,
         CancellationToken cancellationToken)
     {
-        if (!validator.IsValid(request))
+        if (!validator.IsValid(request) || request.ThemeMode is not { } themeMode)
         {
             return TypedResults.BadRequest();
         }
 
-        var record = await repository.UpsertAsync(currentUser.UserId, request.ThemeMode.Value, clock.UtcNow, cancellationToken);
+        var record = await repository.UpsertAsync(currentUser.UserId, themeMode, clock.UtcNow, cancellationToken);
         return TypedResults.Ok(new ThemePreferenceResponse(record.ThemeMode, ThemePreferenceSource.AccountPreference, record.UpdatedAtUtc));
     }
 }

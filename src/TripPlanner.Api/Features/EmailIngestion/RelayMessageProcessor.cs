@@ -244,7 +244,7 @@ public sealed partial class RelayMessageProcessor
     [LoggerMessage(Level = LogLevel.Information, Message = "Inbox email {InboxEmailId} (traveler {UserId}) produced {DraftCount} draft(s).")]
     private partial void LogDraftsCreated(Guid inboxEmailId, string userId, int draftCount);
 
-    private static string AssembleText(string subject, string? bodyText, IReadOnlyList<string> attachmentText)
+    private static string AssembleText(string subject, string? bodyText, string[] attachmentText)
     {
         var builder = new System.Text.StringBuilder();
         if (!string.IsNullOrWhiteSpace(subject))
@@ -257,7 +257,7 @@ public sealed partial class RelayMessageProcessor
             builder.AppendLine(bodyText).AppendLine();
         }
 
-        for (var i = 0; i < attachmentText.Count; i++)
+        for (var i = 0; i < attachmentText.Length; i++)
         {
             builder.AppendLine($"--- Attachment {i + 1} ---").AppendLine(attachmentText[i]).AppendLine();
         }

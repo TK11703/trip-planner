@@ -56,6 +56,8 @@ public static class TripPrintFormatting
         return string.IsNullOrEmpty(abbreviation) ? id : abbreviation;
     }
 
+    private static readonly char[] ZoneNameSeparators = [' ', '-'];
+
     private static string Abbreviate(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -64,7 +66,7 @@ public static class TripPrintFormatting
         }
 
         var initials = name
-            .Split(new[] { ' ', '-' }, StringSplitOptions.RemoveEmptyEntries)
+            .Split(ZoneNameSeparators, StringSplitOptions.RemoveEmptyEntries)
             .Where(word => char.IsLetter(word[0]))
             .Select(word => char.ToUpperInvariant(word[0]))
             .ToArray();

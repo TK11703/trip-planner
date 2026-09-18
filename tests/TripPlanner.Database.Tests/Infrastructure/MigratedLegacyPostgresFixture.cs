@@ -16,8 +16,7 @@ public sealed class MigratedLegacyPostgresFixture : IAsyncLifetime
 {
     private const string MigrationScript = "014_trip_leg_modes.sql";
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("tripplanner_migration_tests")
         .WithUsername("test")
         .WithPassword("test")

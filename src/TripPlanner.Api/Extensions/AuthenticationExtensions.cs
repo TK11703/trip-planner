@@ -75,7 +75,7 @@ public static partial class AuthenticationExtensions
         return builder;
     }
 
-    private static IEnumerable<string> GetConfiguredScopeAliases(IConfiguration configuration)
+    private static IEnumerable<string> GetConfiguredScopeAliases(ConfigurationManager configuration)
     {
         var values = configuration.GetSection("AzureEntra:RequiredScopes").Get<string[]>()
             ?? configuration.GetSection("AzureEntra:ApiScopes").Get<string[]>()
