@@ -1,3 +1,4 @@
+@inherits ApiComponentBase
 @inject ITripApiClient TripApi
 @implements IDisposable
 
@@ -214,20 +215,17 @@
     private async Task LoadMembersAsync()
     {
         _loadingMembers = true;
-        try
-        {
-            var members = await TripApi.GetSharesAsync(TripId);
-            _members.Clear();
-            _members.AddRange(members);
-        }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _loadingMembers = false;
-        }
+
+        await CallApiAsync(
+            async () =>
+            {
+                var members = await TripApi.GetSharesAsync(TripId);
+                _members.Clear();
+                _members.AddRange(members);
+            },
+            message => _error = message);
+
+        _loadingMembers = false;
     }
 
     private async Task OnSearchKeyDownAsync(KeyboardEventArgs e)
@@ -254,31 +252,25 @@
         var seq = ++_searchSeq;
         _searching = true;
         _error = null;
-        try
-        {
-            var results = await TripApi.SearchDirectoryUsersAsync(TripId, term, _disposeCts.Token);
-            if (seq != _searchSeq)
+
+        await CallApiAsync(
+            async () =>
             {
-                return;
-            }
-            _results.Clear();
-            _results.AddRange(results);
-            _searchAttempted = true;
-        }
-        catch (OperationCanceledException)
+                var results = await TripApi.SearchDirectoryUsersAsync(TripId, term, _disposeCts.Token);
+                if (seq != _searchSeq)
+                {
+                    return;
+                }
+
+                _results.Clear();
+                _results.AddRange(results);
+                _searchAttempted = true;
+            },
+            message => _error = message);
+
+        if (seq == _searchSeq)
         {
-            // The modal was closed while searching; ignore.
-        }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            if (seq == _searchSeq)
-            {
-                _searching = false;
-            }
+            _searching = false;
         }
     }
 
@@ -297,24 +289,21 @@
     {
         _busy = true;
         _error = null;
-        try
-        {
-            await TripApi.UpsertShareAsync(TripId, new UpsertTripShareRequest(user.UserId, user.DisplayName, user.Email ?? user.UserPrincipalName, LevelFor(user.UserId)));
-            _results.RemoveAll(r => r.UserId == user.UserId);
-            _newLevels.Remove(user.UserId);
-            _searchTerm = string.Empty;
-            _searchAttempted = false;
-            await LoadMembersAsync();
-            await OnChanged.InvokeAsync();
-        }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _busy = false;
-        }
+
+        await CallApiAsync(
+            async () =>
+            {
+                await TripApi.UpsertShareAsync(TripId, new UpsertTripShareRequest(user.UserId, user.DisplayName, user.Email ?? user.UserPrincipalName, LevelFor(user.UserId)));
+                _results.RemoveAll(r => r.UserId == user.UserId);
+                _newLevels.Remove(user.UserId);
+                _searchTerm = string.Empty;
+                _searchAttempted = false;
+                await LoadMembersAsync();
+                await OnChanged.InvokeAsync();
+            },
+            message => _error = message);
+
+        _busy = false;
     }
 
     private async Task OnChangeLevelAsync(TripShareMember member, ChangeEventArgs e)
@@ -325,40 +314,34 @@
         }
         _busy = true;
         _error = null;
-        try
-        {
-            await TripApi.UpdateShareAccessAsync(TripId, member.UserId, new UpdateTripShareAccessRequest(level));
-            await LoadMembersAsync();
-            await OnChanged.InvokeAsync();
-        }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _busy = false;
-        }
+
+        await CallApiAsync(
+            async () =>
+            {
+                await TripApi.UpdateShareAccessAsync(TripId, member.UserId, new UpdateTripShareAccessRequest(level));
+                await LoadMembersAsync();
+                await OnChanged.InvokeAsync();
+            },
+            message => _error = message);
+
+        _busy = false;
     }
 
     private async Task RemoveAsync(TripShareMember member)
     {
         _busy = true;
         _error = null;
-        try
-        {
-            await TripApi.RemoveShareAsync(TripId, member.UserId);
-            await LoadMembersAsync();
-            await OnChanged.InvokeAsync();
-        }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _busy = false;
-        }
+
+        await CallApiAsync(
+            async () =>
+            {
+                await TripApi.RemoveShareAsync(TripId, member.UserId);
+                await LoadMembersAsync();
+                await OnChanged.InvokeAsync();
+            },
+            message => _error = message);
+
+        _busy = false;
     }
 
     private async Task CloseAsync() => await OnClose.InvokeAsync();

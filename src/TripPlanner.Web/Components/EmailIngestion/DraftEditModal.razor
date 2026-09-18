@@ -1,3 +1,4 @@
+@inherits ApiComponentBase
 @using System.ComponentModel.DataAnnotations
 @using TripPlanner.Contracts.EmailIngestion
 @using TripPlanner.Contracts.Trips
@@ -299,34 +300,35 @@
     {
         _saving = true;
         _error = null;
-        try
+
+        await CallApiAsync(SaveDraftAsync, message => _error = message);
+
+        _saving = false;
+    }
+
+    private async Task SaveDraftAsync()
+    {
+        // The leg window is re-derived from the current selection so a stale window can never
+        // let a placement through that the API would refuse.
+        ApplyLegWindow();
+
+        var result = await EmailIngestionApi.UpdateDraftAsync(Draft.ParsedItemDraftId, new UpdateParsedItemDraftRequest(
+            _model.TripId, _model.TripLegId, _model.ItemType, _model.Title, _model.Location,
+            _model.StartLocal, _model.StartTimeZoneId, _model.EndLocal, _model.EndTimeZoneId,
+            _model.ConfirmationCode, _model.Notes));
+
+        if (!result.Succeeded)
         {
-            // The leg window is re-derived from the current selection so a stale window can never
-            // let a placement through that the API would refuse.
-            ApplyLegWindow();
-
-            var result = await EmailIngestionApi.UpdateDraftAsync(Draft.ParsedItemDraftId, new UpdateParsedItemDraftRequest(
-                _model.TripId, _model.TripLegId, _model.ItemType, _model.Title, _model.Location,
-                _model.StartLocal, _model.StartTimeZoneId, _model.EndLocal, _model.EndTimeZoneId,
-                _model.ConfirmationCode, _model.Notes));
-
-            if (!result.Succeeded)
-            {
-                // The API names the input it refused, so the message lands next to that control
-                // rather than as an unattributed banner.
-                _error = result.Field is { } field
-                    ? $"{FieldLabel(field)}: {result.Error!.Message}"
-                    : result.Error?.Message ?? "We couldn't save your changes. Please try again.";
-                return;
-            }
-
-            await OnSaved.InvokeAsync();
-            await OnClose.InvokeAsync();
+            // The API names the input it refused, so the message lands next to that control
+            // rather than as an unattributed banner.
+            _error = result.Field is { } field
+                ? $"{FieldLabel(field)}: {result.Error!.Message}"
+                : result.Error?.Message ?? "We couldn't save your changes. Please try again.";
+            return;
         }
-        finally
-        {
-            _saving = false;
-        }
+
+        await OnSaved.InvokeAsync();
+        await OnClose.InvokeAsync();
     }
 
     private Task CloseAsync() => OnClose.InvokeAsync();

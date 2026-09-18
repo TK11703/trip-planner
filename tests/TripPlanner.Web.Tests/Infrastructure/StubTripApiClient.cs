@@ -21,8 +21,15 @@ public sealed class StubTripApiClient : ITripApiClient
     /// </summary>
     public Dictionary<Guid, TripDetail> Details { get; } = new();
 
+    /// <summary>
+    /// When set, <see cref="GetRecentAsync"/> throws it instead of returning trips.
+    /// </summary>
+    public Exception? RecentFailure { get; set; }
+
     public Task<TripListResponse> GetTripsAsync(int page = 1, int pageSize = 12, CancellationToken ct = default) => Task.FromResult(new TripListResponse(_recent, page, pageSize, _recent.Count));
-    public Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default) => Task.FromResult(_recent);
+    public Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default) => RecentFailure is null
+        ? Task.FromResult(_recent)
+        : Task.FromException<IReadOnlyList<TripSummary>>(RecentFailure);
     public Task<TripDetail?> GetDetailAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult(Details.TryGetValue(tripId, out var detail) ? detail : null);
     public Task<CreateTripResponse> CreateAsync(CreateTripRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<CreateTripResponse> UpdateAsync(Guid tripId, UpdateTripRequest request, CancellationToken ct = default) => throw new NotSupportedException();

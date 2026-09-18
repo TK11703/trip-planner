@@ -1,3 +1,4 @@
+@inherits ApiComponentBase
 @using System.ComponentModel.DataAnnotations
 
 <EditForm Model="Model" OnValidSubmit="SubmitAsync" FormName="trip-form">
@@ -62,18 +63,12 @@
             _errorMessage = "The trip end date must be on or after the start date.";
             return;
         }
-        try
-        {
-            _isSubmitting = true;
-            await OnSubmit.InvokeAsync(Model);
-        }
-        catch (Exception ex)
-        {
-            _errorMessage = ex.Message;
-        }
-        finally
-        {
-            _isSubmitting = false;
-        }
+        _isSubmitting = true;
+
+        await CallApiAsync(
+            () => OnSubmit.InvokeAsync(Model),
+            message => _errorMessage = message);
+
+        _isSubmitting = false;
     }
 }

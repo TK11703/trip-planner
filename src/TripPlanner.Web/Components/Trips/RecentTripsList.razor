@@ -1,3 +1,4 @@
+@inherits ApiComponentBase
 @inject ITripApiClient TripApi
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
@@ -63,17 +64,10 @@
             return;
         }
 
-        try
-        {
-            _trips = await TripApi.GetRecentAsync();
-        }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _isLoading = false;
-        }
+        await CallApiAsync(
+            async () => _trips = await TripApi.GetRecentAsync(),
+            message => _error = message);
+
+        _isLoading = false;
     }
 }

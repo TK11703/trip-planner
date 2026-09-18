@@ -1,3 +1,4 @@
+@inherits ApiComponentBase
 @using System.ComponentModel.DataAnnotations
 @using TripPlanner.Contracts.Profile
 @inject ITripApiClient TripApi
@@ -652,60 +653,57 @@
     private async Task SubmitAsync()
     {
         _error = null; _submitting = true;
-        try
-        {
-            if (_model.EndLocal is not null && string.IsNullOrWhiteSpace(_model.EndTimeZoneId))
-            {
-                _error = "Select an end timezone for the item end, or clear the end date.";
-                return;
-            }
 
-            var request = new CreateTrackedItemRequest(
-                _model.TripLegId,
-                _model.ItemType,
-                _model.Title.Trim(),
-                _model.Location,
-                _model.StartLocal,
-                _model.StartTimeZoneId,
-                _model.EndLocal,
-                _model.EndLocal is null ? null : _model.EndTimeZoneId,
-                _model.DisplayColor,
-                _model.ConfirmationCode,
-                _model.Notes,
-                _model.EstimatedCost);
-            if (Item is null)
-            {
-                await TripApi.CreateItemAsync(TripId, request);
-                _model = new ItemModel { TripLegId = Legs.FirstOrDefault(l => l.CanContainItems)?.TripLegId };
-                _tzInitialized = false;
-                _endManuallySet = false;
-                _clampedLegId = null;
-            }
-            else
-            {
-                await TripApi.UpdateItemAsync(TripId, Item.TrackedItemId, new UpdateTrackedItemRequest(
-                    request.TripLegId,
-                    request.ItemType,
-                    request.Title,
-                    request.Location,
-                    request.StartLocal,
-                    request.StartTimeZoneId,
-                    request.EndLocal,
-                    request.EndTimeZoneId,
-                    request.DisplayColor,
-                    request.ConfirmationCode,
-                    request.Notes,
-                    request.EstimatedCost));
-            }
-            await OnSaved.InvokeAsync();
-        }
-        catch (Exception ex)
+        await CallApiAsync(SaveItemAsync, message => _error = message);
+
+        _submitting = false;
+    }
+
+    private async Task SaveItemAsync()
+    {
+        if (_model.EndLocal is not null && string.IsNullOrWhiteSpace(_model.EndTimeZoneId))
         {
-            _error = ex.Message;
+            _error = "Select an end timezone for the item end, or clear the end date.";
+            return;
         }
-        finally
+
+        var request = new CreateTrackedItemRequest(
+            _model.TripLegId,
+            _model.ItemType,
+            _model.Title.Trim(),
+            _model.Location,
+            _model.StartLocal,
+            _model.StartTimeZoneId,
+            _model.EndLocal,
+            _model.EndLocal is null ? null : _model.EndTimeZoneId,
+            _model.DisplayColor,
+            _model.ConfirmationCode,
+            _model.Notes,
+            _model.EstimatedCost);
+        if (Item is null)
         {
-            _submitting = false;
+            await TripApi.CreateItemAsync(TripId, request);
+            _model = new ItemModel { TripLegId = Legs.FirstOrDefault(l => l.CanContainItems)?.TripLegId };
+            _tzInitialized = false;
+            _endManuallySet = false;
+            _clampedLegId = null;
         }
+        else
+        {
+            await TripApi.UpdateItemAsync(TripId, Item.TrackedItemId, new UpdateTrackedItemRequest(
+                request.TripLegId,
+                request.ItemType,
+                request.Title,
+                request.Location,
+                request.StartLocal,
+                request.StartTimeZoneId,
+                request.EndLocal,
+                request.EndTimeZoneId,
+                request.DisplayColor,
+                request.ConfirmationCode,
+                request.Notes,
+                request.EstimatedCost));
+        }
+        await OnSaved.InvokeAsync();
     }
 }

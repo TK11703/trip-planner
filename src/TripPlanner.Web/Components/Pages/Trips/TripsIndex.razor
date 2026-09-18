@@ -1,6 +1,7 @@
 @page "/trips"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inherits ApiComponentBase
 @inject ITripApiClient TripApi
 
 <PageTitle>Trips</PageTitle>
@@ -91,17 +92,11 @@ else
     {
         _isLoading = true;
         _error = null;
-        try
-        {
-            _response = await TripApi.GetTripsAsync(page, PageSize);
-        }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _isLoading = false;
-        }
+
+        await CallApiAsync(
+            async () => _response = await TripApi.GetTripsAsync(page, PageSize),
+            message => _error = message);
+
+        _isLoading = false;
     }
 }

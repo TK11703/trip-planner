@@ -1,6 +1,7 @@
 @page "/profile"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inherits ApiComponentBase
 @using System.ComponentModel.DataAnnotations
 @using TripPlanner.Contracts.Profile
 @using TripPlanner.Web.Features.Timezones
@@ -134,25 +135,21 @@ else if (_model is not null)
 
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            var profile = await ProfileApi.GetAsync();
-            if (profile is null)
+        await CallApiAsync(
+            async () =>
             {
-                _loadError = "We couldn't load your profile right now.";
-                return;
-            }
+                var profile = await ProfileApi.GetAsync();
+                if (profile is null)
+                {
+                    _loadError = "We couldn't load your profile right now.";
+                    return;
+                }
 
-            ApplyProfile(profile);
-        }
-        catch (Exception ex)
-        {
-            _loadError = ex.Message;
-        }
-        finally
-        {
-            _isLoading = false;
-        }
+                ApplyProfile(profile);
+            },
+            message => _loadError = message);
+
+        _isLoading = false;
     }
 
     private async Task SaveAsync()
@@ -163,33 +160,29 @@ else if (_model is not null)
         _saveError = null;
         _saveMessage = null;
 
-        try
-        {
-            var request = new UpdateUserProfileRequest(
-                _model.FirstName,
-                _model.LastName,
-                _model.DisplayName,
-                _model.Email,
-                _model.TimeZoneId,
-                MapProviders.Normalize(_model.MapProvider),
-                new NotificationPreferences(_model.NotificationCategories
-                    .Select(c => new NotificationCategoryPreference(c.Category, c.DisplayName, c.InAppEnabled, c.EmailEnabled))
-                    .ToArray()),
-                new PersonalizationPreferences(_model.TravelInterests, _model.HomeAirport, _model.PreferredTravelStyle, _model.AccessibilityNotes));
+        await CallApiAsync(
+            async () =>
+            {
+                var request = new UpdateUserProfileRequest(
+                    _model.FirstName,
+                    _model.LastName,
+                    _model.DisplayName,
+                    _model.Email,
+                    _model.TimeZoneId,
+                    MapProviders.Normalize(_model.MapProvider),
+                    new NotificationPreferences(_model.NotificationCategories
+                        .Select(c => new NotificationCategoryPreference(c.Category, c.DisplayName, c.InAppEnabled, c.EmailEnabled))
+                        .ToArray()),
+                    new PersonalizationPreferences(_model.TravelInterests, _model.HomeAirport, _model.PreferredTravelStyle, _model.AccessibilityNotes));
 
-            var saved = await ProfileApi.SaveAsync(request);
-            MapPreference.Invalidate();
-            ApplyProfile(saved);
-            _saveMessage = "Profile saved. Notification changes apply to future notifications.";
-        }
-        catch (Exception ex)
-        {
-            _saveError = ex.Message;
-        }
-        finally
-        {
-            _isSaving = false;
-        }
+                var saved = await ProfileApi.SaveAsync(request);
+                MapPreference.Invalidate();
+                ApplyProfile(saved);
+                _saveMessage = "Profile saved. Notification changes apply to future notifications.";
+            },
+            message => _saveError = message);
+
+        _isSaving = false;
     }
 
     private void ApplyProfile(UserProfileResponse profile)

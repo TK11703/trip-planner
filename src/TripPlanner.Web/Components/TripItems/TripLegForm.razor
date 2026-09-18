@@ -1,3 +1,4 @@
+@inherits ApiComponentBase
 @using System.ComponentModel.DataAnnotations
 @inject ITripApiClient TripApi
 @inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
@@ -292,61 +293,58 @@
     private async Task SubmitAsync()
     {
         _error = null; _submitting = true;
-        try
+
+        await CallApiAsync(SaveLegAsync, message => _error = message);
+
+        _submitting = false;
+    }
+
+    private async Task SaveLegAsync()
+    {
+        var isStay = _model.Kind == LegKind.Stay;
+        var request = new CreateTripLegRequest(
+            _model.Title.Trim(),
+            isStay ? null : _model.Origin,
+            _model.Destination,
+            _model.StartAt,
+            _model.StartTimeZoneId,
+            _model.EndAt,
+            _model.EndTimeZoneId,
+            _model.Notes,
+            // A stay carries no travel-only data, so those values are dropped on the way out
+            // rather than kept as hidden state the traveler cannot see.
+            _model.LegKindValue,
+            isStay ? null : TransportationModes.Normalize(_model.TransportationMode),
+            isStay ? null : _model.TravelCost,
+            isStay ? null : _model.ConfirmationCode);
+        if (Leg is null)
         {
-            var isStay = _model.Kind == LegKind.Stay;
-            var request = new CreateTripLegRequest(
-                _model.Title.Trim(),
-                isStay ? null : _model.Origin,
-                _model.Destination,
-                _model.StartAt,
-                _model.StartTimeZoneId,
-                _model.EndAt,
-                _model.EndTimeZoneId,
-                _model.Notes,
-                // A stay carries no travel-only data, so those values are dropped on the way out
-                // rather than kept as hidden state the traveler cannot see.
-                _model.LegKindValue,
-                isStay ? null : TransportationModes.Normalize(_model.TransportationMode),
-                isStay ? null : _model.TravelCost,
-                isStay ? null : _model.ConfirmationCode);
-            if (Leg is null)
+            await TripApi.CreateLegAsync(TripId, request);
+            _model = new LegModel
             {
-                await TripApi.CreateLegAsync(TripId, request);
-                _model = new LegModel
-                {
-                    Kind = _model.Kind,
-                    TransportationMode = _model.TransportationMode,
-                    StartTimeZoneId = request.EndTimeZoneId,
-                    EndTimeZoneId = request.EndTimeZoneId
-                };
-                _defaultsLoadedForTripId = null;
-            }
-            else
-            {
-                await TripApi.UpdateLegAsync(TripId, Leg.TripLegId, new UpdateTripLegRequest(
-                    request.Title,
-                    request.Origin,
-                    request.Destination,
-                    request.StartLocal,
-                    request.StartTimeZoneId,
-                    request.EndLocal,
-                    request.EndTimeZoneId,
-                    request.Notes,
-                    request.LegKind,
-                    request.TransportationMode,
-                    request.TravelCost,
-                    request.ConfirmationCode));
-            }
-            await OnSaved.InvokeAsync();
+                Kind = _model.Kind,
+                TransportationMode = _model.TransportationMode,
+                StartTimeZoneId = request.EndTimeZoneId,
+                EndTimeZoneId = request.EndTimeZoneId
+            };
+            _defaultsLoadedForTripId = null;
         }
-        catch (Exception ex)
+        else
         {
-            _error = ex.Message;
+            await TripApi.UpdateLegAsync(TripId, Leg.TripLegId, new UpdateTripLegRequest(
+                request.Title,
+                request.Origin,
+                request.Destination,
+                request.StartLocal,
+                request.StartTimeZoneId,
+                request.EndLocal,
+                request.EndTimeZoneId,
+                request.Notes,
+                request.LegKind,
+                request.TransportationMode,
+                request.TravelCost,
+                request.ConfirmationCode));
         }
-        finally
-        {
-            _submitting = false;
-        }
+        await OnSaved.InvokeAsync();
     }
 }
