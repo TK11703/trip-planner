@@ -1029,6 +1029,15 @@ body {
         display: none !important;
     }
 
+    /* Plain white page: drop the themed body gradient/surface tint. */
+    html,
+    body,
+    .tp-print-shell,
+    .tp-print-doc {
+        background: #fff !important;
+        background-image: none !important;
+    }
+
     .tp-print-shell {
         max-width: none;
         padding: 0;
