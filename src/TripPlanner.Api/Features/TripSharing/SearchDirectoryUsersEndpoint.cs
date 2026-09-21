@@ -19,7 +19,7 @@ public static class SearchDirectoryUsersEndpoint
         return group;
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<DirectoryUserResult>>, BadRequest<ApiError>, NotFound<ApiError>>> HandleAsync(
+    private static async Task<Results<Ok<IReadOnlyList<DirectoryUserResult>>, BadRequest<ApiError>, NotFound<ApiError>, JsonHttpResult<ApiError>>> HandleAsync(
         Guid tripId,
         string? query,
         ICurrentUser currentUser,
@@ -44,7 +44,16 @@ public static class SearchDirectoryUsersEndpoint
             return TypedResults.BadRequest(validation.Error!);
         }
 
-        var results = await directory.SearchAsync(query!, ct);
+        IReadOnlyList<DirectoryUserResult> results;
+        try
+        {
+            results = await directory.SearchAsync(query!, ct);
+        }
+        catch (DirectoryLookupException ex)
+        {
+            await audit.RecordAsync(callerId, AuditOperations.DirectorySearch, "trip-share", tripId.ToString(), AuditResults.Error, clock.UtcNow, ct);
+            return TypedResults.Json(ApiError.DirectoryUnavailable(ex.Message), statusCode: StatusCodes.Status502BadGateway);
+        }
 
         // Never offer the owner or people who already have access as new-share choices.
         var members = await sharing.GetSharesAsync(tripId, ct);

@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Api.Security;
 using TripPlanner.Api.Tests.Infrastructure;
 using TripPlanner.Contracts.Audit;
+using TripPlanner.Contracts.Errors;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Database.Audit;
 using TripPlanner.Database.TripSharing;
@@ -132,6 +133,25 @@ public class TripSharingEndpointTests : IClassFixture<TestApiFactory>
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task DirectorySearch_WhenDirectoryFails_ReportsTheFailure()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IUserDirectoryLookup>();
+            services.AddSingleton<IUserDirectoryLookup, FailingDirectoryLookup>();
+        }));
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TestUserHeader, TestUsers.UserA);
+
+        var response = await client.GetAsync($"/api/trips/{TripId}/shares/directory-users?query=ca");
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiError>();
+        Assert.Equal("directory_unavailable", error!.Code);
+        Assert.Contains("User.ReadBasic.All", error.Message, StringComparison.Ordinal);
+    }
+
     private HttpClient ClientFor(string userId)
     {
         var client = _factory.CreateClient();
@@ -181,6 +201,13 @@ public class TripSharingEndpointTests : IClassFixture<TestApiFactory>
                 new DirectoryUserResult(Stranger, "Casey", "casey@example.com", "casey@example.com"),
                 new DirectoryUserResult(TestUsers.UserA, "Owner", "owner@example.com", "owner@example.com")
             });
+    }
+
+    private sealed class FailingDirectoryLookup : IUserDirectoryLookup
+    {
+        public bool IsConfigured => true;
+        public Task<IReadOnlyList<DirectoryUserResult>> SearchAsync(string query, CancellationToken ct)
+            => throw new DirectoryLookupException("Directory search was denied by Microsoft Graph (403). The app registration or managed identity needs the User.ReadBasic.All application permission with admin consent.");
     }
 
     private sealed class NoopAuditRepository : IAuditRepository

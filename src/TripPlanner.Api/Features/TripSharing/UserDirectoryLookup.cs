@@ -15,7 +15,21 @@ namespace TripPlanner.Api.Features.TripSharing;
 public interface IUserDirectoryLookup
 {
     bool IsConfigured { get; }
+
+    /// <exception cref="DirectoryLookupException">The directory could not be reached or rejected the request.</exception>
     Task<IReadOnlyList<DirectoryUserResult>> SearchAsync(string query, CancellationToken ct);
+}
+
+/// <summary>
+/// Raised when the directory itself failed, so callers can tell that apart from "no one matched".
+/// The message is safe to show to a signed-in owner; diagnostic detail stays in the logs.
+/// </summary>
+public sealed class DirectoryLookupException : Exception
+{
+    public DirectoryLookupException(string message, Exception? innerException = null)
+        : base(message, innerException)
+    {
+    }
 }
 
 public sealed partial class GraphUserDirectoryLookup : IUserDirectoryLookup
@@ -65,8 +79,9 @@ public sealed partial class GraphUserDirectoryLookup : IUserDirectoryLookup
             if (!response.IsSuccessStatusCode)
             {
                 var body = await response.Content.ReadAsStringAsync(ct);
-                LogLookupFailed((int)response.StatusCode, body);
-                return Array.Empty<DirectoryUserResult>();
+                var statusCode = (int)response.StatusCode;
+                LogLookupFailed(statusCode, body);
+                throw new DirectoryLookupException(DescribeFailure(statusCode));
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -95,14 +110,21 @@ public sealed partial class GraphUserDirectoryLookup : IUserDirectoryLookup
         catch (AuthenticationFailedException ex)
         {
             LogTokenAcquisitionFailed(ex);
-            return Array.Empty<DirectoryUserResult>();
+            throw new DirectoryLookupException("Directory search is unavailable because the app could not sign in to Microsoft Graph. Check the server logs for details.", ex);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not DirectoryLookupException)
         {
             LogLookupError(ex);
-            return Array.Empty<DirectoryUserResult>();
+            throw new DirectoryLookupException("Directory search is unavailable right now. Check the server logs for details.", ex);
         }
     }
+
+    private static string DescribeFailure(int statusCode) => statusCode switch
+    {
+        401 or 403 => $"Directory search was denied by Microsoft Graph ({statusCode}). The app registration or managed identity needs the User.ReadBasic.All application permission with admin consent.",
+        429 => "Directory search is being throttled by Microsoft Graph. Try again in a moment.",
+        _ => $"Directory search failed because Microsoft Graph returned {statusCode}. Check the server logs for details."
+    };
 
     /// <summary>
     /// Builds the Graph users query. <c>$search</c> is used rather than <c>startswith</c> filtering because
