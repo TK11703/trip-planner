@@ -92,7 +92,7 @@
                 <label class="form-label mb-0">Start</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyStartFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" step="1" @bind-Value="_model.StartLocal" @bind-Value:after="OnStartChanged" />
+            <InputDate id="item-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" step="1" @bind-Value="_model.StartLocal" @bind-Value:after="OnStartChanged" />
             <ValidationMessage For="@(() => _model.StartLocal)" />
             @if (SelectedLeg is not null)
             {
@@ -123,7 +123,7 @@
                 <label class="form-label mb-0">End</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyEndFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" step="1" @bind-Value="_model.EndLocal" @bind-Value:after="OnEndChangedManually" />
+            <InputDate id="item-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" step="1" @bind-Value="_model.EndLocal" />
             <ValidationMessage For="@(() => _model.EndLocal)" />
             @if (SelectedLeg is not null)
             {
@@ -270,10 +270,6 @@
     // The leg whose travel window the entered dates were last pulled into, so a new item is only
     // re-clamped when the traveler actually switches legs.
     private Guid? _clampedLegId;
-    // True once the traveler (or an explicit copy/edit) has set the end directly, after which
-    // the end no longer auto-follows the start.
-    private bool _endManuallySet;
-
     private bool IsEdit => Item is not null;
     private string FormName => IsEdit ? $"tracked-item-edit-{Item!.TrackedItemId}" : "tracked-item-create";
 
@@ -509,7 +505,6 @@
                 _loadedItemId = null;
                 _appliedInitial = false;
                 _tzInitialized = false;
-                _endManuallySet = false;
                 _clampedLegId = null;
             }
 
@@ -571,29 +566,20 @@
         };
         _loadedItemId = Item.TrackedItemId;
         _tzInitialized = true;
-        // An existing item's saved end is authoritative and must not auto-follow start edits.
-        _endManuallySet = true;
         _clampedLegId = _model.TripLegId;
         SyncLegWindow();
     }
 
-    // When the traveler changes the start, the end reacts to one hour after the new start,
-    // unless the end has already been set directly. The reaction never leaves the leg's window.
+    // When the traveler changes the start, keep the end one hour later without leaving the leg's window.
     private void OnStartChanged()
     {
-        if (!_endManuallySet)
+        var candidate = _model.StartLocal.AddHours(1);
+        if (ToLocal(_model.LegEndUtc, EndTimeZoneId) is { } endMax && candidate > endMax)
         {
-            var candidate = _model.StartLocal.AddHours(1);
-            if (ToLocal(_model.LegEndUtc, EndTimeZoneId) is { } endMax && candidate > endMax)
-            {
-                candidate = endMax;
-            }
-            _model.EndLocal = candidate;
+            candidate = endMax;
         }
+        _model.EndLocal = candidate;
     }
-
-    // A direct edit of the end stops the automatic one-hour-after-start adjustment.
-    private void OnEndChangedManually() => _endManuallySet = true;
 
     private void RequestCopyStartFromLeg()
     {
@@ -647,7 +633,6 @@
         _model.EndLocal = leg.EndLocal;
         _model.EndTimeZoneId = leg.EndTimeZoneId;
         _confirmEndCopy = false;
-        _endManuallySet = true;
     }
 
     private async Task SubmitAsync()
@@ -685,7 +670,6 @@
             await TripApi.CreateItemAsync(TripId, request);
             _model = new ItemModel { TripLegId = Legs.FirstOrDefault(l => l.CanContainItems)?.TripLegId };
             _tzInitialized = false;
-            _endManuallySet = false;
             _clampedLegId = null;
         }
         else

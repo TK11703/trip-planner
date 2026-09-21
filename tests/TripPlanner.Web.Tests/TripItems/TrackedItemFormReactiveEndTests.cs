@@ -8,7 +8,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.TripItems;
 
-// User Story 1 (P1): The end reacts to one hour after the start, until the end is set directly.
+// User Story 1 (P1): The end reacts to one hour after the start on create and edit forms.
 public class TrackedItemFormReactiveEndTests : TestContext
 {
     public TrackedItemFormReactiveEndTests()
@@ -40,7 +40,7 @@ public class TrackedItemFormReactiveEndTests : TestContext
     }
 
     [Fact]
-    public void AfterManualEndEdit_StartChange_DoesNotOverrideEnd()
+    public void AfterManualEndEdit_StartChange_ResetsEndToOneHourLater()
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
         var cut = RenderCreate(leg, new DateTime(2026, 9, 5, 9, 0, 0));
@@ -50,11 +50,11 @@ public class TrackedItemFormReactiveEndTests : TestContext
         cut.FindAll("input[type=datetime-local]")[0].Change("2026-09-07T08:00");
 
         var end = cut.FindAll("input[type=datetime-local]")[1];
-        Assert.Equal("2026-09-06T20:00:00", end.GetAttribute("value"));
+        Assert.Equal("2026-09-07T09:00:00", end.GetAttribute("value"));
     }
 
     [Fact]
-    public void EditingExistingItem_StartChange_KeepsSavedEnd()
+    public void EditingExistingItem_StartChange_SetsEndToOneHourLater()
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
         var item = TrackedItemFormTestData.Item(leg.TripLegId, new DateTime(2026, 9, 5, 9, 0, 0), new DateTime(2026, 9, 5, 12, 0, 0));
@@ -67,6 +67,6 @@ public class TrackedItemFormReactiveEndTests : TestContext
         cut.FindAll("input[type=datetime-local]")[0].Change("2026-09-05T15:00");
 
         var end = cut.FindAll("input[type=datetime-local]")[1];
-        Assert.Equal("2026-09-05T12:00:00", end.GetAttribute("value"));
+        Assert.Equal("2026-09-05T16:00:00", end.GetAttribute("value"));
     }
 }

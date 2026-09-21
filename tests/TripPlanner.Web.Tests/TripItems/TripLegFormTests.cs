@@ -35,6 +35,26 @@ public class TripLegFormTests : TestContext
             .Add(x => x.TripId, leg.TripId)
             .Add(x => x.Leg, leg));
 
+    [Fact]
+    public void ChangingStart_SetsEndToOneHourLater()
+    {
+        var cut = RenderCreate();
+
+        cut.Find("#leg-start").Change("2026-09-06T13:00");
+
+        Assert.Equal("2026-09-06T14:00:00", cut.Find("#leg-end").GetAttribute("value"));
+    }
+
+    [Fact]
+    public void EditingExistingLeg_ChangingStart_SetsEndToOneHourLater()
+    {
+        var cut = RenderEdit(TripLegModeTestData.StayLeg());
+
+        cut.Find("#leg-start").Change("2026-09-06T13:00");
+
+        Assert.Equal("2026-09-06T14:00:00", cut.Find("#leg-end").GetAttribute("value"));
+    }
+
     // --- US1: choosing what the leg is ---
 
     [Fact]

@@ -74,12 +74,12 @@
     </div>
     <div class="row g-2 mb-2">
         <div class="col-6">
-            <label class="form-label">Start</label>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.StartAt" />
+            <label class="form-label" for="leg-start">Start</label>
+            <InputDate id="leg-start" Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.StartAt" @bind-Value:after="OnStartChanged" />
         </div>
         <div class="col-6">
-            <label class="form-label">End</label>
-            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndAt" />
+            <label class="form-label" for="leg-end">End</label>
+            <InputDate id="leg-end" Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndAt" />
         </div>
     </div>
     <div class="row g-2 mb-2">
@@ -299,6 +299,8 @@
 
         _defaultsLoadedForTripId = TripId;
     }
+
+    private void OnStartChanged() => _model.EndAt = _model.StartAt.AddHours(1);
 
     private async Task SubmitAsync()
     {
