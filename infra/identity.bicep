@@ -16,6 +16,9 @@ resource webIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-3
   tags: tags
 }
 
+// The API identity also needs the Microsoft Graph 'User.ReadBasic.All' application role for
+// trip-share directory search. That is a directory grant, not Azure RBAC, so it cannot be
+// expressed here -- see docs/operations/production-runbook.md section 1.4.
 resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: 'id-${environmentName}-api'
   location: location

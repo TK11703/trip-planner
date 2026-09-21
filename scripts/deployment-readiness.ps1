@@ -568,6 +568,58 @@ function Test-Entra {
     }
 }
 
+# Trip sharing looks users up in the tenant through Microsoft Graph as the API's managed
+# identity, which needs an application role -- a delegated permission on the app
+# registration does nothing for an app-only call. A missing grant degrades quietly: Graph
+# returns 403 and the search looks like "nobody matched", so it is checked rather than
+# left to be rediscovered. Advisory, because only trip sharing depends on it.
+function Test-ApiGraphDirectoryPermission {
+    $checkId = 'entra-api-graph-directory-permission'
+    # Well-known ids: Microsoft Graph's first-party app, and its User.ReadBasic.All app role.
+    $graphAppId = '00000003-0000-0000-c000-000000000000'
+    $userReadBasicAllRoleId = '97235f07-e226-4f63-ace3-39588e11d3a1'
+
+    if (-not $deployedResourcesExpected) {
+        Add-SkippedCheck -Id $checkId -Category 'entra' -Reason 'First release or offline: the API managed identity is created by this deployment.'
+        return
+    }
+
+    if (-not $azureAvailable) {
+        Add-SkippedCheck -Id $checkId -Category 'entra' -Reason 'Offline mode: Microsoft Graph app role assignments not queried.'
+        return
+    }
+
+    $apiPrincipalId = Invoke-AzCommand -Argument @(
+        'identity', 'show', '--resource-group', $ResourceGroup, '--name', "id-$EnvironmentName-api",
+        '--query', 'principalId', '-o', 'tsv')
+
+    if ([string]::IsNullOrWhiteSpace("$apiPrincipalId")) {
+        Add-Check -Id $checkId -Category 'entra' -Status 'fail' -Required $false `
+            -Summary "Could not read the principal id of 'id-$EnvironmentName-api', so its Microsoft Graph grant could not be confirmed." `
+            -CorrectiveAction "Confirm the identity exists in '$ResourceGroup' and that the deploying identity has reader access."
+        return
+    }
+
+    $assignments = Invoke-AzCommand -Argument @(
+        'rest', '--method', 'get', '-o', 'json',
+        '--url', "https://graph.microsoft.com/v1.0/servicePrincipals/$apiPrincipalId/appRoleAssignments")
+
+    $granted = @($assignments.value | Where-Object { $_.appRoleId -eq $userReadBasicAllRoleId })
+    $grantCommand = "az rest --method post --url https://graph.microsoft.com/v1.0/servicePrincipals/$apiPrincipalId/appRoleAssignments (see docs/operations/production-runbook.md section 1.5)"
+
+    if ($granted.Count -gt 0) {
+        Add-Check -Id $checkId -Category 'entra' -Status 'pass' -Required $false `
+            -Summary "The API managed identity holds the Microsoft Graph 'User.ReadBasic.All' application role." `
+            -EvidenceReference "az rest --method get --url https://graph.microsoft.com/v1.0/servicePrincipals/$apiPrincipalId/appRoleAssignments"
+    }
+    else {
+        Add-Check -Id $checkId -Category 'entra' -Status 'fail' -Required $false `
+            -Summary "'id-$EnvironmentName-api' ($apiPrincipalId) has no Microsoft Graph 'User.ReadBasic.All' application role, so trip-share directory search will return no results." `
+            -CorrectiveAction "Grant app role $userReadBasicAllRoleId on the Microsoft Graph service principal ($graphAppId) to the API identity: $grantCommand" `
+            -EvidenceReference "az rest --method get --url https://graph.microsoft.com/v1.0/servicePrincipals/$apiPrincipalId/appRoleAssignments"
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Category: data-protection
 # ---------------------------------------------------------------------------
@@ -854,6 +906,7 @@ Test-Configuration
 Test-Identity
 Test-SecretReferences
 Test-Entra
+Test-ApiGraphDirectoryPermission
 Test-DataProtection
 Test-Artifacts
 Test-InfrastructurePreview

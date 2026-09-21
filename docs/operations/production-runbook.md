@@ -45,8 +45,9 @@ because an accidental `azd down` must never delete the identity users have conse
    v1 tokens the `aud` claim is `api://<client-id>`, but `entraApiAudience` defaults to the
    bare client id, and the mismatch rejects every call with a bare `401`. v2 tokens put the
    client id in `aud`, matching the default.
-5. **API permissions**: add `Microsoft Graph → User.Read` (delegated) only if directory
-   lookup is enabled (`AzureEntra:DirectoryLookupEnabled`). Grant admin consent.
+5. **API permissions**: none are required on this registration. The API never calls Graph
+   with a delegated token — trip-share directory lookup runs app-only as the managed
+   identity, which is granted separately in [1.4](#14-api-managed-identity-graph-permission).
 6. **Token configuration → Add optional claim → Access → `given_name` and `family_name`.**
    Entra omits both from access tokens by default. `CurrentUser.FirstName`/`LastName` read
    exactly these claims to seed a profile on first sign-in, so without them a new user is
@@ -124,7 +125,60 @@ prompt on first sign-in. If admin consent is withheld, each user is prompted onc
 approve `access_as_user`; sign-in still succeeds, but the first API call fails until
 consent is granted.
 
-### 1.4 Post-deployment verification
+### 1.4 API managed identity Graph permission
+
+Trip sharing lets an owner search the tenant for people to share with. In production the
+API has no client secret, so `DefaultAzureCredential` resolves to the user-assigned
+identity `id-<environment-name>-api` and the Graph call is **app-only**. That requires an
+*application* role on the Microsoft Graph service principal. A delegated permission on
+the app registration has no effect here, and neither does any Azure RBAC role — Graph
+permissions are a directory concept and are not expressible in the Bicep under `infra/`.
+
+This is a one-time, per-tenant grant and needs **Privileged Role Administrator** or
+**Global Administrator**. The identity does not exist until the first provision, so run it
+afterwards.
+
+| Field | Value |
+| --- | --- |
+| Permission | `User.ReadBasic.All` (Application) |
+| App role id | `97235f07-e226-4f63-ace3-39588e11d3a1` |
+| Graph app id | `00000003-0000-0000-c000-000000000000` |
+| Assigned to | `id-<environment-name>-api` |
+
+```powershell
+$principalId = az identity show -g $env:AZURE_RESOURCE_GROUP -n "id-$env:AZURE_ENV_NAME-api" --query principalId -o tsv
+$graphSpId = az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv
+$body = @{
+    principalId = $principalId
+    resourceId  = $graphSpId
+    appRoleId   = '97235f07-e226-4f63-ace3-39588e11d3a1'
+} | ConvertTo-Json -Compress
+Set-Content -LiteralPath "$env:TEMP\graph-approle.json" -Value $body -Encoding utf8 -NoNewline
+
+az rest --method post --headers "Content-Type=application/json" --body "@$env:TEMP\graph-approle.json" `
+    --url "https://graph.microsoft.com/v1.0/servicePrincipals/$principalId/appRoleAssignments"
+```
+
+A repeat run returns `Permission being assigned already exists on the object`, which is
+harmless. **Restart the API afterwards** — the identity caches its Graph token, so an
+already-running revision keeps presenting a token minted before the role existed:
+
+```powershell
+az containerapp revision restart -g $env:AZURE_RESOURCE_GROUP -n "ca-api-$env:AZURE_ENV_NAME" `
+    --revision (az containerapp show -g $env:AZURE_RESOURCE_GROUP -n "ca-api-$env:AZURE_ENV_NAME" --query properties.latestRevisionName -o tsv)
+```
+
+Without the grant the app still starts and trip sharing still opens; only directory search
+fails, with a `502` and `"Directory search was denied by Microsoft Graph (403)"`. Earlier
+builds swallowed this into an empty result set that was indistinguishable from "nobody
+matched", which is why `deployment-readiness.ps1` now carries the
+`entra-api-graph-directory-permission` check. It is advisory rather than blocking: only
+trip sharing depends on it.
+
+Set `AzureEntra:DirectoryLookupEnabled` to `false` if the tenant will not allow the grant.
+The share dialog then falls back to inviting by email address.
+
+### 1.5 Post-deployment verification
 
 ```powershell
 # Confirm the redirect URI matches the live ingress FQDN.
@@ -136,6 +190,11 @@ az ad app show --id $env:AZURE_ENTRA_API_CLIENT_ID --query "api.oauth2Permission
 
 # Confirm the name claims are requested. Empty output means new users get blank names.
 az ad app show --id $env:AZURE_ENTRA_API_CLIENT_ID --query "optionalClaims.accessToken[].name" -o tsv
+
+# Confirm the API identity holds the Graph app role. Empty output means directory search is dead.
+$principalId = az identity show -g $env:AZURE_RESOURCE_GROUP -n "id-$env:AZURE_ENV_NAME-api" --query principalId -o tsv
+az rest --method get --url "https://graph.microsoft.com/v1.0/servicePrincipals/$principalId/appRoleAssignments" `
+    --query "value[].appRoleId" -o tsv
 ```
 
 A mismatch between the redirect URI and `$webUrl` produces `AADSTS50011` at sign-in.
