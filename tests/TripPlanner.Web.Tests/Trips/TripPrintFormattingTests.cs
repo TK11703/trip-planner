@@ -150,7 +150,7 @@ public class TripPrintFormattingTests
         var printed = Assert.Single(TripPrintFormatting.BuildPrintableTrip(trip).Legs);
 
         Assert.Equal("ABC123", printed.ConfirmationCode);
-        Assert.Equal(412.50m.ToString("C", System.Globalization.CultureInfo.CurrentCulture), printed.TravelCostText);
+        Assert.Equal("$412.50", printed.TravelCostText);
     }
 
     /// <summary>An unbooked travel leg still prints; it simply has nothing to say about cost or codes.</summary>

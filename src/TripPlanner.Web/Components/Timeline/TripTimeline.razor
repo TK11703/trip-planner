@@ -107,11 +107,11 @@ else
                         <div class="ttl-leg-estimate small text-secondary">
                             @if (leg.CanContainItems)
                             {
-                                <span>Estimated total: @leg.EstimatedCostTotal.ToString("C")</span>
+                                <span>Estimated total: @leg.EstimatedCostTotal.ToDisplayAmount()</span>
                             }
                             @if (leg.TravelCost is { } travelCost)
                             {
-                                <span data-testid="leg-travel-cost">Travel cost: @travelCost.ToString("C")</span>
+                                <span data-testid="leg-travel-cost">Travel cost: @travelCost.ToDisplayAmount()</span>
                             }
                         </div>
                     </div>

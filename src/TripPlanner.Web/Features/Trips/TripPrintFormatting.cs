@@ -143,7 +143,7 @@ public static class TripPrintFormatting
                 // Only a travel leg has a mode or booking details; a stay prints without them.
                 TransportationModes.Label(leg.TransportationMode) is { Length: > 0 } mode ? mode : null,
                 string.IsNullOrWhiteSpace(leg.ConfirmationCode) ? null : leg.ConfirmationCode,
-                leg.TravelCost is { } travelCost ? travelCost.ToString("C", CultureInfo.CurrentCulture) : null))
+                leg.TravelCost is { } travelCost ? travelCost.ToDisplayAmount() : null))
             .ToList();
 
         var description = string.IsNullOrWhiteSpace(trip.Description) ? null : trip.Description;
@@ -152,7 +152,7 @@ public static class TripPrintFormatting
             trip.Name,
             BuildDateRangeText(trip.StartDate, trip.EndDate),
             description,
-            trip.EstimatedCostTotal.ToString("C", CultureInfo.CurrentCulture),
+            trip.EstimatedCostTotal.ToDisplayAmount(),
             legs,
             unassigned.Select(ToPrintableItem).ToList());
     }
@@ -164,7 +164,7 @@ public static class TripPrintFormatting
         FormatDateTimeWithZone(item.StartLocal, item.StartTimeZoneId),
         item.EndLocal is { } end ? FormatDateTimeWithZone(end, item.EndTimeZoneId ?? item.StartTimeZoneId) : null,
         string.IsNullOrWhiteSpace(item.ConfirmationCode) ? null : item.ConfirmationCode,
-        item.EstimatedCost is { } cost ? cost.ToString("C", CultureInfo.CurrentCulture) : null);
+        item.EstimatedCost is { } cost ? cost.ToDisplayAmount() : null);
 
     private static string? BuildRouteText(string? origin, string? destination)
     {
