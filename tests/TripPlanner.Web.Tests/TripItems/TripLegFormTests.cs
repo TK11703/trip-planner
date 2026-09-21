@@ -28,7 +28,10 @@ public class TripLegFormTests : TestContext
     }
 
     private IRenderedComponent<TripLegForm> RenderCreate(Guid? tripId = null) =>
-        RenderComponent<TripLegForm>(p => p.Add(x => x.TripId, tripId ?? Guid.NewGuid()));
+        RenderComponent<TripLegForm>(p => p
+            .Add(x => x.TripId, tripId ?? Guid.NewGuid())
+            .Add(x => x.TripStartDate, new DateOnly(2026, 9, 5))
+            .Add(x => x.TripEndDate, new DateOnly(2026, 9, 12)));
 
     private IRenderedComponent<TripLegForm> RenderEdit(TripLegDto leg, bool canEditContent = true) =>
         RenderComponent<TripLegForm>(p => p
@@ -44,6 +47,22 @@ public class TripLegFormTests : TestContext
         cut.Find("#leg-start").Change("2026-09-06T13:00");
 
         Assert.Equal("2026-09-06T14:00:00", cut.Find("#leg-end").GetAttribute("value"));
+    }
+
+    [Fact]
+    public void NewLeg_DefaultsToTripStartAndLimitsDatesToTripRange()
+    {
+        var cut = RenderCreate();
+
+        var start = cut.Find("#leg-start");
+        var end = cut.Find("#leg-end");
+
+        Assert.Equal("2026-09-05T00:00:00", start.GetAttribute("value"));
+        Assert.Equal("2026-09-05T01:00:00", end.GetAttribute("value"));
+        Assert.Equal("2026-09-05T00:00:00", start.GetAttribute("min"));
+        Assert.Equal("2026-09-12T23:59:59", start.GetAttribute("max"));
+        Assert.Equal("2026-09-05T00:00:00", end.GetAttribute("min"));
+        Assert.Equal("2026-09-12T23:59:59", end.GetAttribute("max"));
     }
 
     [Fact]

@@ -276,10 +276,10 @@ else
                                 <TripForm Model="_tripEditModel" IsEdit="true" OnSubmit="HandleTripEditAsync" />
                                 break;
                             case ActiveModal.CreateLeg:
-                                <TripLegForm TripId="@TripId" OnSaved="HandleModalSavedAsync" />
+                                <TripLegForm TripId="@TripId" TripStartDate="_trip.StartDate" TripEndDate="_trip.EndDate" OnSaved="HandleModalSavedAsync" />
                                 break;
                             case ActiveModal.EditLeg:
-                                <TripLegForm TripId="@TripId" Leg="_editingLeg" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" />
+                                <TripLegForm TripId="@TripId" Leg="_editingLeg" TripStartDate="_trip.StartDate" TripEndDate="_trip.EndDate" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" />
                                 break;
                             case ActiveModal.CreateItem:
                                 <TrackedItemForm TripId="@TripId" Legs="_trip.Legs" InitialTripLegId="_initialItemLegId" InitialStartsAt="_initialItemStart" OnSaved="HandleModalSavedAsync" />

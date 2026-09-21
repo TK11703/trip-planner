@@ -71,6 +71,18 @@ public class TripDetailsTableViewTests : TestContext
     }
 
     [Fact]
+    public void AddLegUsesTheTripDateRange()
+    {
+        var cut = RenderDetails();
+        cut.WaitForAssertion(() => cut.FindAll("button").Single(button => button.TextContent.Trim() == "Add trip leg").Click());
+
+        var form = cut.FindComponent<TripLegForm>();
+
+        Assert.Equal(new DateOnly(2026, 7, 14), form.Instance.TripStartDate);
+        Assert.Equal(new DateOnly(2026, 7, 20), form.Instance.TripEndDate);
+    }
+
+    [Fact]
     public void ClosingTableModalRestoresFocusToInvokingAction()
     {
         var cut = RenderDetails();
