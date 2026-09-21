@@ -129,7 +129,8 @@ public sealed class TripApiClient : ITripApiClient
     public async Task<IReadOnlyList<DirectoryUserResult>> SearchDirectoryUsersAsync(Guid tripId, string query, CancellationToken ct = default)
     {
         var resp = await _http.GetAsync($"/api/trips/{tripId}/shares/directory-users?query={Uri.EscapeDataString(query)}", ct);
-        if (!resp.IsSuccessStatusCode) return Array.Empty<DirectoryUserResult>();
+        // Surface failures instead of returning empty, which the modal cannot tell apart from "no matches".
+        await EnsureSuccessAsync(resp, ct);
         var result = await resp.Content.ReadFromJsonAsync<DirectoryUserResult[]>(cancellationToken: ct);
         return result ?? Array.Empty<DirectoryUserResult>();
     }
