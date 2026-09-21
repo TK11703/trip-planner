@@ -68,6 +68,7 @@ public readonly record struct TripLegShape(
     string LegKind,
     string? TransportationMode,
     string? Origin,
+    string? Destination,
     decimal? TravelCost,
     string? ConfirmationCode)
 {
@@ -81,7 +82,7 @@ public readonly record struct TripLegShape(
     /// by car — so older clients keep working without inventing a different rule. Travel-only
     /// values are dropped for a Stay rather than kept as hidden data.
     /// </summary>
-    public static TripLegShape Resolve(string? legKind, string? transportationMode, string? origin, decimal? travelCost, string? confirmationCode)
+    public static TripLegShape Resolve(string? legKind, string? transportationMode, string? origin, string? destination, decimal? travelCost, string? confirmationCode)
     {
         var kindSupplied = TripLegKinds.IsValid(legKind);
         var kind = kindSupplied
@@ -90,7 +91,7 @@ public readonly record struct TripLegShape(
 
         if (kind == TripLegKinds.Stay)
         {
-            return new TripLegShape(TripLegKinds.Stay, null, null, null, null);
+            return new TripLegShape(TripLegKinds.Stay, null, null, null, null, null);
         }
 
         // Only an inferred classification gets a default mode; an explicit Travel request that
@@ -100,15 +101,16 @@ public readonly record struct TripLegShape(
 
         var trimmedCode = string.IsNullOrWhiteSpace(confirmationCode) ? null : confirmationCode.Trim();
         var trimmedOrigin = string.IsNullOrWhiteSpace(origin) ? null : origin.Trim();
+        var trimmedDestination = string.IsNullOrWhiteSpace(destination) ? null : destination.Trim();
 
-        return new TripLegShape(TripLegKinds.Travel, mode, trimmedOrigin, travelCost, trimmedCode);
+        return new TripLegShape(TripLegKinds.Travel, mode, trimmedOrigin, trimmedDestination, travelCost, trimmedCode);
     }
 
     public static TripLegShape Resolve(CreateTripLegRequest request) =>
-        Resolve(request.LegKind, request.TransportationMode, request.Origin, request.TravelCost, request.ConfirmationCode);
+        Resolve(request.LegKind, request.TransportationMode, request.Origin, request.Destination, request.TravelCost, request.ConfirmationCode);
 
     public static TripLegShape Resolve(UpdateTripLegRequest request) =>
-        Resolve(request.LegKind, request.TransportationMode, request.Origin, request.TravelCost, request.ConfirmationCode);
+        Resolve(request.LegKind, request.TransportationMode, request.Origin, request.Destination, request.TravelCost, request.ConfirmationCode);
 }
 
 public sealed record CreateTripLegRequest(string Title, string? Origin, string? Destination, DateTime StartLocal, string StartTimeZoneId, DateTime EndLocal, string EndTimeZoneId, string? Notes, string? LegKind = null, string? TransportationMode = null, decimal? TravelCost = null, string? ConfirmationCode = null);

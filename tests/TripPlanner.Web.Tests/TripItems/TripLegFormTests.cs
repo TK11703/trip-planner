@@ -91,7 +91,7 @@ public class TripLegFormTests : TestContext
         Assert.Empty(cut.FindAll("#leg-origin"));
         Assert.Empty(cut.FindAll("#leg-travel-cost"));
         Assert.Empty(cut.FindAll("#leg-confirmation-code"));
-        Assert.NotNull(cut.Find("#leg-destination"));
+        Assert.Empty(cut.FindAll("#leg-destination"));
     }
 
     [Fact]
@@ -192,13 +192,13 @@ public class TripLegFormTests : TestContext
 
         cut.Find("#leg-title").Change("Hotel Kabuki");
         cut.Find("#leg-kind-stay").Change("Stay");
-        cut.Find("#leg-destination").Change("San Francisco");
         cut.Find("form").Submit();
 
         var request = Assert.Single(_api.Created);
         Assert.Equal(TripLegKinds.Stay, request.LegKind);
         Assert.Null(request.TransportationMode);
         Assert.Null(request.Origin);
+        Assert.Null(request.Destination);
         Assert.Null(request.TravelCost);
         Assert.Null(request.ConfirmationCode);
     }
@@ -259,6 +259,7 @@ public class TripLegFormTests : TestContext
 
         Assert.Empty(cut.FindAll("#leg-transportation-mode"));
         Assert.Empty(cut.FindAll("#leg-origin"));
+        Assert.Empty(cut.FindAll("#leg-destination"));
     }
 
     /// <summary>A leg saved before this feature carries no kind; its origin still says what it was.</summary>
@@ -292,6 +293,7 @@ public class TripLegFormTests : TestContext
         Assert.Equal(TripLegKinds.Stay, request.LegKind);
         Assert.Null(request.TransportationMode);
         Assert.Null(request.Origin);
+        Assert.Null(request.Destination);
         Assert.Null(request.TravelCost);
         Assert.Null(request.ConfirmationCode);
     }

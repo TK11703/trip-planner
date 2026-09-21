@@ -51,6 +51,23 @@ public class TripLegModeMigrationTests
     }
 
     /// <summary>
+    /// A stay's destination only ever restated its title, so the migration clears it instead of
+    /// leaving it to surface on the timeline of a leg the traveler may never reopen.
+    /// </summary>
+    [Theory]
+    [InlineData("blank-origin")]
+    [InlineData("whitespace-origin")]
+    public async Task ALegacyStayLosesItsDestination(string title)
+    {
+        await using var conn = await _fixture.OpenAsync();
+
+        var destination = await conn.ExecuteScalarAsync<string?>(
+            "SELECT destination FROM trip_legs WHERE title = @title", new { title });
+
+        Assert.Null(destination);
+    }
+
+    /// <summary>
     /// Car is chosen for every migrated travel leg precisely because it still accepts items, so no
     /// legacy row needs an exception and no item has to be moved.
     /// </summary>

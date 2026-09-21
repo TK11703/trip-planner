@@ -33,7 +33,7 @@ internal static class TripLegModeTestData
         "Leg", origin, destination, LegStart, "UTC", LegEnd, "UTC", null,
         TripLegKinds.Travel, mode, travelCost, confirmationCode);
 
-    public static CreateTripLegRequest CreateStay(string? destination = "Chicago") => new(
+    public static CreateTripLegRequest CreateStay(string? destination = null) => new(
         "Leg", null, destination, LegStart, "UTC", LegEnd, "UTC", null,
         TripLegKinds.Stay, null, null, null);
 
@@ -47,7 +47,7 @@ internal static class TripLegModeTestData
         TripLegKinds.Travel, mode, travelCost, confirmationCode);
 
     public static TripLegDto StayLeg(Guid tripId, Guid legId) => new(
-        legId, tripId, "Leg", null, "Chicago", LegStart, "UTC", "UTC", LegEnd, "UTC", "UTC", null, 0,
+        legId, tripId, "Leg", null, null, LegStart, "UTC", "UTC", LegEnd, "UTC", "UTC", null, 0,
         TripLegKinds.Stay, null, null, null);
 
     public static TripDetail TripWith(Guid tripId, params TripLegDto[] legs) => new(

@@ -69,7 +69,7 @@ public sealed class TripLegValidator
         if (!string.IsNullOrWhiteSpace(legKind) && !TripLegKinds.IsValid(legKind))
             return ValidationResult.Fail("Choose whether this leg is a stay or travel.", "legKind");
 
-        var shape = TripLegShape.Resolve(legKind, transportationMode, origin, travelCost, confirmationCode);
+        var shape = TripLegShape.Resolve(legKind, transportationMode, origin, destination, travelCost, confirmationCode);
         if (!shape.IsTravel)
             return ValidationResult.Success;
 
@@ -79,7 +79,7 @@ public sealed class TripLegValidator
         if (shape.Origin is null)
             return ValidationResult.Fail("Enter where this travel leg starts from.", "origin");
 
-        if (string.IsNullOrWhiteSpace(destination))
+        if (shape.Destination is null)
             return ValidationResult.Fail("Enter where this travel leg arrives.", "destination");
 
         // Booking details are welcome on every travel mode but never demanded: a leg can be

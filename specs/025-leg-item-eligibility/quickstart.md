@@ -20,7 +20,7 @@ Open the Web endpoint shown by Aspire and sign in with a traveler who can edit a
 2. For each, verify origin, destination, start/end, and both time zones are required while travel cost and confirmation number are optional.
 3. Save each mode once without booking details and once with valid booking details; reopen the legs and verify supplied values are retained.
 4. Try negative or over-precision cost and a whitespace-only or overlength confirmation; verify invalid supplied values are refused.
-5. Add a Stay leg; verify no mode or travel-only fields persist.
+5. Add a Stay leg; verify no mode, route, or other travel-only fields are offered or persisted.
 
 Expected: all six resulting leg shapes follow [data-model.md](data-model.md), and invalid requests produce the field-level outcomes in [contracts/api.md](contracts/api.md).
 

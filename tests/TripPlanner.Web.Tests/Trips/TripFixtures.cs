@@ -39,7 +39,7 @@ internal static class TripFixtures
     public static TripDetail WithStayLeg()
     {
         var leg = Leg("Hotel Kabuki", new DateTime(2026, 7, 14, 15, 0, 0), sortOrder: 0,
-            destination: "Tokyo", legKind: TripLegKinds.Stay);
+            legKind: TripLegKinds.Stay);
 
         return Trip("Japan 2026", null, new[] { leg }, Array.Empty<TrackedItemDto>());
     }

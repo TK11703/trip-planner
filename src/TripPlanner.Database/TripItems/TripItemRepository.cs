@@ -76,7 +76,7 @@ public sealed class TripItemRepository : ITripItemRepository
         var rows = await conn.ExecuteAsync(new CommandDefinition(LegSql("Insert"), new
         {
             TripLegId = id, TripId = tripId, OwnerUserId = ownerUserId,
-            request.Title, shape.Origin, request.Destination,
+            request.Title, shape.Origin, shape.Destination,
             request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId,
             StartAt = ToInstant(request.StartLocal, request.StartTimeZoneId),
             EndAt = ToInstant(request.EndLocal, request.EndTimeZoneId),
@@ -95,7 +95,7 @@ public sealed class TripItemRepository : ITripItemRepository
             () => conn.ExecuteAsync(new CommandDefinition(LegSql("Update"), new
             {
                 TripLegId = tripLegId, TripId = tripId, OwnerUserId = ownerUserId,
-                request.Title, shape.Origin, request.Destination,
+                request.Title, shape.Origin, shape.Destination,
                 request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId,
                 StartAt = ToInstant(request.StartLocal, request.StartTimeZoneId),
                 EndAt = ToInstant(request.EndLocal, request.EndTimeZoneId),

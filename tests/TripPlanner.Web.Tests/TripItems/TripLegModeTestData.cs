@@ -36,7 +36,7 @@ internal static class TripLegModeTestData
         Guid? legId = null,
         Guid? tripId = null,
         string title = "Stay leg") => new(
-        legId ?? Guid.NewGuid(), tripId ?? Guid.NewGuid(), title, null, "Chicago",
+        legId ?? Guid.NewGuid(), tripId ?? Guid.NewGuid(), title, null, null,
         LegStart, "UTC", "UTC", LegEnd, "UTC", "UTC", null, 0,
         TripLegKinds.Stay, null, null, null);
 
@@ -51,7 +51,7 @@ internal static class TripLegModeTestData
         TripLegKinds.Travel, mode, travelCost, confirmationCode);
 
     public static TimelineLeg TimelineStayLeg(Guid? legId = null, string title = "Stay leg") => new(
-        legId ?? Guid.NewGuid(), title, null, "Chicago",
+        legId ?? Guid.NewGuid(), title, null, null,
         LegStart, "UTC", "UTC", LegEnd, "UTC", "UTC", 0, Array.Empty<TimelineItem>(), 0m,
         TripLegKinds.Stay, null, null, null);
 

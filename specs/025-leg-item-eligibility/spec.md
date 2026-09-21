@@ -24,7 +24,7 @@ A traveler creating a trip leg identifies it as either Travel or Stay. For Trave
 2. **Given** a traveler is creating a leg, **When** they select Stay and save valid leg details, **Then** the leg is saved and subsequently identified as a Stay leg.
 3. **Given** an existing leg created before this feature, **When** the traveler first views or edits it after the change, **Then** it has a classification derived from its existing origin information without requiring traveler action.
 4. **Given** a Travel leg, **When** the traveler enters its details, **Then** both an origin and destination are required.
-5. **Given** a Stay leg, **When** the traveler enters its details, **Then** a destination is required and an origin is not requested.
+5. **Given** a Stay leg, **When** the traveler enters its details, **Then** neither an origin nor a destination is requested; the leg's name identifies it and its items carry the addresses.
 6. **Given** a Travel leg, **When** the traveler saves it, **Then** exactly one mode from Flight, Train, Bus, Boat, or Car is required.
 7. **Given** any Travel mode, **When** the traveler enters a travel cost or reservation or confirmation number, **Then** the supplied detail is saved with the leg.
 8. **Given** any Travel mode, **When** the traveler omits travel cost and reservation or confirmation number, **Then** the leg can still be saved when its other details are valid.
@@ -104,7 +104,7 @@ A traveler opens a trip created before this distinction was persisted. Existing 
 - **FR-001**: Every trip leg MUST have exactly one explicit classification: Travel or Stay.
 - **FR-002**: Users MUST select a classification when creating a leg and MUST be able to view that classification when viewing or editing the leg.
 - **FR-003**: A Travel leg MUST require an origin and a destination.
-- **FR-004**: A Stay leg MUST require a destination and MUST NOT retain an origin.
+- **FR-004**: A Stay leg MUST NOT retain an origin or a destination.
 - **FR-005**: Both classifications MUST retain the existing leg title, start, end, start time zone, end time zone, and notes behavior.
 - **FR-006**: Every Travel leg MUST have exactly one transportation mode: Flight, Train, Bus, Boat, or Car; a Stay leg MUST NOT have a transportation mode.
 - **FR-007**: Every Travel mode MUST accept an optional travel cost and an optional reservation or confirmation number.
@@ -137,7 +137,7 @@ A traveler opens a trip created before this distinction was persisted. Existing 
 
 ### Key Entities
 
-- **Trip Leg**: A dated segment of a trip with a title, classification, destination, travel window, time zones, and optional notes. A Travel leg also has an origin, transportation mode, and optional booking details.
+- **Trip Leg**: A dated segment of a trip with a title, classification, travel window, time zones, and optional notes. A Travel leg also has an origin, destination, transportation mode, and optional booking details.
 - **Leg Classification**: The persisted meaning of a leg. Travel represents movement between places; Stay represents time at a destination.
 - **Transportation Mode**: Flight, Train, Bus, Boat, or Car. It controls whether a Travel leg may contain items; every mode accepts the same optional booking details.
 - **Item**: A planned event, reservation, activity, or reminder. It may be assigned only to an eligible Stay or Car leg whose travel window contains it, or remain unassigned under existing rules.

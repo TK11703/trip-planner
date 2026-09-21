@@ -131,7 +131,7 @@ public class TripPrintFormattingTests
     [Fact]
     public void BuildPrintableTrip_StayLeg_HasNoModeText()
     {
-        var leg = Leg("Hotel Kabuki", new DateTime(2026, 7, 14, 8, 0, 0), destination: "Tokyo", legKind: TripLegKinds.Stay);
+        var leg = Leg("Hotel Kabuki", new DateTime(2026, 7, 14, 8, 0, 0), legKind: TripLegKinds.Stay);
         var trip = Trip("Japan 2026", null, new[] { leg }, Array.Empty<TrackedItemDto>());
 
         var printable = TripPrintFormatting.BuildPrintableTrip(trip);

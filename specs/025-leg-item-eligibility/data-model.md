@@ -12,7 +12,7 @@ Represents either time spent at a destination or movement between two places.
 | `TransportationMode` | string | Conditional | Required for Travel; null for Stay; `flight`, `train`, `bus`, `boat`, or `car` |
 | `Title` | string | Yes | Existing title rules |
 | `Origin` | string | Conditional | Nonblank for Travel; null for Stay |
-| `Destination` | string | Yes | Nonblank for both kinds |
+| `Destination` | string | Conditional | Nonblank for Travel; null for Stay |
 | `StartLocal` | local date/time | Yes | Existing trip-range rules |
 | `StartTimeZoneId` | string | Yes | Existing valid-timezone rule |
 | `EndLocal` | local date/time | Yes | End instant is not before start instant |
@@ -36,7 +36,7 @@ Represents either time spent at a destination or movement between two places.
 
 ### Row Invariants
 
-- Stay: mode, origin, travel cost, and confirmation code are null.
+- Stay: mode, origin, destination, travel cost, and confirmation code are null.
 - Travel: mode, origin, and destination are nonblank.
 - Every Travel mode: travel cost and confirmation code may be null; supplied cost is nonnegative with at most two decimal places, and supplied confirmation is nonblank after trimming and at most 255 characters.
 - Cost has at most two decimal places and the same upper bound as existing estimated costs.

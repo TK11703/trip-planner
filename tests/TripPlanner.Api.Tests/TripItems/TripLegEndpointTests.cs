@@ -193,6 +193,7 @@ public class TripLegEndpointTests
         Assert.Equal(TripLegKinds.Stay, shape.LegKind);
         Assert.Null(shape.TransportationMode);
         Assert.Null(shape.Origin);
+        Assert.Null(shape.Destination);
         Assert.Null(shape.TravelCost);
         Assert.Null(shape.ConfirmationCode);
         Assert.True(shape.CanContainItems);

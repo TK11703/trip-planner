@@ -45,7 +45,8 @@ public class TripLegModeInvariantTests : IClassFixture<PostgresFixture>
                 sort_order, leg_kind, transportation_mode)
             VALUES (
                 @legId, @tripId, @owner, 'Leg',
-                CASE WHEN @legKind = 'travel' THEN 'Paris' END, 'Chicago',
+                CASE WHEN @legKind = 'travel' THEN 'Paris' END,
+                CASE WHEN @legKind = 'travel' THEN 'Chicago' END,
                 TIMESTAMPTZ '2026-07-11 08:00+00', TIMESTAMPTZ '2026-07-12 08:00+00',
                 TIMESTAMP '2026-07-11 08:00', 'UTC', TIMESTAMP '2026-07-12 08:00', 'UTC',
                 0, @legKind, @mode);

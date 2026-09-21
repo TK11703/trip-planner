@@ -14,7 +14,13 @@ namespace TripPlanner.Database.Tests.Infrastructure;
 /// </summary>
 public sealed class MigratedLegacyPostgresFixture : IAsyncLifetime
 {
-    private const string MigrationScript = "014_trip_leg_modes.sql";
+    // Applied after the legacy seed rather than with the rest of the schema: these are the scripts
+    // under test, and 015 depends on the leg_kind column 014 introduces.
+    private static readonly string[] MigrationScripts =
+    [
+        "014_trip_leg_modes.sql",
+        "015_stay_leg_destination_removed.sql",
+    ];
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("tripplanner_migration_tests")
@@ -32,7 +38,7 @@ public sealed class MigratedLegacyPostgresFixture : IAsyncLifetime
 
     public string ConnectionString => _container.GetConnectionString();
 
-    public string MigrationSql => _sql.Get($"Schema/{MigrationScript}");
+    public string MigrationSql => string.Join("\n", MigrationScripts.Select(name => _sql.Get($"Schema/{name}")));
 
     public async Task<NpgsqlConnection> OpenAsync()
     {
@@ -48,7 +54,7 @@ public sealed class MigratedLegacyPostgresFixture : IAsyncLifetime
 
         foreach (var (name, body) in _sql.GetAllInDirectory("Schema"))
         {
-            if (string.Equals(name, MigrationScript, StringComparison.OrdinalIgnoreCase)) continue;
+            if (MigrationScripts.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
             await conn.ExecuteAsync(body);
         }
 
