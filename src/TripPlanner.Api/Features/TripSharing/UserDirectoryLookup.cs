@@ -22,6 +22,7 @@ public sealed partial class GraphUserDirectoryLookup : IUserDirectoryLookup
 {
     public const string HttpClientName = "graph";
     private static readonly string[] GraphScopes = ["https://graph.microsoft.com/.default"];
+    private static readonly string[] SearchFields = ["displayName", "givenName", "surname", "mail", "userPrincipalName"];
 
     private readonly IHttpClientFactory _httpFactory;
     private readonly TokenCredential _credential;
@@ -54,14 +55,11 @@ public sealed partial class GraphUserDirectoryLookup : IUserDirectoryLookup
             var token = await _credential.GetTokenAsync(new TokenRequestContext(GraphScopes), ct);
             var http = _httpFactory.CreateClient(HttpClientName);
 
-            // Escape single quotes for OData and URL-encode the term.
-            var term = Uri.EscapeDataString(query.Trim().Replace("'", "''"));
-            var filter = $"startswith(displayName,'{term}') or startswith(mail,'{term}') or startswith(userPrincipalName,'{term}')";
-            var requestUri = $"v1.0/users?$select=id,displayName,mail,userPrincipalName&$top=10&$filter={Uri.EscapeDataString(filter)}";
-
-            using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+            using var request = new HttpRequestMessage(HttpMethod.Get, BuildSearchRequestUri(query));
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            // $search over directory objects is an advanced query and is rejected without this header.
+            request.Headers.Add("ConsistencyLevel", "eventual");
 
             using var response = await http.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
@@ -104,6 +102,19 @@ public sealed partial class GraphUserDirectoryLookup : IUserDirectoryLookup
             LogLookupError(ex);
             return Array.Empty<DirectoryUserResult>();
         }
+    }
+
+    /// <summary>
+    /// Builds the Graph users query. <c>$search</c> is used rather than <c>startswith</c> filtering because
+    /// it tokenizes <c>displayName</c>, so a surname matches a "First Last" display name; the remaining
+    /// fields fall back to prefix matching. Requires the <c>ConsistencyLevel: eventual</c> header.
+    /// </summary>
+    public static string BuildSearchRequestUri(string query)
+    {
+        // Each clause is wrapped in double quotes, so quotes and backslashes in the term must be escaped.
+        var term = query.Trim().Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var search = string.Join(" OR ", SearchFields.Select(field => $"\"{field}:{term}\""));
+        return $"v1.0/users?$select=id,displayName,mail,userPrincipalName&$top=10&$search={Uri.EscapeDataString(search)}";
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Directory lookup returned {StatusCode}. A 403 usually means the app is missing the Microsoft Graph application permission User.ReadBasic.All with admin consent. Graph response: {Body}")]
