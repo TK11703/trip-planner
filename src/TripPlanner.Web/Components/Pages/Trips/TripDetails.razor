@@ -36,15 +36,18 @@ else
             {
                 <div class="btn-group">
                     <button type="button" class="btn btn-primary" @onclick="OpenTripEditModal">Edit trip</button>
-                    @if (_trip.IsOwner)
-                    {
-                        <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                            <span class="visually-hidden">Toggle trip actions</span>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
+                    <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="visually-hidden">Toggle trip actions</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button class="dropdown-item" type="button" @onclick="OpenCreateLegModal">Add trip leg</button></li>
+                        <li><button class="dropdown-item" type="button" @onclick="OpenCreateItemModal">Add a tracked item</button></li>
+                        @if (_trip.IsOwner)
+                        {
+                            <li><hr class="dropdown-divider" /></li>
                             <li><button class="dropdown-item text-danger" type="button" @onclick="OpenDeleteModal">Delete trip</button></li>
-                        </ul>
-                    }
+                        }
+                    </ul>
                 </div>
             }
         </div>
