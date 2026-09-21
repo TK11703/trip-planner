@@ -190,7 +190,23 @@
     {
         <div class="alert alert-danger py-2 small">@_error</div>
     }
-    <button type="submit" class="btn btn-primary" disabled="@_submitting">@(IsEdit ? "Save item" : "Add item")</button>
+    <div class="d-flex justify-content-between align-items-center gap-2">
+        <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)">@(IsEdit ? "Save item" : "Add item")</button>
+        @if (CanDelete)
+        {
+            <button type="button" id="item-delete" class="btn btn-outline-danger" disabled="@(_submitting || _deleting)" @onclick="RequestDelete">Delete item</button>
+        }
+    </div>
+    @if (_confirmDelete)
+    {
+        <div class="alert alert-warning mt-2 mb-0 py-2 small" role="alert" data-testid="item-delete-confirm">
+            <p class="mb-2">Delete <strong>@_model.Title</strong>? This can't be undone.</p>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_deleting" @onclick="CancelDelete">Keep item</button>
+                <button type="button" id="item-delete-confirm" class="btn btn-sm btn-danger" disabled="@_deleting" @onclick="DeleteItemAsync">@(_deleting ? "Deleting…" : "Delete item")</button>
+            </div>
+        </div>
+    }
 </EditForm>
 
 @code {
@@ -261,9 +277,15 @@
     [Parameter] public DateTime? InitialStartsAt { get; set; }
     [Parameter] public EventCallback OnSaved { get; set; }
 
+    // Only an owner or a collaborator may remove an item. Defaults to denied so a host that forgets
+    // to pass it hides the action instead of offering one the API will reject.
+    [Parameter] public bool CanEditContent { get; set; }
+
     private ItemModel _model = new();
     private string? _error;
     private bool _submitting;
+    private bool _confirmDelete;
+    private bool _deleting;
     private Guid? _loadedItemId;
     private bool _appliedInitial;
     private bool _tzInitialized;
@@ -273,6 +295,7 @@
     // re-clamped when the traveler actually switches legs.
     private Guid? _clampedLegId;
     private bool IsEdit => Item is not null;
+    private bool CanDelete => IsEdit && CanEditContent;
     private string FormName => IsEdit ? $"tracked-item-edit-{Item!.TrackedItemId}" : "tracked-item-create";
 
     private TripLegDto? SelectedLeg => _model.TripLegId is { } id ? Legs.FirstOrDefault(l => l.TripLegId == id) : null;
@@ -508,6 +531,7 @@
                 _appliedInitial = false;
                 _tzInitialized = false;
                 _clampedLegId = null;
+                _confirmDelete = false;
             }
 
             if (!_appliedInitial)
@@ -550,6 +574,7 @@
             return;
         }
 
+        _confirmDelete = false;
         _model = new ItemModel
         {
             // An item saved without a leg stays without one until the traveler relates it.
@@ -644,6 +669,34 @@
         await CallApiAsync(SaveItemAsync, message => _error = message);
 
         _submitting = false;
+    }
+
+    private void RequestDelete()
+    {
+        if (!CanDelete) return;
+
+        _error = null;
+        _confirmDelete = true;
+    }
+
+    private void CancelDelete() => _confirmDelete = false;
+
+    private async Task DeleteItemAsync()
+    {
+        if (!CanDelete) return;
+
+        _error = null; _deleting = true;
+
+        await CallApiAsync(
+            async () =>
+            {
+                await TripApi.DeleteItemAsync(TripId, Item!.TrackedItemId);
+                _confirmDelete = false;
+                await OnSaved.InvokeAsync();
+            },
+            message => _error = message);
+
+        _deleting = false;
     }
 
     private async Task SaveItemAsync()

@@ -30,10 +30,11 @@ public class TripLegFormTests : TestContext
     private IRenderedComponent<TripLegForm> RenderCreate(Guid? tripId = null) =>
         RenderComponent<TripLegForm>(p => p.Add(x => x.TripId, tripId ?? Guid.NewGuid()));
 
-    private IRenderedComponent<TripLegForm> RenderEdit(TripLegDto leg) =>
+    private IRenderedComponent<TripLegForm> RenderEdit(TripLegDto leg, bool canEditContent = true) =>
         RenderComponent<TripLegForm>(p => p
             .Add(x => x.TripId, leg.TripId)
-            .Add(x => x.Leg, leg));
+            .Add(x => x.Leg, leg)
+            .Add(x => x.CanEditContent, canEditContent));
 
     [Fact]
     public void ChangingStart_SetsEndToOneHourLater()
@@ -330,6 +331,83 @@ public class TripLegFormTests : TestContext
         Assert.Equal(TransportationModes.Flight, cut.Find("#leg-transportation-mode").GetAttribute("value"));
         Assert.NotNull(cut.Find("[data-testid=leg-item-restriction]"));
     }
+
+    // --- Removing a leg ---
+
+    [Fact]
+    public void ALegBeingCreated_OffersNoDelete()
+    {
+        var cut = RenderCreate();
+
+        Assert.Empty(cut.FindAll("#leg-delete"));
+    }
+
+    /// <summary>Only an owner or a collaborator may remove a leg; a viewer is never offered the action.</summary>
+    [Fact]
+    public void AViewer_IsOfferedNoDelete()
+    {
+        var cut = RenderEdit(TripLegModeTestData.StayLeg(), canEditContent: false);
+
+        Assert.Empty(cut.FindAll("#leg-delete"));
+    }
+
+    /// <summary>Deleting is irreversible, so the first click only asks.</summary>
+    [Fact]
+    public void DeletingALeg_AsksBeforeItRemovesAnything()
+    {
+        var cut = RenderEdit(TripLegModeTestData.StayLeg());
+
+        cut.Find("#leg-delete").Click();
+
+        Assert.NotNull(cut.Find("[data-testid=leg-delete-confirm]"));
+        Assert.Empty(_api.DeletedLegs);
+    }
+
+    [Fact]
+    public void ConfirmingTheDelete_RemovesTheLegAndTellsTheHost()
+    {
+        var leg = TripLegModeTestData.StayLeg();
+        var saved = false;
+        var cut = RenderComponent<TripLegForm>(p => p
+            .Add(x => x.TripId, leg.TripId)
+            .Add(x => x.Leg, leg)
+            .Add(x => x.CanEditContent, true)
+            .Add(x => x.OnSaved, () => saved = true));
+
+        cut.Find("#leg-delete").Click();
+        cut.Find("#leg-delete-confirm").Click();
+
+        Assert.Equal(new[] { leg.TripLegId }, _api.DeletedLegs);
+        Assert.True(saved);
+    }
+
+    [Fact]
+    public void KeepingTheLeg_LeavesItAlone()
+    {
+        var cut = RenderEdit(TripLegModeTestData.StayLeg());
+
+        cut.Find("#leg-delete").Click();
+        cut.Find("[data-testid=leg-delete-confirm] .btn-outline-secondary").Click();
+
+        Assert.Empty(cut.FindAll("[data-testid=leg-delete-confirm]"));
+        Assert.Empty(_api.DeletedLegs);
+    }
+
+    /// <summary>A leg that still holds items cannot go, and the traveler is told what to do first.</summary>
+    [Fact]
+    public void RefusedDelete_SurfacesTheReasonAndKeepsAsking()
+    {
+        const string reason = "This trip leg still has related items. Reassign or remove those items before deleting the leg.";
+        _api.DeleteFailure = new InvalidOperationException(reason);
+
+        var cut = RenderEdit(TripLegModeTestData.StayLeg());
+
+        cut.Find("#leg-delete").Click();
+        cut.Find("#leg-delete-confirm").Click();
+
+        Assert.Contains(reason, cut.Markup, StringComparison.Ordinal);
+        Assert.NotNull(cut.Find("[data-testid=leg-delete-confirm]"));
+    }
 }
 
 /// <summary>Captures the leg requests the form sends so the tests can read what was actually saved.</summary>
@@ -337,7 +415,9 @@ internal sealed class RecordingLegApiClient : ITripApiClient
 {
     public List<CreateTripLegRequest> Created { get; } = new();
     public List<UpdateTripLegRequest> Updated { get; } = new();
+    public List<Guid> DeletedLegs { get; } = new();
     public Exception? UpdateFailure { get; set; }
+    public Exception? DeleteFailure { get; set; }
 
     public Task CreateLegAsync(Guid tripId, CreateTripLegRequest request, CancellationToken ct = default)
     {
@@ -362,7 +442,12 @@ internal sealed class RecordingLegApiClient : ITripApiClient
     public Task<CreateTripResponse> CreateAsync(CreateTripRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<CreateTripResponse> UpdateAsync(Guid tripId, UpdateTripRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     public Task DeleteTripAsync(Guid tripId, CancellationToken ct = default) => throw new NotSupportedException();
-    public Task DeleteLegAsync(Guid tripId, Guid tripLegId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task DeleteLegAsync(Guid tripId, Guid tripLegId, CancellationToken ct = default)
+    {
+        if (DeleteFailure is not null) throw DeleteFailure;
+        DeletedLegs.Add(tripLegId);
+        return Task.CompletedTask;
+    }
     public Task CreateItemAsync(Guid tripId, CreateTrackedItemRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     public Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     public Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default) => throw new NotSupportedException();

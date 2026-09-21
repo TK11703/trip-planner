@@ -52,6 +52,8 @@ internal static class TrackedItemFormTestData
 
 internal sealed class FormStubTripApiClient : ITripApiClient
 {
+    public List<Guid> DeletedItems { get; } = new();
+    public Exception? DeleteFailure { get; set; }
     public Task<TripTimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<TripListResponse> GetTripsAsync(int page = 1, int pageSize = 12, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default) => throw new NotSupportedException();
@@ -65,7 +67,12 @@ internal sealed class FormStubTripApiClient : ITripApiClient
     public Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(Guid tripId, CancellationToken ct = default) => throw new NotSupportedException();
     public Task CreateItemAsync(Guid tripId, CreateTrackedItemRequest request, CancellationToken ct = default) => Task.CompletedTask;
     public Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default) => Task.CompletedTask;
-    public Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default)
+    {
+        if (DeleteFailure is not null) throw DeleteFailure;
+        DeletedItems.Add(trackedItemId);
+        return Task.CompletedTask;
+    }
     public Task<IReadOnlyList<TripShareMember>> GetSharesAsync(Guid tripId, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<DirectoryUserResult>> SearchDirectoryUsersAsync(Guid tripId, string query, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<TripShareMember> UpsertShareAsync(Guid tripId, UpsertTripShareRequest request, CancellationToken ct = default) => throw new NotSupportedException();

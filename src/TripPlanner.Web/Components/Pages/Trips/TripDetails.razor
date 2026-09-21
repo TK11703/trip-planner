@@ -249,13 +249,13 @@ else
                                 <TripLegForm TripId="@TripId" OnSaved="HandleModalSavedAsync" />
                                 break;
                             case ActiveModal.EditLeg:
-                                <TripLegForm TripId="@TripId" Leg="_editingLeg" OnSaved="HandleModalSavedAsync" />
+                                <TripLegForm TripId="@TripId" Leg="_editingLeg" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" />
                                 break;
                             case ActiveModal.CreateItem:
                                 <TrackedItemForm TripId="@TripId" Legs="_trip.Legs" InitialTripLegId="_initialItemLegId" InitialStartsAt="_initialItemStart" OnSaved="HandleModalSavedAsync" />
                                 break;
                             case ActiveModal.EditItem:
-                                <TrackedItemForm TripId="@TripId" Item="_editingItem" Legs="_trip.Legs" OnSaved="HandleModalSavedAsync" />
+                                <TrackedItemForm TripId="@TripId" Item="_editingItem" Legs="_trip.Legs" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" />
                                 break;
                         }
                     </div>
