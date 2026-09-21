@@ -36,6 +36,12 @@
     </div>
 </section>
 
+<AuthorizeView>
+    <Authorized>
+        <RecentTripsList />
+    </Authorized>
+</AuthorizeView>
+
 <section class="mb-4" aria-labelledby="planning-tips-heading">
     <p class="brand-eyebrow mb-1">Tips for a smoother trip</p>
     <h2 id="planning-tips-heading" class="h3 mb-3">Small habits that make big trips easier</h2>
@@ -77,9 +83,6 @@
 </section>
 
 <AuthorizeView>
-    <Authorized>
-        <RecentTripsList />
-    </Authorized>
     <NotAuthorized>
         <div class="row g-3">
             <div class="col-md-4">
