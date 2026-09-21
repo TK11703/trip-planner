@@ -165,19 +165,21 @@
             }
         </div>
     </div>
-    <div class="mb-2">
-        <label class="form-label" for="item-confirmation-code">Confirmation/Reservation Code</label>
-        <InputText id="item-confirmation-code" class="form-control" maxlength="255" @bind-Value="_model.ConfirmationCode" />
-        <ValidationMessage For="@(() => _model.ConfirmationCode)" />
-    </div>
-    <div class="mb-2">
-        <label class="form-label" for="item-estimated-cost">Estimated cost</label>
-        <div class="input-group">
-            <span class="input-group-text">$</span>
-            <InputNumber id="item-estimated-cost" class="form-control" step="0.01" min="0" @bind-Value="_model.EstimatedCost" placeholder="Optional" />
+    <div class="row g-2 mb-2">
+        <div class="col-md-6">
+            <label class="form-label" for="item-confirmation-code">Confirmation/Reservation Code</label>
+            <InputText id="item-confirmation-code" class="form-control" maxlength="255" @bind-Value="_model.ConfirmationCode" />
+            <ValidationMessage For="@(() => _model.ConfirmationCode)" />
         </div>
-        <div class="form-text">Optional estimate, not an actual amount. Leave blank if unknown.</div>
-        <ValidationMessage For="@(() => _model.EstimatedCost)" />
+        <div class="col-md-6">
+            <label class="form-label" for="item-estimated-cost">Estimated cost</label>
+            <div class="input-group">
+                <span class="input-group-text">$</span>
+                <InputNumber id="item-estimated-cost" class="form-control" step="0.01" min="0" @bind-Value="_model.EstimatedCost" placeholder="Optional" />
+            </div>
+            <div class="form-text">Optional estimate, not an actual amount. Leave blank if unknown.</div>
+            <ValidationMessage For="@(() => _model.EstimatedCost)" />
+        </div>
     </div>
     <div class="mb-2">
         <label class="form-label" for="item-notes">Notes</label>
