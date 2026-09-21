@@ -160,13 +160,20 @@ az rest --method post --headers "Content-Type=application/json" --body "@$env:TE
 ```
 
 A repeat run returns `Permission being assigned already exists on the object`, which is
-harmless. **Restart the API afterwards** — the identity caches its Graph token, so an
-already-running revision keeps presenting a token minted before the role existed:
+harmless.
 
-```powershell
-az containerapp revision restart -g $env:AZURE_RESOURCE_GROUP -n "ca-api-$env:AZURE_ENV_NAME" `
-    --revision (az containerapp show -g $env:AZURE_RESOURCE_GROUP -n "ca-api-$env:AZURE_ENV_NAME" --query properties.latestRevisionName -o tsv)
-```
+> **Grant this before the API ever calls Graph.** App role membership is a claim inside the
+> access token, and the managed identity platform caches tokens **per resource URI for
+> roughly 24 hours**. If the API requested a Graph token before the grant, that role-less
+> token keeps being served — to new replicas and new revisions alike — until it expires.
+> Restarting the revision does not help, and
+> [forcing a refresh is explicitly unsupported](https://learn.microsoft.com/azure/container-apps/managed-identity#configure-a-target-resource).
+> The symptom is a `403` with `Authorization_RequestDenied` even though
+> `appRoleAssignments` shows the grant. The only remedies are to wait out the cache or to
+> deploy under a different user-assigned identity.
+
+Do **not** try to clear the cache by removing and re-adding the identity: it also resolves
+the `db-connection` Key Vault secret reference, so detaching it breaks the app.
 
 Without the grant the app still starts and trip sharing still opens; only directory search
 fails, with a `502` and `"Directory search was denied by Microsoft Graph (403)"`. Earlier
