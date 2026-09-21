@@ -125,27 +125,34 @@ public static class TripPrintFormatting
         return (projected, OrderItemsWithinLeg(unassigned));
     }
 
-    /// <summary>Builds the full printable view model for a trip.</summary>
-    public static PrintableTrip BuildPrintableTrip(TripDetail trip)
+    /// <summary>Builds the shared table projection used by interactive and printable itinerary views.</summary>
+    public static ItineraryTableModel BuildItineraryTable(TripDetail trip)
     {
         var (byLeg, unassigned) = GroupItemsByLeg(trip.Legs, trip.TrackedItems);
 
         var legs = OrderLegsChronologically(trip.Legs)
-            .Select(leg => new PrintableLeg(
+            .Select(leg => new ItineraryLegRow(
                 leg.TripLegId,
                 leg.Title,
                 BuildRouteText(leg.Origin, leg.Destination),
                 FormatDateTimeWithZone(leg.StartLocal, leg.StartTimeZoneId),
                 FormatDateTimeWithZone(leg.EndLocal, leg.EndTimeZoneId),
                 byLeg.TryGetValue(leg.TripLegId, out var legItems)
-                    ? legItems.Select(ToPrintableItem).ToList()
-                    : Array.Empty<PrintableItem>(),
-                // Only a travel leg has a mode or booking details; a stay prints without them.
+                    ? legItems.Select(ToItineraryItem).ToList()
+                    : Array.Empty<ItineraryItemRow>(),
                 TransportationModes.Label(leg.TransportationMode) is { Length: > 0 } mode ? mode : null,
                 string.IsNullOrWhiteSpace(leg.ConfirmationCode) ? null : leg.ConfirmationCode,
-                leg.TravelCost is { } travelCost ? travelCost.ToDisplayAmount() : null))
+                leg.TravelCost is { } travelCost ? travelCost.ToDisplayAmount() : null,
+                leg.CanContainItems))
             .ToList();
 
+        return new ItineraryTableModel(legs, unassigned.Select(ToItineraryItem).ToList());
+    }
+
+    /// <summary>Builds the printable metadata wrapper around the shared itinerary projection.</summary>
+    public static PrintableTrip BuildPrintableTrip(TripDetail trip)
+    {
+        var table = BuildItineraryTable(trip);
         var description = string.IsNullOrWhiteSpace(trip.Description) ? null : trip.Description;
 
         return new PrintableTrip(
@@ -153,11 +160,14 @@ public static class TripPrintFormatting
             BuildDateRangeText(trip.StartDate, trip.EndDate),
             description,
             trip.EstimatedCostTotal.ToDisplayAmount(),
-            legs,
-            unassigned.Select(ToPrintableItem).ToList());
+            table.Legs.Select(ToPrintableLeg).ToList(),
+            table.UnassignedItems.Select(ToPrintableItem).ToList(),
+            table);
     }
 
-    private static PrintableItem ToPrintableItem(TrackedItemDto item) => new(
+    private static ItineraryItemRow ToItineraryItem(TrackedItemDto item) => new(
+        item.TrackedItemId,
+        item.TripLegId,
         CultureInfo.InvariantCulture.TextInfo.ToTitleCase(item.ItemType),
         item.Title,
         string.IsNullOrWhiteSpace(item.Location) ? null : item.Location,
@@ -165,6 +175,26 @@ public static class TripPrintFormatting
         item.EndLocal is { } end ? FormatDateTimeWithZone(end, item.EndTimeZoneId ?? item.StartTimeZoneId) : null,
         string.IsNullOrWhiteSpace(item.ConfirmationCode) ? null : item.ConfirmationCode,
         item.EstimatedCost is { } cost ? cost.ToDisplayAmount() : null);
+
+    private static PrintableLeg ToPrintableLeg(ItineraryLegRow leg) => new(
+        leg.TripLegId,
+        leg.Title,
+        leg.RouteText,
+        leg.StartText,
+        leg.EndText,
+        leg.Items.Select(ToPrintableItem).ToList(),
+        leg.ModeText,
+        leg.ConfirmationCode,
+        leg.TravelCostText);
+
+    private static PrintableItem ToPrintableItem(ItineraryItemRow item) => new(
+        item.TypeText,
+        item.Title,
+        item.Location,
+        item.StartText,
+        item.EndText,
+        item.ConfirmationCode,
+        item.EstimatedCostText);
 
     private static string? BuildRouteText(string? origin, string? destination)
     {
@@ -179,6 +209,39 @@ public static class TripPrintFormatting
         $"{start.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture)} \u2013 {end.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture)}";
 }
 
+/// <summary>The shared hierarchy rendered by interactive and printable itinerary tables.</summary>
+public sealed record ItineraryTableModel(
+    IReadOnlyList<ItineraryLegRow> Legs,
+    IReadOnlyList<ItineraryItemRow> UnassignedItems)
+{
+    public bool HasContent => Legs.Count > 0 || UnassignedItems.Count > 0;
+}
+
+/// <summary>A leg row-group divider and its chronologically ordered item rows.</summary>
+public sealed record ItineraryLegRow(
+    Guid TripLegId,
+    string Title,
+    string? RouteText,
+    string StartText,
+    string EndText,
+    IReadOnlyList<ItineraryItemRow> Items,
+    string? ModeText = null,
+    string? ConfirmationCode = null,
+    string? TravelCostText = null,
+    bool CanContainItems = false);
+
+/// <summary>An ID-bearing tracked-item row shared by screen and print rendering.</summary>
+public sealed record ItineraryItemRow(
+    Guid TrackedItemId,
+    Guid? TripLegId,
+    string TypeText,
+    string Title,
+    string? Location,
+    string StartText,
+    string? EndText,
+    string? ConfirmationCode,
+    string? EstimatedCostText);
+
 /// <summary>Top-level printable projection of a single trip.</summary>
 public sealed record PrintableTrip(
     string Name,
@@ -186,10 +249,11 @@ public sealed record PrintableTrip(
     string? Description,
     string EstimatedCostText,
     IReadOnlyList<PrintableLeg> Legs,
-    IReadOnlyList<PrintableItem> UnassignedItems)
+    IReadOnlyList<PrintableItem> UnassignedItems,
+    ItineraryTableModel Table)
 {
     /// <summary>True when the trip has at least one leg or item to print.</summary>
-    public bool HasContent => Legs.Count > 0 || UnassignedItems.Count > 0;
+    public bool HasContent => Table.HasContent;
 }
 
 /// <summary>A leg rendered as a chronological row-divider grouping its items.</summary>

@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject ITripApiClient TripApi
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Trip details</PageTitle>
 
@@ -58,73 +59,102 @@ else
             <div class="card shadow-sm mb-3 tp-static">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div>
-                        <div class="fw-semibold">Trip timeline</div>
-                        <div class="small text-secondary">Trip legs are listed on the left. Scroll the grid to see each day, hour, and the items on each leg. Select a leg or item to edit it.</div>
+                        <div class="fw-semibold">@(_planningView == TripPlanningView.Timeline ? "Trip timeline" : "Itinerary table")</div>
+                        @if (_planningView == TripPlanningView.Timeline)
+                        {
+                            <div class="small text-secondary">Trip legs are listed on the left. Scroll the grid to see each day, hour, and the items on each leg. Select a leg or item to edit it.</div>
+                        }
                     </div>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
+                            <button type="button"
+                                    class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")"
+                                    aria-pressed="@(_planningView == TripPlanningView.Timeline)"
+                                    @onclick="() => _planningView = TripPlanningView.Timeline">
+                                Timeline
+                            </button>
+                            <button type="button"
+                                    class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")"
+                                    aria-pressed="@(_planningView == TripPlanningView.Table)"
+                                    @onclick="() => _planningView = TripPlanningView.Table">
+                                Table
+                            </button>
+                        </div>
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 @onclick="OpenMapModal" disabled="@(!CanOpenMap)"
                                 title="@(CanOpenMap ? "View all trip locations on a map" : "Add a location to an item to view the map")"
                                 aria-label="View all trip locations on a map">
                             View map
                         </button>
-                        @{
+                        @if (_planningView == TripPlanningView.Timeline)
+                        {
                             var navDates = _timeline?.TripDates ?? (IReadOnlyList<DateOnly>)Array.Empty<DateOnly>();
                             var navCurrent = _timeline?.CurrentDate;
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Step timeline by day">
+                                <button type="button" class="btn btn-outline-secondary"
+                                        title="Previous day" aria-label="Go to previous day"
+                                        disabled="@(_timeline is null || _timeline.AtTripStart)"
+                                        @onclick="GoToPreviousDayAsync">
+                                    <span aria-hidden="true">&lsaquo;</span>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary"
+                                        title="Next day" aria-label="Go to next day"
+                                        disabled="@(_timeline is null || _timeline.AtTripEnd)"
+                                        @onclick="GoToNextDayAsync">
+                                    <span aria-hidden="true">&rsaquo;</span>
+                                </button>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
+                                        data-bs-toggle="dropdown" aria-expanded="false"
+                                        aria-label="Jump to a date in the trip"
+                                        disabled="@(navDates.Count == 0)">
+                                    Jump to date@(navCurrent is { } jc ? $": {jc:ddd M/d}" : "")
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end tp-jump-menu">
+                                    <li><h6 class="dropdown-header">Shortcuts</h6></li>
+                                    <li><button type="button" class="dropdown-item" @onclick="GoToTripStartAsync">Trip start</button></li>
+                                    @if (_timeline?.TodayInRange == true)
+                                    {
+                                        <li><button type="button" class="dropdown-item" @onclick="GoToTodayAsync">Today</button></li>
+                                    }
+                                    <li><button type="button" class="dropdown-item" @onclick="GoToTripEndAsync">Trip end</button></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><h6 class="dropdown-header">Dates</h6></li>
+                                    @foreach (var date in navDates)
+                                    {
+                                        var jumpDate = date;
+                                        var isActive = navCurrent == jumpDate;
+                                        <li>
+                                            <button type="button"
+                                                    class="dropdown-item d-flex justify-content-between align-items-center @(isActive ? "active" : null)"
+                                                    @onclick="() => JumpToDateAsync(jumpDate)">
+                                                <span>@jumpDate.ToString("ddd, MMM d")</span>
+                                                @if (isActive)
+                                                {
+                                                    <span class="ms-2" aria-hidden="true">&#10003;</span>
+                                                }
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
                         }
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Step timeline by day">
-                            <button type="button" class="btn btn-outline-secondary"
-                                    title="Previous day" aria-label="Go to previous day"
-                                    disabled="@(_timeline is null || _timeline.AtTripStart)"
-                                    @onclick="GoToPreviousDayAsync">
-                                <span aria-hidden="true">&lsaquo;</span>
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary"
-                                    title="Next day" aria-label="Go to next day"
-                                    disabled="@(_timeline is null || _timeline.AtTripEnd)"
-                                    @onclick="GoToNextDayAsync">
-                                <span aria-hidden="true">&rsaquo;</span>
-                            </button>
-                        </div>
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
-                                    data-bs-toggle="dropdown" aria-expanded="false"
-                                    aria-label="Jump to a date in the trip"
-                                    disabled="@(navDates.Count == 0)">
-                                Jump to date@(navCurrent is { } jc ? $": {jc:ddd M/d}" : "")
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end tp-jump-menu">
-                                <li><h6 class="dropdown-header">Shortcuts</h6></li>
-                                <li><button type="button" class="dropdown-item" @onclick="GoToTripStartAsync">Trip start</button></li>
-                                @if (_timeline?.TodayInRange == true)
-                                {
-                                    <li><button type="button" class="dropdown-item" @onclick="GoToTodayAsync">Today</button></li>
-                                }
-                                <li><button type="button" class="dropdown-item" @onclick="GoToTripEndAsync">Trip end</button></li>
-                                <li><hr class="dropdown-divider" /></li>
-                                <li><h6 class="dropdown-header">Dates</h6></li>
-                                @foreach (var date in navDates)
-                                {
-                                    var jumpDate = date;
-                                    var isActive = navCurrent == jumpDate;
-                                    <li>
-                                        <button type="button"
-                                                class="dropdown-item d-flex justify-content-between align-items-center @(isActive ? "active" : null)"
-                                                @onclick="() => JumpToDateAsync(jumpDate)">
-                                            <span>@jumpDate.ToString("ddd, MMM d")</span>
-                                            @if (isActive)
-                                            {
-                                                <span class="ms-2" aria-hidden="true">&#10003;</span>
-                                            }
-                                        </button>
-                                    </li>
-                                }
-                            </ul>
-                        </div>
                     </div>
                 </div>
                 <div class="card-body">
-                    <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" OnAddLegRequested="OpenCreateLegModal" OnLoaded="HandleTimelineLoaded" OnActiveDateChanged="HandleActiveDateChanged" />
+                    @if (_planningView == TripPlanningView.Timeline)
+                    {
+                        <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" OnAddLegRequested="OpenCreateLegModal" OnLoaded="HandleTimelineLoaded" OnActiveDateChanged="HandleActiveDateChanged" />
+                    }
+                    else
+                    {
+                        <TripItineraryTable Model="@TripPrintFormatting.BuildItineraryTable(_trip)"
+                                            OnEditLeg="@(CanEditContent ? EventCallback.Factory.Create<Guid>(this, OpenTableEditLeg) : default)"
+                                            OnEditItem="@(CanEditContent ? EventCallback.Factory.Create<Guid>(this, OpenTableEditItem) : default)"
+                                            OnAddLeg="@(CanEditContent ? EventCallback.Factory.Create(this, OpenTableCreateLeg) : default)"
+                                            OnAddItem="@(CanEditContent ? EventCallback.Factory.Create<Guid?>(this, (Action<Guid?>)OpenTableCreateItem) : default)" />
+                    }
                 </div>
             </div>
         </div>
@@ -298,6 +328,7 @@ else
     private bool _loading = true;
     private TripDetail? _trip;
     private TripTimeline? _timeline;
+    private TripPlanningView _planningView = TripPlanningView.Timeline;
     private ActiveModal _activeModal = ActiveModal.None;
     private bool _showShareModal;
     private bool _showMapModal;
@@ -309,6 +340,14 @@ else
     private bool _showDeleteModal;
     private bool _isDeleting;
     private string? _deleteError;
+    private string? _returnFocusElementId;
+    private string? _pendingFocusElementId;
+
+    private enum TripPlanningView
+    {
+        Timeline,
+        Table
+    }
 
     private bool CanEditContent => _trip is not null && (_trip.IsOwner || _trip.AccessLevel == TripAccessLevel.Collaborator);
     private bool CanOpenMap => _trip is not null && _trip.TrackedItems.Any(i => IsLocationMappable(i.Location));
@@ -361,6 +400,17 @@ else
     };
 
     protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingFocusElementId is not { } elementId)
+        {
+            return;
+        }
+
+        _pendingFocusElementId = null;
+        await JS.InvokeVoidAsync("tripFocus.focusById", elementId);
+    }
 
     private async Task ReloadAsync()
     {
@@ -458,15 +508,53 @@ else
         _activeModal = ActiveModal.EditLeg;
     }
 
-    private void OpenCreateItemModal()
+    private void OpenCreateItemModal() => OpenCreateItemModal(null);
+
+    private void OpenCreateItemModal(Guid? initialTripLegId)
     {
         _editingItem = null;
-        _initialItemLegId = null;
+        _initialItemLegId = initialTripLegId;
         // Default a new item to the timeline's active (centered) date when available.
         _initialItemStart = _timeline?.CurrentDate is { } activeDate
             ? activeDate.ToDateTime(new TimeOnly(9, 0))
             : null;
         _activeModal = ActiveModal.CreateItem;
+    }
+
+    private void OpenTableEditLeg(Guid tripLegId)
+    {
+        if (!CanEditContent) return;
+        var leg = _trip?.Legs.FirstOrDefault(candidate => candidate.TripLegId == tripLegId);
+        if (leg is not null)
+        {
+            _returnFocusElementId = TripItineraryTable.EditLegActionId(tripLegId);
+            OpenEditLegModal(leg);
+        }
+    }
+
+    private void OpenTableEditItem(Guid trackedItemId)
+    {
+        if (!CanEditContent) return;
+        var item = _trip?.TrackedItems.FirstOrDefault(candidate => candidate.TrackedItemId == trackedItemId);
+        if (item is not null)
+        {
+            _returnFocusElementId = TripItineraryTable.EditItemActionId(trackedItemId);
+            OpenEditItemModal(item);
+        }
+    }
+
+    private void OpenTableCreateLeg()
+    {
+        _returnFocusElementId = "tp-table-add-leg";
+        OpenCreateLegModal();
+    }
+
+    private void OpenTableCreateItem(Guid? initialTripLegId)
+    {
+        _returnFocusElementId = initialTripLegId is { } tripLegId
+            ? TripItineraryTable.AddItemActionId(tripLegId)
+            : "tp-table-add-item";
+        OpenCreateItemModal(initialTripLegId);
     }
 
     private void OpenEditItemModal(TrackedItemDto item)
@@ -480,6 +568,8 @@ else
         _activeModal = ActiveModal.None;
         _editingLeg = null;
         _editingItem = null;
+        _pendingFocusElementId = _returnFocusElementId;
+        _returnFocusElementId = null;
     }
 
     private async Task HandleTripEditAsync(TripPlanner.Web.Components.Trips.TripForm.TripFormModel model)

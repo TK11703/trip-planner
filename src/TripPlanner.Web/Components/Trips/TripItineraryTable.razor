@@ -1,0 +1,138 @@
+@using TripPlanner.Web.Features.Trips
+
+@if (!Model.HasContent)
+{
+    <p class="tp-itinerary-empty">This trip has no legs or items yet.</p>
+}
+else
+{
+    @if (OnAddLeg.HasDelegate || OnAddItem.HasDelegate)
+    {
+        <div class="tp-itinerary-actions">
+            @if (OnAddLeg.HasDelegate)
+            {
+                <button id="tp-table-add-leg" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add leg" @onclick="OnAddLeg">Add leg</button>
+            }
+            @if (OnAddItem.HasDelegate)
+            {
+                <button id="tp-table-add-item" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add item" @onclick="() => OnAddItem.InvokeAsync(null)">Add item</button>
+            }
+        </div>
+    }
+    <div class="tp-itinerary-table-region" role="region" aria-label="Itinerary table" tabindex="0">
+        <table class="tp-itinerary-table">
+            <caption>Itinerary</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Type</th>
+                    <th scope="col">Title</th>
+                    <th scope="col">Location</th>
+                    <th scope="col">Start</th>
+                    <th scope="col">End</th>
+                    <th scope="col">Confirmation</th>
+                    <th scope="col">Est. Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var leg in Model.Legs)
+                {
+                    <tr class="tp-itinerary-leg">
+                        <th scope="rowgroup" colspan="@ColumnCount">
+                            @if (OnEditLeg.HasDelegate)
+                            {
+                                <button id="@EditLegActionId(leg.TripLegId)" type="button" class="tp-itinerary-leg-title tp-itinerary-title-action" aria-label="Edit leg @leg.Title" @onclick="() => OnEditLeg.InvokeAsync(leg.TripLegId)">@leg.Title</button>
+                            }
+                            else
+                            {
+                                <span class="tp-itinerary-leg-title">@leg.Title</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(leg.ModeText))
+                            {
+                                <span class="tp-itinerary-leg-mode">@leg.ModeText</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(leg.RouteText))
+                            {
+                                <span class="tp-itinerary-leg-route">@leg.RouteText</span>
+                            }
+                            <span class="tp-itinerary-leg-when">@leg.StartText &ndash; @leg.EndText</span>
+                            @if (!string.IsNullOrWhiteSpace(leg.ConfirmationCode))
+                            {
+                                <span class="tp-itinerary-leg-confirmation">Confirmation @leg.ConfirmationCode</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(leg.TravelCostText))
+                            {
+                                <span class="tp-itinerary-leg-cost">@leg.TravelCostText</span>
+                            }
+                            @if (leg.CanContainItems && OnAddItem.HasDelegate)
+                            {
+                                <button id="@AddItemActionId(leg.TripLegId)" type="button" class="btn btn-sm btn-link tp-itinerary-row-action" aria-label="Add item to @leg.Title" @onclick="() => OnAddItem.InvokeAsync(leg.TripLegId)">Add item</button>
+                            }
+                        </th>
+                    </tr>
+                    @if (leg.Items.Count == 0)
+                    {
+                        <tr class="tp-itinerary-leg-empty">
+                            <td colspan="@ColumnCount">No items for this leg.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in leg.Items)
+                        {
+                            @RenderItemRow(item)
+                        }
+                    }
+                }
+
+                @if (Model.UnassignedItems.Count > 0)
+                {
+                    <tr class="tp-itinerary-leg">
+                        <th scope="rowgroup" colspan="@ColumnCount">
+                            <span class="tp-itinerary-leg-title">Unassigned</span>
+                        </th>
+                    </tr>
+                    @foreach (var item in Model.UnassignedItems)
+                    {
+                        @RenderItemRow(item)
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public ItineraryTableModel Model { get; set; } = default!;
+    [Parameter] public EventCallback<Guid> OnEditLeg { get; set; }
+    [Parameter] public EventCallback<Guid> OnEditItem { get; set; }
+    [Parameter] public EventCallback OnAddLeg { get; set; }
+    [Parameter] public EventCallback<Guid?> OnAddItem { get; set; }
+
+    private const int ColumnCount = 7;
+
+    public static string EditLegActionId(Guid tripLegId) => $"tp-table-edit-leg-{tripLegId}";
+    public static string EditItemActionId(Guid trackedItemId) => $"tp-table-edit-item-{trackedItemId}";
+    public static string AddItemActionId(Guid tripLegId) => $"tp-table-add-item-{tripLegId}";
+
+    private RenderFragment RenderItemRow(ItineraryItemRow item) => __builder =>
+    {
+        <tr class="tp-itinerary-item">
+            <td>@item.TypeText</td>
+            <td>
+                @if (OnEditItem.HasDelegate)
+                {
+                    <button id="@EditItemActionId(item.TrackedItemId)" type="button" class="tp-itinerary-title-action" aria-label="Edit item @item.Title" @onclick="() => OnEditItem.InvokeAsync(item.TrackedItemId)">@item.Title</button>
+                }
+                else
+                {
+                    <span>@item.Title</span>
+                }
+            </td>
+            <td>@item.Location</td>
+            <td>@item.StartText</td>
+            <td>@item.EndText</td>
+            <td>@item.ConfirmationCode</td>
+            <td>@item.EstimatedCostText</td>
+        </tr>
+    };
+}
