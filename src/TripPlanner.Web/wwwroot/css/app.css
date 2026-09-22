@@ -950,6 +950,8 @@ body {
 .tp-itinerary-table-region {
     width: 100%;
     overflow-x: auto;
+    /* overflow-x alone would compute overflow-y to auto; pin it so the table grows the page instead. */
+    overflow-y: hidden;
     overscroll-behavior-inline: contain;
 }
 
