@@ -66,20 +66,6 @@ else
                         }
                     </div>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
-                            <button type="button"
-                                    class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")"
-                                    aria-pressed="@(_planningView == TripPlanningView.Timeline)"
-                                    @onclick="() => _planningView = TripPlanningView.Timeline">
-                                Timeline
-                            </button>
-                            <button type="button"
-                                    class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")"
-                                    aria-pressed="@(_planningView == TripPlanningView.Table)"
-                                    @onclick="() => _planningView = TripPlanningView.Table">
-                                Table
-                            </button>
-                        </div>
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 @onclick="OpenMapModal" disabled="@(!CanOpenMap)"
                                 title="@(CanOpenMap ? "View all trip locations on a map" : "Add a location to an item to view the map")"
@@ -140,6 +126,20 @@ else
                                 </ul>
                             </div>
                         }
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
+                            <button type="button"
+                                    class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")"
+                                    aria-pressed="@(_planningView == TripPlanningView.Table)"
+                                    @onclick="() => _planningView = TripPlanningView.Table">
+                                Table
+                            </button>
+                            <button type="button"
+                                    class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")"
+                                    aria-pressed="@(_planningView == TripPlanningView.Timeline)"
+                                    @onclick="() => _planningView = TripPlanningView.Timeline">
+                                Timeline
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -328,7 +328,7 @@ else
     private bool _loading = true;
     private TripDetail? _trip;
     private TripTimeline? _timeline;
-    private TripPlanningView _planningView = TripPlanningView.Timeline;
+    private TripPlanningView _planningView = TripPlanningView.Table;
     private ActiveModal _activeModal = ActiveModal.None;
     private bool _showShareModal;
     private bool _showMapModal;

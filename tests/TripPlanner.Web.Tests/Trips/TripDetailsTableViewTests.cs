@@ -14,21 +14,38 @@ namespace TripPlanner.Web.Tests.Trips;
 public class TripDetailsTableViewTests : TestContext
 {
     [Fact]
-    public void DefaultsToTimelineAndSwitchesToTableInPlace()
+    public void DefaultsToTableAndSwitchesToTimelineInPlace()
     {
         var cut = RenderDetails();
 
         cut.WaitForAssertion(() =>
         {
-            Assert.Single(cut.FindComponents<TripTimeline>());
-            Assert.True(ViewButton(cut, "Timeline").HasAttribute("aria-pressed"));
+            Assert.NotEmpty(cut.FindAll("table.tp-itinerary-table"));
+            Assert.True(ViewButton(cut, "Table").HasAttribute("aria-pressed"));
         });
 
-        ViewButton(cut, "Table").Click();
+        ViewButton(cut, "Timeline").Click();
 
-        Assert.Empty(cut.FindComponents<TripTimeline>());
-        Assert.NotEmpty(cut.FindAll("table.tp-itinerary-table"));
-        Assert.True(ViewButton(cut, "Table").HasAttribute("aria-pressed"));
+        Assert.Single(cut.FindComponents<TripTimeline>());
+        Assert.Empty(cut.FindAll("table.tp-itinerary-table"));
+        Assert.True(ViewButton(cut, "Timeline").HasAttribute("aria-pressed"));
+    }
+
+    [Fact]
+    public void ViewToggleIsTableFirstAndFollowsTheOtherControls()
+    {
+        var cut = RenderDetails();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("[role='group'][aria-label='Itinerary view']")));
+
+        var toggleLabels = cut.FindAll("[role='group'][aria-label='Itinerary view'] button")
+            .Select(button => button.TextContent.Trim())
+            .ToArray();
+        Assert.Equal(new[] { "Table", "Timeline" }, toggleLabels);
+
+        var headerElements = cut.Find(".card-header").QuerySelectorAll("*").ToList();
+        var mapIndex = headerElements.FindIndex(e => e.GetAttribute("aria-label") == "View all trip locations on a map");
+        var toggleIndex = headerElements.FindIndex(e => e.GetAttribute("aria-label") == "Itinerary view");
+        Assert.True(mapIndex >= 0 && mapIndex < toggleIndex, "View map should precede the itinerary view toggle.");
     }
 
     [Fact]
