@@ -138,7 +138,7 @@
     <div class="d-flex justify-content-end align-items-center gap-2">
         @if (CanDelete)
         {
-            <button type="button" id="leg-delete" class="btn btn-outline-danger" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete leg</button>
+            <button type="button" id="leg-delete" class="btn btn-sm btn-outline-secondary tp-delete-action" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete leg</button>
         }
         <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save leg" : "Add leg")</button>
     </div>

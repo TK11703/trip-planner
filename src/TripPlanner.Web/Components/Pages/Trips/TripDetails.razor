@@ -72,6 +72,20 @@ else
                                 aria-label="View all trip locations on a map">
                             View map
                         </button>
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
+                            <button type="button"
+                                    class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")"
+                                    aria-pressed="@(_planningView == TripPlanningView.Table)"
+                                    @onclick="() => _planningView = TripPlanningView.Table">
+                                Table
+                            </button>
+                            <button type="button"
+                                    class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")"
+                                    aria-pressed="@(_planningView == TripPlanningView.Timeline)"
+                                    @onclick="() => _planningView = TripPlanningView.Timeline">
+                                Timeline
+                            </button>
+                        </div>
                         @if (_planningView == TripPlanningView.Timeline)
                         {
                             var navDates = _timeline?.TripDates ?? (IReadOnlyList<DateOnly>)Array.Empty<DateOnly>();
@@ -126,20 +140,6 @@ else
                                 </ul>
                             </div>
                         }
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
-                            <button type="button"
-                                    class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")"
-                                    aria-pressed="@(_planningView == TripPlanningView.Table)"
-                                    @onclick="() => _planningView = TripPlanningView.Table">
-                                Table
-                            </button>
-                            <button type="button"
-                                    class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")"
-                                    aria-pressed="@(_planningView == TripPlanningView.Timeline)"
-                                    @onclick="() => _planningView = TripPlanningView.Timeline">
-                                Timeline
-                            </button>
-                        </div>
                     </div>
                 </div>
                 <div class="card-body">

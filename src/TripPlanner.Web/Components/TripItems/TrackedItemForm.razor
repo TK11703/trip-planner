@@ -193,7 +193,7 @@
     <div class="d-flex justify-content-end align-items-center gap-2">
         @if (CanDelete)
         {
-            <button type="button" id="item-delete" class="btn btn-outline-danger" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete item</button>
+            <button type="button" id="item-delete" class="btn btn-sm btn-outline-secondary tp-delete-action" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete item</button>
         }
         <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save item" : "Add item")</button>
     </div>

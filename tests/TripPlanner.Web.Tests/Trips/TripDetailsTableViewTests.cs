@@ -32,7 +32,7 @@ public class TripDetailsTableViewTests : TestContext
     }
 
     [Fact]
-    public void ViewToggleIsTableFirstAndFollowsTheOtherControls()
+    public void HeaderControlsRunFromMapThroughTheToggleToTheDateNavigation()
     {
         var cut = RenderDetails();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("[role='group'][aria-label='Itinerary view']")));
@@ -42,10 +42,20 @@ public class TripDetailsTableViewTests : TestContext
             .ToArray();
         Assert.Equal(new[] { "Table", "Timeline" }, toggleLabels);
 
+        ViewButton(cut, "Timeline").Click();
+
         var headerElements = cut.Find(".card-header").QuerySelectorAll("*").ToList();
-        var mapIndex = headerElements.FindIndex(e => e.GetAttribute("aria-label") == "View all trip locations on a map");
-        var toggleIndex = headerElements.FindIndex(e => e.GetAttribute("aria-label") == "Itinerary view");
-        Assert.True(mapIndex >= 0 && mapIndex < toggleIndex, "View map should precede the itinerary view toggle.");
+        int IndexOfLabel(string label) => headerElements.FindIndex(e => e.GetAttribute("aria-label") == label);
+
+        var mapIndex = IndexOfLabel("View all trip locations on a map");
+        var toggleIndex = IndexOfLabel("Itinerary view");
+        var stepIndex = IndexOfLabel("Step timeline by day");
+        var jumpIndex = IndexOfLabel("Jump to a date in the trip");
+
+        Assert.True(mapIndex >= 0, "View map should render in the header.");
+        Assert.True(mapIndex < toggleIndex, "View map should precede the itinerary view toggle.");
+        Assert.True(toggleIndex < stepIndex, "The day-step controls should follow the itinerary view toggle.");
+        Assert.True(stepIndex < jumpIndex, "Jump to date should follow the day-step controls.");
     }
 
     [Fact]

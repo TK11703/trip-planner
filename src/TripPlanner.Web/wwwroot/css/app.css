@@ -767,6 +767,17 @@ body {
     --bs-btn-hover-border-color: var(--tp-brand);
 }
 
+/* Destructive actions stay neutral until reached for, so they never compete with the primary save. */
+.tp-delete-action {
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--bs-danger);
+    --bs-btn-hover-border-color: var(--bs-danger);
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: var(--bs-danger);
+    --bs-btn-active-border-color: var(--bs-danger);
+    --bs-btn-focus-shadow-rgb: var(--bs-danger-rgb);
+}
+
 .state-message {
     display: flex;
     gap: 1rem;
