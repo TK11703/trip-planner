@@ -135,20 +135,20 @@
     {
         <div class="alert alert-danger py-2 small">@_error</div>
     }
-    <div class="d-flex justify-content-between align-items-center gap-2">
-        <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)">@(IsEdit ? "Save leg" : "Add leg")</button>
+    <div class="d-flex justify-content-end align-items-center gap-2">
         @if (CanDelete)
         {
-            <button type="button" id="leg-delete" class="btn btn-outline-danger" disabled="@(_submitting || _deleting)" @onclick="RequestDelete">Delete leg</button>
+            <button type="button" id="leg-delete" class="btn btn-outline-danger" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete leg</button>
         }
+        <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save leg" : "Add leg")</button>
     </div>
     @if (_confirmDelete)
     {
         <div class="alert alert-warning mt-2 mb-0 py-2 small" role="alert" data-testid="leg-delete-confirm">
             <p class="mb-2">Delete <strong>@_model.Title</strong>? This can't be undone. Items on this leg have to be moved off it first.</p>
             <div class="d-flex gap-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_deleting" @onclick="CancelDelete">Keep leg</button>
-                <button type="button" id="leg-delete-confirm" class="btn btn-sm btn-danger" disabled="@_deleting" @onclick="DeleteLegAsync">@(_deleting ? "Deleting…" : "Delete leg")</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_deleting" @onclick="CancelDelete"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Keep leg</button>
+                <button type="button" id="leg-delete-confirm" class="btn btn-sm btn-danger" disabled="@_deleting" @onclick="DeleteLegAsync"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />@(_deleting ? "Deleting…" : "Delete leg")</button>
             </div>
         </div>
     }

@@ -190,20 +190,20 @@
     {
         <div class="alert alert-danger py-2 small">@_error</div>
     }
-    <div class="d-flex justify-content-between align-items-center gap-2">
-        <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)">@(IsEdit ? "Save item" : "Add item")</button>
+    <div class="d-flex justify-content-end align-items-center gap-2">
         @if (CanDelete)
         {
-            <button type="button" id="item-delete" class="btn btn-outline-danger" disabled="@(_submitting || _deleting)" @onclick="RequestDelete">Delete item</button>
+            <button type="button" id="item-delete" class="btn btn-outline-danger" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete item</button>
         }
+        <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save item" : "Add item")</button>
     </div>
     @if (_confirmDelete)
     {
         <div class="alert alert-warning mt-2 mb-0 py-2 small" role="alert" data-testid="item-delete-confirm">
             <p class="mb-2">Delete <strong>@_model.Title</strong>? This can't be undone.</p>
             <div class="d-flex gap-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_deleting" @onclick="CancelDelete">Keep item</button>
-                <button type="button" id="item-delete-confirm" class="btn btn-sm btn-danger" disabled="@_deleting" @onclick="DeleteItemAsync">@(_deleting ? "Deleting…" : "Delete item")</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_deleting" @onclick="CancelDelete"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Keep item</button>
+                <button type="button" id="item-delete-confirm" class="btn btn-sm btn-danger" disabled="@_deleting" @onclick="DeleteItemAsync"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />@(_deleting ? "Deleting…" : "Delete item")</button>
             </div>
         </div>
     }

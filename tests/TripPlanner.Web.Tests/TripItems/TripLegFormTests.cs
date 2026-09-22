@@ -353,6 +353,19 @@ public class TripLegFormTests : TestContext
 
     // --- Removing a leg ---
 
+    /// <summary>Save is the rightmost action, with Delete to its left, so the primary action is never buried.</summary>
+    [Fact]
+    public void DeleteSitsToTheLeftOfSave()
+    {
+        var cut = RenderEdit(TripLegModeTestData.StayLeg());
+
+        var actions = cut.Find("#leg-delete").ParentElement!.Children;
+        Assert.Equal(2, actions.Length);
+        Assert.Equal("leg-delete", actions[0].Id);
+        Assert.Equal("submit", actions[1].GetAttribute("type"));
+        Assert.All(actions, button => Assert.NotNull(button.QuerySelector("svg")));
+    }
+
     [Fact]
     public void ALegBeingCreated_OffersNoDelete()
     {
