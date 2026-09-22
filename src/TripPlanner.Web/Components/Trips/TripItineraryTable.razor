@@ -1,24 +1,25 @@
 @using TripPlanner.Web.Features.Trips
 
+@if (OnAddLeg.HasDelegate || OnAddItem.HasDelegate)
+{
+    <div class="tp-itinerary-actions">
+        @if (OnAddLeg.HasDelegate)
+        {
+            <button id="tp-table-add-leg" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add leg" @onclick="OnAddLeg">Add leg</button>
+        }
+        @if (OnAddItem.HasDelegate)
+        {
+            <button id="tp-table-add-item" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add item" @onclick="() => OnAddItem.InvokeAsync(null)">Add item</button>
+        }
+    </div>
+}
+
 @if (!Model.HasContent)
 {
     <p class="tp-itinerary-empty">This trip has no legs or items yet.</p>
 }
 else
 {
-    @if (OnAddLeg.HasDelegate || OnAddItem.HasDelegate)
-    {
-        <div class="tp-itinerary-actions">
-            @if (OnAddLeg.HasDelegate)
-            {
-                <button id="tp-table-add-leg" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add leg" @onclick="OnAddLeg">Add leg</button>
-            }
-            @if (OnAddItem.HasDelegate)
-            {
-                <button id="tp-table-add-item" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add item" @onclick="() => OnAddItem.InvokeAsync(null)">Add item</button>
-            }
-        </div>
-    }
     <div class="tp-itinerary-table-region" role="region" aria-label="Itinerary table" tabindex="0">
         <table class="tp-itinerary-table">
             @* The surrounding card header already names this table on screen. *@

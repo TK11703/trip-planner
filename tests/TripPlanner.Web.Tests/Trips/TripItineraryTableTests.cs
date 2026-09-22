@@ -46,6 +46,24 @@ public class TripItineraryTableTests : TestContext
     }
 
     [Fact]
+    public void EmptyTripStillOffersCreateActions()
+    {
+        var addLegCount = 0;
+        Guid? initialLeg = TripFixtures.ArrivalLegId;
+        var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Empty());
+        var cut = RenderComponent<TripItineraryTable>(parameters => parameters
+            .Add(component => component.Model, model)
+            .Add(component => component.OnAddLeg, () => addLegCount++)
+            .Add(component => component.OnAddItem, id => initialLeg = id));
+
+        cut.Find("[aria-label='Add leg']").Click();
+        cut.Find("[aria-label='Add item']").Click();
+
+        Assert.Equal(1, addLegCount);
+        Assert.Null(initialLeg);
+    }
+
+    [Fact]
     public void InteractiveCallbacksReceiveStableIds()
     {
         Guid? editedLeg = null;
