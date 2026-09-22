@@ -972,14 +972,6 @@ body {
     font-size: .9rem;
 }
 
-.tp-itinerary-table caption {
-    padding: 0 0 .5rem;
-    color: var(--bs-body-color);
-    font-size: 1rem;
-    font-weight: 600;
-    text-align: left;
-}
-
 .tp-itinerary-table th,
 .tp-itinerary-table td {
     padding: .55rem .65rem;

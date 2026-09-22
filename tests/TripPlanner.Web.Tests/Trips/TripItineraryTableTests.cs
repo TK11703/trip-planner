@@ -13,7 +13,9 @@ public class TripItineraryTableTests : TestContext
     {
         var cut = Render(TripFixtures.Representative());
 
-        Assert.Equal("Itinerary", cut.Find("caption").TextContent.Trim());
+        var caption = cut.Find("caption");
+        Assert.Equal("Itinerary", caption.TextContent.Trim());
+        Assert.Contains("visually-hidden", caption.ClassList);
         Assert.Equal(
             new[] { "Type", "Title", "Location", "Start", "End", "Confirmation", "Est. Cost" },
             cut.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray());
