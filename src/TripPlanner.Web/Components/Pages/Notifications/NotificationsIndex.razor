@@ -69,6 +69,15 @@
                                     }
                                 }
 
+                                @* A parsed email has no trip yet -- the draft is still awaiting
+                                   review -- so it points at the inbox instead of a trip. *@
+                                @if (string.Equals(item.Category, NotificationCategories.ParsedEmail, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <div class="mt-2">
+                                        <a class="btn btn-sm btn-outline-primary" href="/inbox/drafts">Review in inbox</a>
+                                    </div>
+                                }
+
                                 @if (item.ActionStatus == NotificationActionStatus.Completed && item.CompletedAtUtc is DateTimeOffset completedAt)
                                 {
                                     <div class="mt-2 small text-success">
