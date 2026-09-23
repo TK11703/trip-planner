@@ -99,7 +99,7 @@ var effectiveApiScope = empty(entraApiScope) ? '${entraApiAudience}/access_as_us
 var effectiveOpenAiDeployment = empty(azureOpenAiDeploymentName) ? 'gpt-4o' : azureOpenAiDeploymentName
 var emailRelayOn = toLower(emailRelayEnabled) == 'true'
 var emailRelayWorkflowName = 'logic-${environmentName}-email-relay'
-var emailRelayConnectionName = 'con-${environmentName}-office365'
+var emailRelayConnectionName = 'con-${environmentName}-outlook'
 
 module storage 'storage.bicep' = {
   name: 'storage'

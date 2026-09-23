@@ -1,9 +1,14 @@
 // Consumption Logic App that polls the trip mailbox and relays each message to the API.
 // The API never touches a mailbox; polling, retry, and run history live here.
 //
-// The Office 365 connection is provisioned unauthorized -- OAuth consent cannot be scripted.
-// An operator must sign in to it once before the trigger will fire. The workflow also needs
-// the EmailIngestion.Relay app role, which is a directory grant and not expressible in Bicep.
+// This uses the Outlook.com connector, not Office 365 Outlook. The trip mailbox is a personal
+// Microsoft account, and the two connectors are mutually exclusive on account type: office365
+// requires an Exchange Online work mailbox and returns 401 on every call for a personal
+// account, even though consent succeeds and the connection reports Connected.
+//
+// The connection is provisioned unauthorized -- OAuth consent cannot be scripted. An operator
+// must sign in to it once before the trigger will fire. The workflow also needs the
+// EmailIngestion.Relay app role, which is a directory grant and not expressible in Bicep.
 // Both steps are in docs/operations/production-runbook.md section 1.6, and until they are
 // done the workflow deploys disabled so the trigger cannot fire against them.
 param location string = resourceGroup().location
@@ -35,16 +40,16 @@ param pollingIntervalMinutes int = 3
 @description('Whether the trigger polls. Leave false until the connection is authorized and the app role is granted.')
 param enabled bool = false
 
-var office365ApiId = subscriptionResourceId('Microsoft.Web/locations/managedApis', location, 'office365')
+var outlookApiId = subscriptionResourceId('Microsoft.Web/locations/managedApis', location, 'outlook')
 
-resource office365 'Microsoft.Web/connections@2016-06-01' = {
+resource outlook 'Microsoft.Web/connections@2016-06-01' = {
   name: connectionName
   location: location
   tags: tags
   properties: {
     displayName: 'Trip Planner mailbox'
     api: {
-      id: office365ApiId
+      id: outlookApiId
     }
   }
 }
@@ -64,10 +69,10 @@ resource relay 'Microsoft.Logic/workflows@2019-05-01' = {
     parameters: {
       '$connections': {
         value: {
-          office365: {
-            connectionId: office365.id
-            connectionName: office365.name
-            id: office365ApiId
+          outlook: {
+            connectionId: outlook.id
+            connectionName: outlook.name
+            id: outlookApiId
           }
         }
       }
@@ -94,11 +99,11 @@ resource relay 'Microsoft.Logic/workflows@2019-05-01' = {
           inputs: {
             host: {
               connection: {
-                name: '@parameters(\'$connections\')[\'office365\'][\'connectionId\']'
+                name: '@parameters(\'$connections\')[\'outlook\'][\'connectionId\']'
               }
             }
             method: 'get'
-            path: '/v3/Mail/OnNewEmail'
+            path: '/v2/Mail/OnNewEmail'
             queries: {
               folderPath: mailFolderPath
               importance: 'Any'
@@ -113,11 +118,11 @@ resource relay 'Microsoft.Logic/workflows@2019-05-01' = {
           type: 'Select'
           runAfter: {}
           inputs: {
-            from: '@coalesce(triggerBody()?[\'attachments\'], json(\'[]\'))'
+            from: '@coalesce(triggerBody()?[\'Attachments\'], json(\'[]\'))'
             select: {
-              fileName: '@item()?[\'name\']'
-              contentType: '@item()?[\'contentType\']'
-              contentBase64: '@item()?[\'contentBytes\']'
+              fileName: '@item()?[\'Name\']'
+              contentType: '@item()?[\'ContentType\']'
+              contentBase64: '@item()?[\'ContentBytes\']'
             }
           }
         }
@@ -137,12 +142,12 @@ resource relay 'Microsoft.Logic/workflows@2019-05-01' = {
             // bodyText is deliberately omitted: the connector only offers a truncated preview,
             // and a non-blank bodyText would win over the full HTML on the API side.
             body: {
-              messageId: '@triggerBody()?[\'internetMessageId\']'
-              sender: '@triggerBody()?[\'from\']'
-              recipient: '@triggerBody()?[\'toRecipients\']'
-              subject: '@triggerBody()?[\'subject\']'
-              receivedAt: '@triggerBody()?[\'receivedDateTime\']'
-              bodyHtml: '@triggerBody()?[\'body\']'
+              messageId: '@triggerBody()?[\'InternetMessageId\']'
+              sender: '@triggerBody()?[\'From\']'
+              recipient: '@triggerBody()?[\'To\']'
+              subject: '@triggerBody()?[\'Subject\']'
+              receivedAt: '@triggerBody()?[\'DateTimeReceived\']'
+              bodyHtml: '@triggerBody()?[\'Body\']'
               attachments: '@body(\'Map_attachments\')'
             }
             authentication: {
@@ -191,11 +196,11 @@ resource relay 'Microsoft.Logic/workflows@2019-05-01' = {
               inputs: {
                 host: {
                   connection: {
-                    name: '@parameters(\'$connections\')[\'office365\'][\'connectionId\']'
+                    name: '@parameters(\'$connections\')[\'outlook\'][\'connectionId\']'
                   }
                 }
                 method: 'post'
-                path: '/v2/Mail/Move/@{encodeURIComponent(triggerBody()?[\'id\'])}'
+                path: '/Mail/Move/@{encodeURIComponent(triggerBody()?[\'Id\'])}'
                 queries: {
                   folderPath: processedFolderPath
                 }
@@ -209,5 +214,5 @@ resource relay 'Microsoft.Logic/workflows@2019-05-01' = {
 }
 
 output name string = relay.name
-output connectionName string = office365.name
+output connectionName string = outlook.name
 output state string = relay.properties.state

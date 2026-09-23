@@ -212,7 +212,7 @@ name and cannot be changed without recreating the environment.
 
 The API does not watch a mailbox. A Consumption Logic App does, and posts each message to
 `POST {SERVICE_API_URI}/api/email-ingestion/messages`. [`infra/email-relay.bicep`](../../infra/email-relay.bicep)
-provisions the workflow and its Office 365 connection on every deployment, but the workflow
+provisions the workflow and its Outlook.com connection on every deployment, but the workflow
 arrives **disabled**: the two steps below cannot be scripted — both are directory or OAuth
 concerns, not ARM ones — and a relay that polls before they are done fails every run.
 
@@ -260,14 +260,24 @@ which is what `AzureEntra__Audience` validates.
 > `roles` is a claim inside it. A relay that called early keeps getting `403` until the
 > cached token expires.
 
-#### Step 2 — authorize the Office 365 connection
+#### Step 2 — authorize the Outlook.com connection
 
 The connection is provisioned unauthorized; OAuth consent cannot be scripted. Open
-**Resource group → `con-<environment-name>-office365` → Edit API connection**, sign in as
+**Resource group → `con-<environment-name>-outlook` → Edit API connection**, sign in as
 the mailbox owner, and save. Until this is done every run fails at the trigger.
 
 The mailbox is whichever account authorizes the connection — it is not a Bicep parameter.
 Change mailboxes by re-authorizing as a different account.
+
+> **Authorize with a personal Microsoft account.** The relay uses the Outlook.com connector,
+> which serves `@outlook.com`/`@hotmail.com`/`@live.com` accounts and rejects work or school
+> accounts. The two connectors are mutually exclusive on account type and neither one says so
+> at consent time: signing in with the wrong kind still yields a connection whose status reads
+> `Connected` with `authenticatedUser` populated, while every trigger poll fails `Unauthorized`
+> and the portal's **Test connection** reports `Unauthorized`. If the mailbox ever moves to
+> Microsoft 365, switch `infra/email-relay.bicep` to the `office365` managed API — the trigger
+> becomes `/v3/Mail/OnNewEmail`, the move becomes `/v2/Mail/Move/...`, and the trigger output
+> fields change from `PascalCase` to `camelCase`.
 
 On a conclusive outcome (`parsed`, `no_content`, or `duplicate`) the relay moves the message
 out of the polled folder into `Processed`, which is what stops the next poll picking it up
