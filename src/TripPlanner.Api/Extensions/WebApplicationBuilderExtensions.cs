@@ -105,6 +105,7 @@ public static class WebApplicationBuilderExtensions
             sp.GetRequiredService<ILogger<AzureMapsPlaceSuggestionLookup>>()));
         builder.Services.AddScoped<IPlaceSuggestionLookup>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
         builder.Services.AddScoped<IPlaceGeocoder>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
+        builder.Services.AddScoped<IPlaceTimeZoneLookup>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
 
         builder.Services.AddSingleton<DatabaseInitializer>();
         builder.Services.AddSingleton<DatabaseMigrationState>();

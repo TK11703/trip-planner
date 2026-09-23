@@ -32,7 +32,18 @@ public interface IPlaceGeocoder
     Task<GeoPoint?> GeocodeAsync(string query, CancellationToken ct);
 }
 
-public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPlaceGeocoder
+/// <summary>
+/// Resolves free-text location text to the IANA time zone observed at that place, by geocoding the
+/// text and then asking Azure Maps which zone covers the coordinates. Degrades to <c>null</c> (never
+/// throws) when the account is unconfigured, the text cannot be placed, or the call fails.
+/// </summary>
+public interface IPlaceTimeZoneLookup
+{
+    bool IsConfigured { get; }
+    Task<string?> ResolveTimeZoneAsync(string query, CancellationToken ct);
+}
+
+public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPlaceGeocoder, IPlaceTimeZoneLookup
 {
     public const string HttpClientName = "azuremaps";
 
@@ -200,15 +211,83 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps search returned {StatusCode} for a place suggestion. A 401/403 usually means the identity lacks the Azure Maps Search and Render Data Reader role, or AzureMaps:ClientId is wrong.")]
+    public async Task<string?> ResolveTimeZoneAsync(string query, CancellationToken ct)
+    {
+        var point = await GeocodeAsync(query, ct);
+        if (point is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var http = _httpFactory.CreateClient(HttpClientName);
+
+            var coordinates = FormattableString.Invariant($"{point.Value.Latitude},{point.Value.Longitude}");
+            var requestUri = $"timezone/byCoordinates/json?api-version=1.0&options=none&query={Uri.EscapeDataString(coordinates)}";
+
+            using var request = await CreateRequestAsync(requestUri, ct);
+
+            using var response = await http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                LogTimeZoneFailed((int)response.StatusCode);
+                return null;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            return ReadFirstTimeZoneId(document.RootElement);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LogTimeZoneError(ex);
+            return null;
+        }
+    }
+
+    // Unlike Search, the timezone API answers in PascalCase; accept either so a casing change
+    // upstream degrades to "no zone" rather than silently reading nothing.
+    private static string? ReadFirstTimeZoneId(JsonElement root)
+    {
+        if (!root.TryGetProperty("TimeZones", out var zones) && !root.TryGetProperty("timeZones", out zones))
+        {
+            return null;
+        }
+
+        if (zones.ValueKind != JsonValueKind.Array || zones.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        var first = zones[0];
+        if (!first.TryGetProperty("Id", out var id) && !first.TryGetProperty("id", out id))
+        {
+            return null;
+        }
+
+        return id.ValueKind == JsonValueKind.String ? id.GetString() : null;
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps search returned {StatusCode} for a place suggestion. A 401/403 usually means the identity lacks the Azure Maps Data Reader role, or AzureMaps:ClientId is wrong.")]
     private partial void LogSearchFailed(int statusCode);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps place suggestion lookup failed.")]
     private partial void LogSearchError(Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps geocode returned {StatusCode}. A 401/403 usually means the identity lacks the Azure Maps Search and Render Data Reader role, or AzureMaps:ClientId is wrong.")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps geocode returned {StatusCode}. A 401/403 usually means the identity lacks the Azure Maps Data Reader role, or AzureMaps:ClientId is wrong.")]
     private partial void LogGeocodeFailed(int statusCode);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps geocode failed.")]
     private partial void LogGeocodeError(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps timezone lookup returned {StatusCode}. A 401/403 here usually means the identity holds only Azure Maps Search and Render Data Reader, which does not cover the timezone API.")]
+    private partial void LogTimeZoneFailed(int statusCode);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps timezone lookup failed.")]
+    private partial void LogTimeZoneError(Exception exception);
 }

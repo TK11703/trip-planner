@@ -4,6 +4,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI.Chat;
+using TripPlanner.Api.Features.Places;
 using TripPlanner.Contracts.Common;
 using TripPlanner.Database.EmailIngestion;
 
@@ -37,15 +38,21 @@ public sealed partial class EmailParserService : IItemRecognizer
 {
     private readonly AzureOpenAIClient _openAi;
     private readonly IConfiguration _config;
+    private readonly IPlaceTimeZoneLookup _timeZones;
     private readonly ILogger<EmailParserService> _logger;
 
     private const double ConfidenceThreshold = 0.5;
     private const int MaxDrafts = 20;
 
-    public EmailParserService(AzureOpenAIClient openAi, IConfiguration config, ILogger<EmailParserService> logger)
+    public EmailParserService(
+        AzureOpenAIClient openAi,
+        IConfiguration config,
+        IPlaceTimeZoneLookup timeZones,
+        ILogger<EmailParserService> logger)
     {
         _openAi = openAi;
         _config = config;
+        _timeZones = timeZones;
         _logger = logger;
     }
 
@@ -127,6 +134,8 @@ public sealed partial class EmailParserService : IItemRecognizer
                 return RecognitionResult.Unsupported();
             }
 
+            await FillMissingTimeZonesAsync(drafts, ct);
+
             return RecognitionResult.Parsed(drafts);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -144,6 +153,49 @@ public sealed partial class EmailParserService : IItemRecognizer
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Recognition provider failed for inbox email {InboxEmailId}.")]
     private partial void LogRecognitionProviderFailed(Exception exception, Guid inboxEmailId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Inferred time zone {TimeZoneId} from the booking location because recognition returned none.")]
+    private partial void LogTimeZoneInferred(string timeZoneId);
+
+    /// <summary>
+    /// A draft with no start zone cannot be matched to a leg, and the traveler has to supply one by
+    /// hand. The model is asked to infer it from the booking location but often stays silent, so ask
+    /// Azure Maps the same question. A failure here leaves the draft as it was.
+    /// </summary>
+    private async Task FillMissingTimeZonesAsync(NewParsedItemDraft[] drafts, CancellationToken ct)
+    {
+        if (!_timeZones.IsConfigured)
+        {
+            return;
+        }
+
+        // One message usually repeats a single location, so cache to keep a multi-item email to one call.
+        var resolved = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < drafts.Length; i++)
+        {
+            var draft = drafts[i];
+            if (draft.StartTimeZoneId is not null || string.IsNullOrWhiteSpace(draft.Location))
+            {
+                continue;
+            }
+
+            var location = draft.Location.Trim();
+            if (!resolved.TryGetValue(location, out var zone))
+            {
+                zone = NormalizeTimeZoneId(await _timeZones.ResolveTimeZoneAsync(location, ct));
+                resolved[location] = zone;
+            }
+
+            if (zone is null)
+            {
+                continue;
+            }
+
+            LogTimeZoneInferred(zone);
+            drafts[i] = draft with { StartTimeZoneId = zone };
+        }
+    }
 
     private static NewParsedItemDraft ToDraft(Guid inboxEmailId, string userId, RecognizedItem recognized) => new(
         InboxEmailId: inboxEmailId,

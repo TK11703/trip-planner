@@ -42,10 +42,11 @@ var cognitiveServicesOpenAiUserRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 )
-// Narrower than Azure Maps Data Reader: covers only the Search and Render APIs the app calls.
-var azureMapsSearchRenderReaderRoleId = subscriptionResourceId(
+// Azure Maps Data Reader. The narrower Search and Render Data Reader role does not cover the
+// timezone API that email ingestion calls to infer a zone from a booking's location.
+var azureMapsDataReaderRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
-  '6be48352-4f82-47c9-ad5e-0acacefdb005'
+  '423170ca-a8f6-4b0f-8487-9e4eb8f49bfa'
 )
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
@@ -143,6 +144,6 @@ module apiMaps 'rbac-maps.bicep' = if (!empty(azureMapsResourceId)) {
   params: {
     accountName: last(split(azureMapsResourceId, '/'))
     principalId: apiPrincipalId
-    roleDefinitionId: azureMapsSearchRenderReaderRoleId
+    roleDefinitionId: azureMapsDataReaderRoleId
   }
 }
