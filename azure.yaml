@@ -12,6 +12,19 @@ infra:
   path: infra
   module: main
 
+# The email relay's authorization lives in Microsoft Entra, not ARM, so Bicep cannot
+# express it. This hook reconciles it after every provision and is a no-op once granted.
+hooks:
+  postprovision:
+    windows:
+      shell: pwsh
+      run: ./scripts/grant-relay-app-role.ps1
+      continueOnError: false
+    posix:
+      shell: pwsh
+      run: ./scripts/grant-relay-app-role.ps1
+      continueOnError: false
+
 services:
   api:
     project: ./src/TripPlanner.Api/TripPlanner.Api.csproj

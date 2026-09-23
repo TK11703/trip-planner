@@ -149,6 +149,8 @@ function Get-TripPlannerDeploymentContract {
         RequiredEnvironmentVars   = $script:RequiredEnvironmentVariables
         SchemaVersion             = '1.0'
         DataProtectionContainer   = 'dataprotection'
+        # Must match EmailIngestionPolicy.RelayAppRole; the API compares it ordinally.
+        EmailIngestionRelayRole   = 'EmailIngestion.Relay'
         # Flexible Server keeps a continuous restore window rather than discrete dumps, so
         # recovery is expressed as retention days and a freshness bound on the restore point.
         BackupRetentionDays       = 7

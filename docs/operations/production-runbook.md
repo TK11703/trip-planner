@@ -225,31 +225,29 @@ The relay route requires the `EmailIngestion.Relay` *application* role. The rela
 (`id-<environment-name>-relay`) is created by `infra/identity.bicep` and holds no Azure RBAC
 at all; this role is its only grant.
 
-```powershell
-# Expose the role on the API registration. Include any existing appRoles in the array —
-# PATCH replaces the collection.
-$appObjectId = az ad app show --id $env:AZURE_ENTRA_API_CLIENT_ID --query id -o tsv
-$roleId = [guid]::NewGuid().ToString()
-$body = @{ appRoles = @(@{
-    id                 = $roleId
-    allowedMemberTypes = @('Application')
-    displayName        = 'Email ingestion relay'
-    description        = 'Allows the email relay to submit messages for ingestion.'
-    value              = 'EmailIngestion.Relay'
-    isEnabled          = $true
-}) } | ConvertTo-Json -Depth 6 -Compress
-Set-Content -LiteralPath "$env:TEMP\relay-role.json" -Value $body -Encoding utf8 -NoNewline
-az rest --method PATCH --headers "Content-Type=application/json" --body "@$env:TEMP\relay-role.json" `
-    --url "https://graph.microsoft.com/v1.0/applications/$appObjectId"
+Both halves of the grant are Microsoft Graph directory objects rather than ARM resources, so
+Bicep cannot express them — and assigning an app role to a *managed identity* has no Azure
+portal equivalent at all. `scripts/grant-relay-app-role.ps1` performs both, and `azure.yaml`
+registers it as the azd `postprovision` hook, so **`azd provision` applies it automatically**
+and re-running it is a no-op.
 
-# Assign it to the relay's managed identity.
-$relayPrincipalId = azd env get-value EMAIL_RELAY_IDENTITY_PRINCIPAL_ID
-$apiSpId = az ad sp show --id $env:AZURE_ENTRA_API_CLIENT_ID --query id -o tsv
-$body = @{ principalId = $relayPrincipalId; resourceId = $apiSpId; appRoleId = $roleId } | ConvertTo-Json -Compress
-Set-Content -LiteralPath "$env:TEMP\relay-assign.json" -Value $body -Encoding utf8 -NoNewline
-az rest --method post --headers "Content-Type=application/json" --body "@$env:TEMP\relay-assign.json" `
-    --url "https://graph.microsoft.com/v1.0/servicePrincipals/$relayPrincipalId/appRoleAssignments"
+To run it outside a provision — or to repair the grant by hand:
+
+```powershell
+./scripts/grant-relay-app-role.ps1 -Strict
 ```
+
+It resolves `AZURE_ENTRA_API_CLIENT_ID` and the `EMAIL_RELAY_IDENTITY_PRINCIPAL_ID` output
+from the selected azd environment, and skips entirely unless `EMAIL_RELAY_ENABLED` is `true`.
+Pass `-ApiClientId` and `-RelayPrincipalId` explicitly when the local environment has not
+provisioned the relay itself. Without `-Strict` a permission failure warns and returns
+success, so a directory gap cannot fail an otherwise healthy infrastructure deployment.
+
+> **The caller needs directory permissions, not just Azure RBAC.** Exposing the role requires
+> `Application.ReadWrite.All` and assigning it requires `AppRoleAssignment.ReadWrite.All`;
+> the **Cloud Application Administrator** role covers both. Subscription Owner does not — this
+> is a tenant operation. If the CI service principal lacks these, the hook warns and the
+> relay stays unauthorized until an administrator runs the script.
 
 The workflow already requests its token for `api://<AZURE_ENTRA_API_CLIENT_ID>`. Because the
 registration sets `requestedAccessTokenVersion: 2`, the issued `aud` is the bare client id,
@@ -257,8 +255,10 @@ which is what `AzureEntra__Audience` validates.
 
 > **Assign the role before the relay's first call.** As with the Graph grant in §1.4, the
 > managed identity platform caches the token per resource URI for roughly 24 hours, and
-> `roles` is a claim inside it. A relay that called early keeps getting `403` until the
-> cached token expires.
+> `roles` is a claim inside it. A relay that called early keeps getting rejected until the
+> cached token expires. The symptom is `401 authentication_required`, not `403` — a token
+> carrying neither `scp` nor `roles` fails Microsoft.Identity.Web validation (IDW10201)
+> before the authorization policy ever runs.
 
 #### Step 2 — authorize the Outlook.com connection
 
