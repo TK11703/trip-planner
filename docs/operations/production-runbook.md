@@ -269,6 +269,17 @@ the mailbox owner, and save. Until this is done every run fails at the trigger.
 The mailbox is whichever account authorizes the connection — it is not a Bicep parameter.
 Change mailboxes by re-authorizing as a different account.
 
+On a conclusive outcome (`parsed`, `no_content`, or `duplicate`) the relay moves the message
+out of the polled folder into `Processed`, which is what stops the next poll picking it up
+again. **Create that folder in the mailbox** — the connector does not create it, and a missing
+folder fails the move after the API has already ingested the message. Override the name with
+`EMAIL_RELAY_PROCESSED_FOLDER_PATH`.
+
+A rejected message (`unknown_sender`, `invalid_request`, `too_large`) or a failed one
+(`processing_failed`) is left where it is, so it stays visible and is retried on the next poll.
+`unknown_sender` in particular means the sender address matches no traveler — expect those to
+pile up in the polled folder until the address is registered.
+
 #### Step 3 — start polling
 
 `EMAIL_RELAY_ENABLED` drives the workflow's `state`, so it is the source of truth: enabling

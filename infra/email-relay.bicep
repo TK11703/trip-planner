@@ -24,6 +24,9 @@ param apiResourceUri string
 @description('Mail folder polled for new messages.')
 param mailFolderPath string = 'Inbox'
 
+@description('Mail folder a message is moved to once the API accepts it. Must already exist in the mailbox.')
+param processedFolderPath string = 'Processed'
+
 @description('Polling interval in minutes.')
 @minValue(1)
 @maxValue(60)
@@ -146,6 +149,57 @@ resource relay 'Microsoft.Logic/workflows@2019-05-01' = {
               type: 'ManagedServiceIdentity'
               identity: relayIdentityId
               audience: apiResourceUri
+            }
+          }
+        }
+        // The API answers 2xx for every conclusive outcome, so gate the move on the outcome
+        // itself. An unrecognized status stays in the polled folder rather than being filed
+        // away as done; moving it out is what stops the next poll picking it up again.
+        Move_if_processed: {
+          type: 'If'
+          runAfter: {
+            Relay_to_api: [
+              'Succeeded'
+            ]
+          }
+          expression: {
+            or: [
+              {
+                equals: [
+                  '@body(\'Relay_to_api\')?[\'status\']'
+                  'parsed'
+                ]
+              }
+              {
+                equals: [
+                  '@body(\'Relay_to_api\')?[\'status\']'
+                  'no_content'
+                ]
+              }
+              {
+                equals: [
+                  '@body(\'Relay_to_api\')?[\'status\']'
+                  'duplicate'
+                ]
+              }
+            ]
+          }
+          actions: {
+            Move_to_processed: {
+              type: 'ApiConnection'
+              runAfter: {}
+              inputs: {
+                host: {
+                  connection: {
+                    name: '@parameters(\'$connections\')[\'office365\'][\'connectionId\']'
+                  }
+                }
+                method: 'post'
+                path: '/v2/Mail/Move/@{encodeURIComponent(triggerBody()?[\'id\'])}'
+                queries: {
+                  folderPath: processedFolderPath
+                }
+              }
             }
           }
         }

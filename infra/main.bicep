@@ -72,6 +72,9 @@ param emailRelayEnabled string = 'false'
 @description('Mail folder the relay polls for new messages.')
 param emailRelayFolderPath string = 'Inbox'
 
+@description('Mail folder the relay moves a message to once the API accepts it. Must already exist in the mailbox.')
+param emailRelayProcessedFolderPath string = 'Processed'
+
 @description('Monthly cost threshold in subscription currency. Blank disables the budget alert.')
 param budgetAmount string = ''
 
@@ -247,6 +250,7 @@ module emailRelay 'email-relay.bicep' = {
     apiUri: 'https://${api.outputs.fqdn}'
     apiResourceUri: 'api://${entraApiClientId}'
     mailFolderPath: emailRelayFolderPath
+    processedFolderPath: emailRelayProcessedFolderPath
     enabled: emailRelayOn
   }
 }

@@ -73,6 +73,9 @@
     },
     "emailRelayFolderPath": {
       "value": "${EMAIL_RELAY_FOLDER_PATH=Inbox}"
+    },
+    "emailRelayProcessedFolderPath": {
+      "value": "${EMAIL_RELAY_PROCESSED_FOLDER_PATH=Processed}"
     }
   }
 }
