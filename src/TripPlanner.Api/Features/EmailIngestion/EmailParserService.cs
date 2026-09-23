@@ -4,6 +4,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI.Chat;
+using TripPlanner.Contracts.Common;
 using TripPlanner.Database.EmailIngestion;
 
 namespace TripPlanner.Api.Features.EmailIngestion;
@@ -81,6 +82,14 @@ public sealed partial class EmailParserService : IItemRecognizer
             "endTimeZoneId (IANA tz id), " +
             "confirmationCode (string), notes (string), " +
             "confidence (number 0.0-1.0 reflecting how certain you are). " +
+            "Booking emails rarely name a time zone, so infer it from where the booking happens " +
+            "rather than omitting it: a museum in London, UK is 'Europe/London'; a hotel in " +
+            "Denver is 'America/Denver'. Times in a booking email are local to the venue, so use " +
+            "the venue's zone, never the reader's. For a flight use the departure airport's zone " +
+            "for startTimeZoneId and the arrival airport's zone for endTimeZoneId. Omit the zone " +
+            "only when the location is missing or too vague to place on a map. " +
+            "Always answer with an IANA zone id such as 'Europe/London', never an abbreviation " +
+            "like 'BST' or a UTC offset. " +
             "Never copy payment card numbers, bank account numbers, passport or other " +
             "identity-document numbers, passwords, or any other credential into any field. " +
             "Return an empty items array when the text describes no booking. " +
@@ -145,9 +154,9 @@ public sealed partial class EmailParserService : IItemRecognizer
         Title: Redact(recognized.Title),
         Location: Redact(recognized.Location),
         StartLocal: ParseDateTime(recognized.StartLocal),
-        StartTimeZoneId: recognized.StartTimeZoneId,
+        StartTimeZoneId: NormalizeTimeZoneId(recognized.StartTimeZoneId),
         EndLocal: ParseDateTime(recognized.EndLocal),
-        EndTimeZoneId: recognized.EndTimeZoneId,
+        EndTimeZoneId: NormalizeTimeZoneId(recognized.EndTimeZoneId),
         ConfirmationCode: Redact(recognized.ConfirmationCode),
         Notes: Redact(recognized.Notes),
         Confidence: recognized.Confidence);
@@ -209,6 +218,24 @@ public sealed partial class EmailParserService : IItemRecognizer
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         return DateTime.TryParse(value, out var dt) ? dt : null;
+    }
+
+    /// <summary>
+    /// Keeps only a zone the rest of the app can resolve. An id that survives here is one the
+    /// draft editor can preselect and the placement matcher can turn into an instant; anything
+    /// else is dropped so the traveler is asked for the zone rather than shown a broken one.
+    /// </summary>
+    private static string? NormalizeTimeZoneId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        var id = value.Trim();
+        if (TimezoneOptions.IsSupported(id)) return id;
+
+        // Models sometimes answer with the Windows id ("GMT Standard Time") despite the prompt.
+        return TimeZoneInfo.TryConvertWindowsIdToIanaId(id, out var iana) && TimezoneOptions.IsSupported(iana)
+            ? iana
+            : null;
     }
 
     [GeneratedRegex(@"\b(?:\d[ -]?){12,}\d\b")]

@@ -57,3 +57,41 @@ public sealed class EmailParserEnvelopeTests
         Assert.Empty(recognized);
     }
 }
+
+/// <summary>
+/// A zone the model returns is only useful if <c>TimezoneOptions</c> can resolve it — the draft
+/// editor preselects from that list and <c>DraftPlacementMatcher</c> needs it to build an instant.
+/// An unresolvable id would reach the traveler looking populated while behaving as if absent.
+/// </summary>
+public sealed class EmailParserTimeZoneNormalizationTests
+{
+    private static readonly MethodInfo NormalizeMethod =
+        typeof(EmailParserService).GetMethod("NormalizeTimeZoneId", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("EmailParserService.NormalizeTimeZoneId was renamed or removed.");
+
+    private static string? Normalize(string? value) => (string?)NormalizeMethod.Invoke(null, [value]);
+
+    [Theory]
+    [InlineData("Europe/London")]
+    [InlineData("America/Denver")]
+    [InlineData("UTC")]
+    public void AnIanaZoneIsKept(string id) => Assert.Equal(id, Normalize(id));
+
+    [Fact]
+    public void SurroundingWhitespaceDoesNotDiscardAnOtherwiseValidZone()
+        => Assert.Equal("Europe/London", Normalize("  Europe/London  "));
+
+    [Fact]
+    public void AWindowsZoneIdIsConvertedRatherThanDiscarded()
+        => Assert.Equal("Europe/London", Normalize("GMT Standard Time"));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("BST")]
+    [InlineData("UTC+1")]
+    [InlineData("Middle/Earth")]
+    public void AnythingUnresolvableBecomesNullSoTheTravelerIsAsked(string? id)
+        => Assert.Null(Normalize(id));
+}
