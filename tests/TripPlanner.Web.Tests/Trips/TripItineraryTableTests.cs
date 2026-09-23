@@ -46,21 +46,23 @@ public class TripItineraryTableTests : TestContext
     }
 
     [Fact]
-    public void EmptyTripStillOffersCreateActions()
+    public void EmptyTripOffersOnlyTheLegActionInAPromptedEmptyState()
     {
         var addLegCount = 0;
-        Guid? initialLeg = TripFixtures.ArrivalLegId;
         var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Empty());
         var cut = RenderComponent<TripItineraryTable>(parameters => parameters
             .Add(component => component.Model, model)
             .Add(component => component.OnAddLeg, () => addLegCount++)
-            .Add(component => component.OnAddItem, id => initialLeg = id));
+            .Add(component => component.OnAddItem, _ => { }));
 
-        cut.Find("[aria-label='Add leg']").Click();
-        cut.Find("[aria-label='Add item']").Click();
+        Assert.NotNull(cut.Find(".border-dashed"));
+        Assert.Empty(cut.FindAll("[aria-label='Add item']"));
+
+        var addLeg = cut.Find("[aria-label='Add leg']");
+        Assert.Contains("ttl-leg-add", addLeg.ClassList);
+        addLeg.Click();
 
         Assert.Equal(1, addLegCount);
-        Assert.Null(initialLeg);
     }
 
     [Fact]
