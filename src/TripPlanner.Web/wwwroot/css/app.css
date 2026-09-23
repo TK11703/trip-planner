@@ -1076,10 +1076,31 @@ body {
 
 
 /* ===== Printable trip view (feature 020) ===== */
+
+/* The print route is a paper preview, so drop the themed page gradient behind it. */
+body:has(.tp-print-shell) {
+    background: #fff;
+}
+
 .tp-print-shell {
     max-width: 60rem;
     margin: 0 auto;
     padding: 1.5rem;
+    background: #fff;
+}
+
+/* Preview what actually prints: let the table shrink to the page instead of scrolling sideways. */
+.tp-print-shell .tp-itinerary-table-region {
+    overflow: visible;
+}
+
+.tp-print-shell .tp-itinerary-table {
+    min-width: 0;
+}
+
+/* The per-column minimums add up to more than a page is wide. */
+.tp-print-shell .tp-itinerary-table thead th {
+    min-width: 0;
 }
 
 .tp-print-doc {
