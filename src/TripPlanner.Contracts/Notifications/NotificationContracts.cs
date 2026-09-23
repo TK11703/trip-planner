@@ -93,15 +93,15 @@ public static class NotificationCategories
 {
     public const string ItineraryChanges = "ItineraryChanges";
     public const string TripSharing = "TripSharing";
-
-    // Deliberately absent from All, which is what the profile preferences screen renders:
-    // parsed-email notifications are not user-configurable yet.
     public const string ParsedEmail = "ParsedEmail";
 
     public static IReadOnlyList<NotificationCategoryDefinition> All { get; } = new[]
     {
         new NotificationCategoryDefinition(ItineraryChanges, "Itinerary changes", true, true),
-        new NotificationCategoryDefinition(TripSharing, "Trip sharing", true, true)
+        new NotificationCategoryDefinition(TripSharing, "Trip sharing", true, true),
+        // Email defaults off: the relay ingestion path creates these without a recipient address,
+        // so an email request would only ever be recorded as suppressed.
+        new NotificationCategoryDefinition(ParsedEmail, "Emailed trip items", true, false)
     };
 
     public static bool IsKnown(string category)
