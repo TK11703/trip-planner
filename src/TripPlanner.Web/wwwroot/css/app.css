@@ -842,11 +842,6 @@ body {
     max-width: 960px;
 }
 
-.profile-page h1 {
-    font-weight: 800;
-    letter-spacing: -.03em;
-}
-
 .profile-page form {
     background: var(--tp-surface-raised);
     border: 1px solid var(--tp-border);
@@ -920,11 +915,6 @@ body {
 
 .notifications-page {
     max-width: 960px;
-}
-
-.notifications-page h1 {
-    font-weight: 800;
-    letter-spacing: -.03em;
 }
 
 .notification-card {
