@@ -3,8 +3,9 @@
 @inject ITripApiClient TripApi
 @inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
 
-<EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName">
+<EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName" class="d-flex flex-column overflow-hidden">
     <DataAnnotationsValidator />
+    <div class="modal-body">
     <div class="mb-2">
         <label class="form-label" for="leg-title">Name</label>
         <InputText id="leg-title" class="form-control" @bind-Value="_model.Title" />
@@ -127,39 +128,42 @@
     </div>
     @if (_model.Kind == LegKind.Travel && TransportationModes.IsValid(_model.TransportationMode) && !_model.CanContainItems)
     {
-        <div class="alert alert-warning py-2 small mb-2" role="note" data-testid="leg-item-restriction">
+        <div class="alert alert-warning py-2 small mb-0" role="note" data-testid="leg-item-restriction">
             You're a passenger on this leg, so you can't schedule stops along the way. Items belong on a stay or a car leg.
         </div>
     }
-    @if (!string.IsNullOrWhiteSpace(_error))
-    {
-        <div class="alert alert-danger py-2 small">@_error</div>
-    }
-    <div class="tp-modal-actions">
-        <div class="tp-modal-actions-start">
-            <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save leg" : "Add leg")</button>
-            @if (CanDelete)
+    </div>
+    <div class="modal-footer tp-modal-footer">
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert alert-danger py-2 small mb-0">@_error</div>
+        }
+        <div class="tp-modal-actions">
+            <div class="tp-modal-actions-start">
+                <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save leg" : "Add leg")</button>
+                @if (CanDelete)
+                {
+                    <button type="button" id="leg-delete" class="btn btn-sm btn-outline-secondary tp-delete-action" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete leg</button>
+                }
+            </div>
+            @if (OnCancel.HasDelegate)
             {
-                <button type="button" id="leg-delete" class="btn btn-sm btn-outline-secondary tp-delete-action" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete leg</button>
+                <div class="tp-modal-actions-end">
+                    <button type="button" id="leg-cancel" class="btn btn-outline-secondary" disabled="@(_submitting || _deleting)" @onclick="OnCancel"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</button>
+                </div>
             }
         </div>
-        @if (OnCancel.HasDelegate)
+        @if (_confirmDelete)
         {
-            <div class="tp-modal-actions-end">
-                <button type="button" id="leg-cancel" class="btn btn-outline-secondary" disabled="@(_submitting || _deleting)" @onclick="OnCancel"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</button>
+            <div class="alert alert-warning mb-0 py-2 small" role="alert" data-testid="leg-delete-confirm">
+                <p class="mb-2">Delete <strong>@_model.Title</strong>? This can't be undone. Items on this leg have to be moved off it first.</p>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_deleting" @onclick="CancelDelete"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Keep leg</button>
+                    <button type="button" id="leg-delete-confirm" class="btn btn-sm btn-danger" disabled="@_deleting" @onclick="DeleteLegAsync"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />@(_deleting ? "Deleting…" : "Delete leg")</button>
+                </div>
             </div>
         }
     </div>
-    @if (_confirmDelete)
-    {
-        <div class="alert alert-warning mt-2 mb-0 py-2 small" role="alert" data-testid="leg-delete-confirm">
-            <p class="mb-2">Delete <strong>@_model.Title</strong>? This can't be undone. Items on this leg have to be moved off it first.</p>
-            <div class="d-flex gap-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_deleting" @onclick="CancelDelete"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Keep leg</button>
-                <button type="button" id="leg-delete-confirm" class="btn btn-sm btn-danger" disabled="@_deleting" @onclick="DeleteLegAsync"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />@(_deleting ? "Deleting…" : "Delete leg")</button>
-            </div>
-        </div>
-    }
 </EditForm>
 
 @code {
