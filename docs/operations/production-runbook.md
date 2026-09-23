@@ -212,16 +212,12 @@ name and cannot be changed without recreating the environment.
 
 The API does not watch a mailbox. A Consumption Logic App does, and posts each message to
 `POST {SERVICE_API_URI}/api/email-ingestion/messages`. [`infra/email-relay.bicep`](../../infra/email-relay.bicep)
-provisions the workflow and its Office 365 connection, but the relay is **opt-in** and two
-steps cannot be scripted — both are directory or OAuth concerns, not ARM ones.
+provisions the workflow and its Office 365 connection on every deployment, but the workflow
+arrives **disabled**: the two steps below cannot be scripted — both are directory or OAuth
+concerns, not ARM ones — and a relay that polls before they are done fails every run.
 
-Enable it on the azd environment, then provision:
-
-```powershell
-azd env set EMAIL_RELAY_ENABLED true
-azd env set EMAIL_RELAY_FOLDER_PATH Inbox   # optional, this is the default
-azd provision
-```
+Work in this order. Steps 1 and 2 are one-time per environment; a disabled Consumption
+workflow runs no actions, so it bills nothing while it waits.
 
 #### Step 1 — expose and assign the app role
 
@@ -272,6 +268,20 @@ the mailbox owner, and save. Until this is done every run fails at the trigger.
 
 The mailbox is whichever account authorizes the connection — it is not a Bicep parameter.
 Change mailboxes by re-authorizing as a different account.
+
+#### Step 3 — start polling
+
+`EMAIL_RELAY_ENABLED` drives the workflow's `state`, so it is the source of truth: enabling
+the workflow in the portal works until the next provision flips it back off.
+
+```powershell
+azd env set EMAIL_RELAY_ENABLED true
+azd env set EMAIL_RELAY_FOLDER_PATH Inbox   # optional, this is the default
+azd provision
+```
+
+In CI the value comes from the `EMAIL_RELAY_ENABLED` repository variable, because the
+runner builds a fresh azd environment on every run and never sees a local `azd env set`.
 
 #### Verification
 

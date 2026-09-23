@@ -195,6 +195,7 @@ jobs:
           resource-group: ${{ env.AZURE_RESOURCE_GROUP }}
           release-id: ${{ github.event.inputs.rollback_sha || github.sha }}
           registry-login-server: ${{ steps.registry.outputs.login_server }}
+          email-relay-enabled: ${{ vars.EMAIL_RELAY_ENABLED }}
 
       - name: Run readiness gate
         id: readiness
@@ -293,13 +294,40 @@ jobs:
           resource-group: ${{ env.AZURE_RESOURCE_GROUP }}
           release-id: ${{ steps.tag.outputs.value }}
           registry-login-server: ${{ steps.registry.outputs.login_server }}
+          email-relay-enabled: ${{ vars.EMAIL_RELAY_ENABLED }}
 
       - name: Provision infrastructure & release images
         # `azd provision` applies infra/main.bicep and, because WEB_IMAGE/API_IMAGE are
         # commit-pinned, promotes the already-built images in the same pass. A rollback
         # is the same command with an earlier SHA.
         id: deploy
-        run: azd provision --no-prompt
+        run: |
+          set -o pipefail
+
+          # azd renders progress only to a TTY, so on a runner the step would otherwise
+          # sit silent for the whole provision. Tail ARM instead for per-resource status.
+          watch_provisioning() {
+            local seen="" name line
+            while sleep 15; do
+              name=$(az deployment group list -g "$AZURE_RESOURCE_GROUP" \
+                --filter "provisioningState eq 'Running'" --query '[0].name' -o tsv 2>/dev/null) || continue
+              [ -n "$name" ] || continue
+              while read -r line; do
+                [ -n "$line" ] || continue
+                case "$seen" in *"<$line>"*) continue ;; esac
+                seen="$seen<$line>"
+                echo "  $line"
+              done < <(az deployment operation group list -g "$AZURE_RESOURCE_GROUP" -n "$name" \
+                --query "[?properties.targetResource.resourceName!=null].join(' ', [properties.provisioningState, properties.targetResource.resourceType, properties.targetResource.resourceName])" \
+                -o tsv 2>/dev/null)
+            done
+          }
+
+          watch_provisioning &
+          watcher=$!
+          trap 'kill "$watcher" 2>/dev/null || true' EXIT
+
+          azd provision --no-prompt
 
       - name: Capture deployment outputs
         id: outputs

@@ -4,7 +4,8 @@
 // The Office 365 connection is provisioned unauthorized -- OAuth consent cannot be scripted.
 // An operator must sign in to it once before the trigger will fire. The workflow also needs
 // the EmailIngestion.Relay app role, which is a directory grant and not expressible in Bicep.
-// Both steps are in docs/operations/production-runbook.md section 1.6.
+// Both steps are in docs/operations/production-runbook.md section 1.6, and until they are
+// done the workflow deploys disabled so the trigger cannot fire against them.
 param location string = resourceGroup().location
 param tags object = {}
 
@@ -27,6 +28,9 @@ param mailFolderPath string = 'Inbox'
 @minValue(1)
 @maxValue(60)
 param pollingIntervalMinutes int = 3
+
+@description('Whether the trigger polls. Leave false until the connection is authorized and the app role is granted.')
+param enabled bool = false
 
 var office365ApiId = subscriptionResourceId('Microsoft.Web/locations/managedApis', location, 'office365')
 
@@ -53,7 +57,7 @@ resource relay 'Microsoft.Logic/workflows@2019-05-01' = {
     }
   }
   properties: {
-    state: 'Enabled'
+    state: enabled ? 'Enabled' : 'Disabled'
     parameters: {
       '$connections': {
         value: {
@@ -152,3 +156,4 @@ resource relay 'Microsoft.Logic/workflows@2019-05-01' = {
 
 output name string = relay.name
 output connectionName string = office365.name
+output state string = relay.properties.state

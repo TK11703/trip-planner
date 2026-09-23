@@ -30,6 +30,10 @@ inputs:
     description: Container registry login server. Blank leaves the image parameters at their defaults.
     required: false
     default: ''
+  email-relay-enabled:
+    description: '"true" starts the email relay polling. The workflow deploys either way, disabled until this is set.'
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -59,6 +63,7 @@ runs:
       env:
         REGISTRY: ${{ inputs.registry-login-server }}
         TAG: ${{ inputs.release-id }}
+        RELAY: ${{ inputs.email-relay-enabled }}
       run: |
         # Non-secret values. Secrets stay in the job environment and are read by
         # main.parameters.json at provision time, so they are never written to .azure/.
@@ -66,6 +71,7 @@ runs:
         azd env set AZURE_LOCATION "${{ inputs.location }}"
         azd env set AZURE_RESOURCE_GROUP "${{ inputs.resource-group }}"
         azd env set RELEASE_ID "$TAG"
+        azd env set EMAIL_RELAY_ENABLED "${RELAY:-false}"
         if [ -n "$REGISTRY" ]; then
           # Immutable, commit-pinned image references — never `latest`.
           azd env set WEB_IMAGE "$REGISTRY/web:$TAG"

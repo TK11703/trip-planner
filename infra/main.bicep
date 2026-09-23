@@ -66,7 +66,7 @@ param azureOpenAiDeploymentName string = ''
 @description('Resource id of the Azure OpenAI account, used to scope the inference role assignment.')
 param azureOpenAiResourceId string = ''
 
-@description('Set to "true" to deploy the email ingestion relay. Opt-in because its Office 365 connection needs a manual OAuth consent before it works.')
+@description('Set to "true" to start the relay polling. The workflow always deploys; it stays disabled until its Office 365 connection is consented and the EmailIngestion.Relay role is granted.')
 param emailRelayEnabled string = 'false'
 
 @description('Mail folder the relay polls for new messages.')
@@ -233,8 +233,10 @@ module web 'web.bicep' = {
   ]
 }
 
-// Opt-in: the Office 365 connection ships unauthorized and needs a manual consent.
-module emailRelay 'email-relay.bicep' = if (emailRelayOn) {
+// Always deployed so the connection exists to be consented, but the trigger stays off until
+// that consent and the app role are in place -- a relay that polls early caches a role-less
+// token for ~24h and 403s the whole time.
+module emailRelay 'email-relay.bicep' = {
   name: 'email-relay'
   params: {
     location: location
@@ -245,6 +247,7 @@ module emailRelay 'email-relay.bicep' = if (emailRelayOn) {
     apiUri: 'https://${api.outputs.fqdn}'
     apiResourceUri: 'api://${entraApiClientId}'
     mailFolderPath: emailRelayFolderPath
+    enabled: emailRelayOn
   }
 }
 
@@ -284,5 +287,6 @@ output API_IDENTITY_CLIENT_ID string = identity.outputs.api.clientId
 output API_IDENTITY_NAME string = identity.outputs.api.name
 output EMAIL_RELAY_IDENTITY_NAME string = identity.outputs.relay.name
 output EMAIL_RELAY_IDENTITY_PRINCIPAL_ID string = identity.outputs.relay.principalId
-output EMAIL_RELAY_WORKFLOW_NAME string = emailRelayOn ? emailRelayWorkflowName : ''
-output EMAIL_RELAY_CONNECTION_NAME string = emailRelayOn ? emailRelayConnectionName : ''
+output EMAIL_RELAY_WORKFLOW_NAME string = emailRelay.outputs.name
+output EMAIL_RELAY_CONNECTION_NAME string = emailRelay.outputs.connectionName
+output EMAIL_RELAY_STATE string = emailRelay.outputs.state
