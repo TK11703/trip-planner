@@ -1,5 +1,7 @@
-// API container app — internal ingress only. Reaches postgres over the environment's
-// internal network; applies schema migrations on startup (RunDatabaseMigrations=true).
+// API container app — public ingress so the external email-ingestion relay can reach it.
+// Every route is behind Entra; /api/email-ingestion/messages additionally requires the
+// EmailIngestion.Relay app role. Reaches postgres over the environment's internal network;
+// applies schema migrations on startup (RunDatabaseMigrations=true).
 param location string = resourceGroup().location
 param tags object = {}
 
@@ -148,7 +150,7 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        external: false
+        external: true
         targetPort: 8080
         transport: 'auto'
         allowInsecure: false

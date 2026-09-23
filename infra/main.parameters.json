@@ -67,6 +67,12 @@
     },
     "budgetContact": {
       "value": "${AZURE_BUDGET_CONTACT}"
+    },
+    "emailRelayEnabled": {
+      "value": "${EMAIL_RELAY_ENABLED=false}"
+    },
+    "emailRelayFolderPath": {
+      "value": "${EMAIL_RELAY_FOLDER_PATH=Inbox}"
     }
   }
 }

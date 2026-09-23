@@ -208,6 +208,85 @@ A mismatch between the redirect URI and `$webUrl` produces `AADSTS50011` at sign
 Fix it in the registration, not in the app — the FQDN is derived from the environment
 name and cannot be changed without recreating the environment.
 
+### 1.6 Email ingestion relay
+
+The API does not watch a mailbox. A Consumption Logic App does, and posts each message to
+`POST {SERVICE_API_URI}/api/email-ingestion/messages`. [`infra/email-relay.bicep`](../../infra/email-relay.bicep)
+provisions the workflow and its Office 365 connection, but the relay is **opt-in** and two
+steps cannot be scripted — both are directory or OAuth concerns, not ARM ones.
+
+Enable it on the azd environment, then provision:
+
+```powershell
+azd env set EMAIL_RELAY_ENABLED true
+azd env set EMAIL_RELAY_FOLDER_PATH Inbox   # optional, this is the default
+azd provision
+```
+
+#### Step 1 — expose and assign the app role
+
+The relay route requires the `EmailIngestion.Relay` *application* role. The relay's identity
+(`id-<environment-name>-relay`) is created by `infra/identity.bicep` and holds no Azure RBAC
+at all; this role is its only grant.
+
+```powershell
+# Expose the role on the API registration. Include any existing appRoles in the array —
+# PATCH replaces the collection.
+$appObjectId = az ad app show --id $env:AZURE_ENTRA_API_CLIENT_ID --query id -o tsv
+$roleId = [guid]::NewGuid().ToString()
+$body = @{ appRoles = @(@{
+    id                 = $roleId
+    allowedMemberTypes = @('Application')
+    displayName        = 'Email ingestion relay'
+    description        = 'Allows the email relay to submit messages for ingestion.'
+    value              = 'EmailIngestion.Relay'
+    isEnabled          = $true
+}) } | ConvertTo-Json -Depth 6 -Compress
+Set-Content -LiteralPath "$env:TEMP\relay-role.json" -Value $body -Encoding utf8 -NoNewline
+az rest --method PATCH --headers "Content-Type=application/json" --body "@$env:TEMP\relay-role.json" `
+    --url "https://graph.microsoft.com/v1.0/applications/$appObjectId"
+
+# Assign it to the relay's managed identity.
+$relayPrincipalId = azd env get-value EMAIL_RELAY_IDENTITY_PRINCIPAL_ID
+$apiSpId = az ad sp show --id $env:AZURE_ENTRA_API_CLIENT_ID --query id -o tsv
+$body = @{ principalId = $relayPrincipalId; resourceId = $apiSpId; appRoleId = $roleId } | ConvertTo-Json -Compress
+Set-Content -LiteralPath "$env:TEMP\relay-assign.json" -Value $body -Encoding utf8 -NoNewline
+az rest --method post --headers "Content-Type=application/json" --body "@$env:TEMP\relay-assign.json" `
+    --url "https://graph.microsoft.com/v1.0/servicePrincipals/$relayPrincipalId/appRoleAssignments"
+```
+
+The workflow already requests its token for `api://<AZURE_ENTRA_API_CLIENT_ID>`. Because the
+registration sets `requestedAccessTokenVersion: 2`, the issued `aud` is the bare client id,
+which is what `AzureEntra__Audience` validates.
+
+> **Assign the role before the relay's first call.** As with the Graph grant in §1.4, the
+> managed identity platform caches the token per resource URI for roughly 24 hours, and
+> `roles` is a claim inside it. A relay that called early keeps getting `403` until the
+> cached token expires.
+
+#### Step 2 — authorize the Office 365 connection
+
+The connection is provisioned unauthorized; OAuth consent cannot be scripted. Open
+**Resource group → `con-<environment-name>-office365` → Edit API connection**, sign in as
+the mailbox owner, and save. Until this is done every run fails at the trigger.
+
+The mailbox is whichever account authorizes the connection — it is not a Bicep parameter.
+Change mailboxes by re-authorizing as a different account.
+
+#### Verification
+
+```powershell
+$workflow = azd env get-value EMAIL_RELAY_WORKFLOW_NAME
+az logic workflow show -g $env:AZURE_RESOURCE_GROUP -n $workflow --query state -o tsv
+az rest --method get --query "value[].appRoleId" -o tsv `
+    --url "https://graph.microsoft.com/v1.0/servicePrincipals/$relayPrincipalId/appRoleAssignments"
+```
+
+Send a test email to the mailbox and watch the run history. `403` means the app role is
+missing or its token is still cached. `422 unknown_sender` means the message's `from`
+address has no matching `users.email` row — attribution comes from the sender address,
+never from the relay's own identity.
+
 ---
 
 ## 2. Deployment
@@ -336,11 +415,10 @@ which exercises the live release across five mandatory categories: `secure-reach
 public internet, so it proves only what such a caller can observe. It does not exercise
 authenticated data access, trip creation, or cross-user isolation.
 
-That is a consequence of the architecture, not an oversight. The API has internal-only
-ingress and is unreachable from a CI runner, and the web app is Blazor Server, so sessions
-are cookie-based rather than bearer — no external caller can obtain one. The two ways to
-close the gap are to give the API public ingress, or to add an endpoint that acts on a
-user's behalf; both widen the production attack surface more than the check is worth.
+That is a consequence of the architecture, not an oversight. The web app is Blazor Server,
+so sessions are cookie-based rather than bearer — no external caller can obtain one. The
+API is publicly reachable but only issues tokens to registered clients, so closing the gap
+would mean shipping a credential to CI.
 
 Authenticated behaviour is covered by `tests/TripPlanner.E2E.Tests` instead. Treat a green
 verification gate as "the release is serving and enforcing authentication", not as "the
@@ -584,7 +662,7 @@ a storage key, a registry password, or a Key Vault access policy.
 | `api` connects but migrations fail with `permission denied for schema public` | The API role exists but lacks `CREATE` on `public` | Re-apply the grants in §2.0 as the Entra administrator. |
 | `api` crashes on `000_init.sql` with `extension "pgcrypto" is not allow-listed` | The `azure.extensions` server parameter does not list `pgcrypto` | Re-run `azd provision` — `infra/postgres.bicep` sets it. The parameter is dynamic, so no restart is needed. |
 | `api` crashes on `000_init.sql` with `permission denied to create extension "pgcrypto"` | The extension is allow-listed but not yet created, and the API role has no `CREATE` on the database | Create it once as the Entra administrator (§2.0 step 4); `CREATE EXTENSION IF NOT EXISTS` then becomes a no-op. |
-| `web` is `Unhealthy` with `api-reachability` timing out after ~5s | `services__api__https__0` points at the bare app name instead of the API's internal ingress FQDN | The bare name is not covered by the ingress certificate, so the TLS handshake never completes. `infra/web.bicep` must pass `api.outputs.fqdn`. |
+| `web` is `Unhealthy` with `api-reachability` timing out after ~5s | `services__api__https__0` points at the bare app name instead of the API's ingress FQDN | The bare name is not covered by the ingress certificate, so the TLS handshake never completes. `infra/web.bicep` must pass `api.outputs.fqdn`. |
 | Database calls start failing ~1 hour after a long idle period | Entra access token expired and was not refreshed | The connection factory refreshes at 45 minutes. If this recurs, confirm `AZURE_CLIENT_ID` on `api` names the API identity so `DefaultAzureCredential` resolves the right one. |
 
 Role assignments are declared in `infra/rbac.bicep` and are idempotent. **Never grant a

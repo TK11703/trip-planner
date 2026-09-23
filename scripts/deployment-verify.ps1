@@ -14,12 +14,11 @@
     caller on the public internet can observe: that the site serves over HTTPS, reports
     itself live and ready, and challenges anonymous callers on protected routes.
 
-    It deliberately does not exercise authenticated data access. The API has internal-only
-    ingress and the web app is Blazor Server, so sessions are cookie-based rather than
-    bearer; no external caller can obtain one. Proving authenticated behaviour from here
-    would require either exposing the API publicly or adding a privileged endpoint that
-    acts on a user's behalf, and both trade away more than the check is worth. Authenticated
-    behaviour is covered by tests/TripPlanner.E2E.Tests instead.
+    It deliberately does not exercise authenticated data access. The web app is Blazor
+    Server, so sessions are cookie-based rather than bearer; no external caller can obtain
+    one. The API accepts public traffic but only issues tokens to registered clients, so
+    proving authenticated behaviour from here would require shipping a credential to CI.
+    Authenticated behaviour is covered by tests/TripPlanner.E2E.Tests instead.
 
 .PARAMETER ReleaseId
     Immutable release identifier, normally the full commit SHA.

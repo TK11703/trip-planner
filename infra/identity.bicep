@@ -1,5 +1,5 @@
-// Three user-assigned managed identities, one per trust boundary, so a compromised
-// workload cannot reach another workload's secrets. Role assignments live in rbac.bicep.
+// One user-assigned managed identity per trust boundary, so a compromised workload cannot
+// reach another workload's secrets. Azure role assignments live in rbac.bicep.
 param environmentName string
 param location string = resourceGroup().location
 param tags object = {}
@@ -25,6 +25,15 @@ resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-3
   tags: tags
 }
 
+// The email relay holds no Azure RBAC at all -- its only grant is the EmailIngestion.Relay
+// app role on the API registration. It lives here rather than in email-relay.bicep so that
+// grant survives the relay being toggled off and back on.
+resource relayIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-${environmentName}-relay'
+  location: location
+  tags: tags
+}
+
 output acrPull object = {
   id: acrPullIdentity.id
   principalId: acrPullIdentity.properties.principalId
@@ -42,4 +51,11 @@ output api object = {
   principalId: apiIdentity.properties.principalId
   clientId: apiIdentity.properties.clientId
   name: apiIdentity.name
+}
+
+output relay object = {
+  id: relayIdentity.id
+  principalId: relayIdentity.properties.principalId
+  clientId: relayIdentity.properties.clientId
+  name: relayIdentity.name
 }

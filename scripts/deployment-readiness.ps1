@@ -832,17 +832,18 @@ function Test-Security {
             'containerapp', 'list', '--resource-group', $ResourceGroup,
             '--query', '[?properties.configuration.ingress.external==`true`].name', '-o', 'json'))
 
-    $unexpected = @($externalApps | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") -and $_ -ne "ca-web-$EnvironmentName" })
+    $expectedExternal = @("ca-web-$EnvironmentName", "ca-api-$EnvironmentName")
+    $unexpected = @($externalApps | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") -and $_ -notin $expectedExternal })
 
     if ($unexpected.Count -eq 0) {
         Add-Check -Id 'security-public-network-exposure' -Category 'security' -Status 'pass' `
-            -Summary 'Only the web front end accepts public traffic; the API and database stay on internal ingress.' `
+            -Summary 'Only the web front end and the Entra-protected API accept public traffic; the database stays on internal ingress.' `
             -EvidenceReference "az containerapp list --resource-group $ResourceGroup"
     }
     else {
         Add-Check -Id 'security-public-network-exposure' -Category 'security' -Status 'fail' `
             -Summary "Unexpected internet-facing container app(s): $($unexpected -join ', ')." `
-            -CorrectiveAction "Set 'external: false' on those apps in infra/ and re-provision. Only the web front end should be publicly reachable."
+            -CorrectiveAction "Set 'external: false' on those apps in infra/ and re-provision. Only the web front end and the API should be publicly reachable."
     }
 }
 

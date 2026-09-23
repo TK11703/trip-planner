@@ -22,7 +22,7 @@ param dataProtectionBlobUri string
 @description('Key Vault key URI used to encrypt the data-protection key ring.')
 param dataProtectionKeyUri string
 
-@description('Internal ingress FQDN of the API container app, reached over the environment network.')
+@description('Ingress FQDN of the API container app.')
 param apiFqdn string
 
 param entraInstance string = environment().authentication.loginEndpoint

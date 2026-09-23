@@ -66,6 +66,12 @@ param azureOpenAiDeploymentName string = ''
 @description('Resource id of the Azure OpenAI account, used to scope the inference role assignment.')
 param azureOpenAiResourceId string = ''
 
+@description('Set to "true" to deploy the email ingestion relay. Opt-in because its Office 365 connection needs a manual OAuth consent before it works.')
+param emailRelayEnabled string = 'false'
+
+@description('Mail folder the relay polls for new messages.')
+param emailRelayFolderPath string = 'Inbox'
+
 @description('Monthly cost threshold in subscription currency. Blank disables the budget alert.')
 param budgetAmount string = ''
 
@@ -88,6 +94,9 @@ var postgresConnectionString = 'Host=${postgres.outputs.fqdn};Port=5432;Database
 // win over the parameter default.
 var effectiveApiScope = empty(entraApiScope) ? '${entraApiAudience}/access_as_user' : entraApiScope
 var effectiveOpenAiDeployment = empty(azureOpenAiDeploymentName) ? 'gpt-4o' : azureOpenAiDeploymentName
+var emailRelayOn = toLower(emailRelayEnabled) == 'true'
+var emailRelayWorkflowName = 'logic-${environmentName}-email-relay'
+var emailRelayConnectionName = 'con-${environmentName}-office365'
 
 module storage 'storage.bicep' = {
   name: 'storage'
@@ -224,6 +233,21 @@ module web 'web.bicep' = {
   ]
 }
 
+// Opt-in: the Office 365 connection ships unauthorized and needs a manual consent.
+module emailRelay 'email-relay.bicep' = if (emailRelayOn) {
+  name: 'email-relay'
+  params: {
+    location: location
+    tags: tags
+    workflowName: emailRelayWorkflowName
+    connectionName: emailRelayConnectionName
+    relayIdentityId: identity.outputs.relay.id
+    apiUri: 'https://${api.outputs.fqdn}'
+    apiResourceUri: 'api://${entraApiClientId}'
+    mailFolderPath: emailRelayFolderPath
+  }
+}
+
 // Skipped until the budget inputs are supplied.
 module budget 'budget.bicep' = if (!empty(budgetAmount) && !empty(budgetContact)) {
   name: 'budget'
@@ -251,9 +275,14 @@ output AZURE_OPENAI_DEPLOYMENT_NAME string = effectiveOpenAiDeployment
 output SERVICE_WEB_NAME string = web.outputs.name
 output SERVICE_WEB_URI string = web.outputs.url
 output SERVICE_API_NAME string = api.outputs.name
+output SERVICE_API_URI string = 'https://${api.outputs.fqdn}'
 output SERVICE_POSTGRES_NAME string = postgres.outputs.name
 output SERVICE_POSTGRES_FQDN string = postgres.outputs.fqdn
 output SERVICE_POSTGRES_DATABASE string = postgres.outputs.databaseName
 output WEB_IDENTITY_CLIENT_ID string = identity.outputs.web.clientId
 output API_IDENTITY_CLIENT_ID string = identity.outputs.api.clientId
 output API_IDENTITY_NAME string = identity.outputs.api.name
+output EMAIL_RELAY_IDENTITY_NAME string = identity.outputs.relay.name
+output EMAIL_RELAY_IDENTITY_PRINCIPAL_ID string = identity.outputs.relay.principalId
+output EMAIL_RELAY_WORKFLOW_NAME string = emailRelayOn ? emailRelayWorkflowName : ''
+output EMAIL_RELAY_CONNECTION_NAME string = emailRelayOn ? emailRelayConnectionName : ''
