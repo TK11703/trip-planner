@@ -507,6 +507,35 @@ public class InboxReviewPageTests : TestContext
         cut.WaitForAssertion(() => Assert.Equal(failed.InboxEmailId, Assert.Single(client.Reprocessed)));
     }
 
+    [Fact]
+    public void RefreshingInboxHistoryRefetchesFromTheApi()
+    {
+        var parsed = new InboxEmailDto(Guid.NewGuid(), "traveler@contoso.com", "Flight confirmation", DateTimeOffset.UtcNow, ParseStatus.Parsed);
+        var client = new StubInboxHistoryApiClient([parsed]);
+        Services.AddSingleton<IInboxHistoryApiClient>(client);
+
+        var cut = RenderComponent<InboxHistory>();
+        cut.WaitForAssertion(() => Assert.Equal(1, client.Fetches));
+
+        cut.FindAll("button").Single(b => b.TextContent.Contains("Refresh", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(2, client.Fetches));
+    }
+
+    [Fact]
+    public void RefreshingPendingDraftsRefetchesFromTheApi()
+    {
+        var client = new StubEmailIngestionApiClient([Draft(Guid.NewGuid(), Guid.NewGuid(), new DateTime(2026, 8, 12, 9, 30, 0))]);
+        Services.AddSingleton<IEmailIngestionApiClient>(client);
+
+        var cut = RenderComponent<InboxDrafts>();
+        cut.WaitForAssertion(() => Assert.Equal(1, client.Fetches));
+
+        cut.FindAll("button").Single(b => b.TextContent.Contains("Refresh", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(2, client.Fetches));
+    }
+
     private sealed class StubEmailIngestionApiClient(IReadOnlyList<ParsedItemDraftDto> drafts) : IEmailIngestionApiClient
     {
         private readonly List<ParsedItemDraftDto> _drafts = [.. drafts];
@@ -518,8 +547,13 @@ public class InboxReviewPageTests : TestContext
         /// <summary>Set to make the next save or confirm fail the way the API would.</summary>
         public ApiError? NextError { get; set; }
 
+        public int Fetches { get; private set; }
+
         public Task<IReadOnlyList<ParsedItemDraftDto>> GetDraftsAsync(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<ParsedItemDraftDto>>([.. _drafts]);
+        {
+            Fetches++;
+            return Task.FromResult<IReadOnlyList<ParsedItemDraftDto>>([.. _drafts]);
+        }
 
         public Task<DraftMutationResult<ParsedItemDraftDto>> UpdateDraftAsync(Guid draftId, UpdateParsedItemDraftRequest request, CancellationToken ct = default)
         {
@@ -576,8 +610,13 @@ public class InboxReviewPageTests : TestContext
     {
         public List<Guid> Reprocessed { get; } = [];
 
+        public int Fetches { get; private set; }
+
         public Task<IReadOnlyList<InboxEmailDto>> GetHistoryAsync(CancellationToken ct = default)
-            => Task.FromResult(items);
+        {
+            Fetches++;
+            return Task.FromResult(items);
+        }
 
         public Task<bool> ReprocessEmailAsync(Guid inboxEmailId, CancellationToken ct = default)
         {

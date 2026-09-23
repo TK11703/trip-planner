@@ -12,7 +12,10 @@
 <section class="inbox-drafts-page">
     <div class="d-flex align-items-center justify-content-between mb-3">
         <h1 class="mb-0">Review parsed items</h1>
-        <a class="btn btn-outline-secondary btn-sm" href="/inbox/history">Inbox history</a>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="LoadAsync" disabled="@(_isLoading || _isBusy)">Refresh</button>
+            <a class="btn btn-outline-secondary btn-sm" href="/inbox/history">Inbox history</a>
+        </div>
     </div>
 
     @if (_isLoading)

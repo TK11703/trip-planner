@@ -8,10 +8,13 @@
 <section class="notifications-page">
     <div class="d-flex align-items-center justify-content-between mb-3">
         <h1 class="mb-0">Notifications</h1>
-        @if (_notifications.Count > 0)
-        {
-            <button class="btn btn-outline-secondary btn-sm" @onclick="MarkAllReadAsync" disabled="@_isBusy">Mark all as read</button>
-        }
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="LoadAsync" disabled="@(_isLoading || _isBusy)">Refresh</button>
+            @if (_notifications.Count > 0)
+            {
+                <button class="btn btn-outline-secondary btn-sm" @onclick="MarkAllReadAsync" disabled="@_isBusy">Mark all as read</button>
+            }
+        </div>
     </div>
 
     @if (_isLoading)
