@@ -28,11 +28,22 @@
         <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
     }
 
-    <div class="d-flex gap-2 mt-4">
-        <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">@(IsEdit ? "Save trip" : "Create trip")</button>
-        @if (!string.IsNullOrWhiteSpace(CancelHref))
+    <div class="tp-modal-actions mt-4">
+        <div class="tp-modal-actions-start">
+            <button type="submit" class="btn btn-primary" disabled="@_isSubmitting"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save trip" : "Create trip")</button>
+        </div>
+        @if (OnCancel.HasDelegate || !string.IsNullOrWhiteSpace(CancelHref))
         {
-            <a class="btn btn-outline-secondary" href="@CancelHref">Cancel</a>
+            <div class="tp-modal-actions-end">
+                @if (OnCancel.HasDelegate)
+                {
+                    <button type="button" id="trip-cancel" class="btn btn-outline-secondary" disabled="@_isSubmitting" @onclick="OnCancel"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</button>
+                }
+                else
+                {
+                    <a class="btn btn-outline-secondary" href="@CancelHref"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</a>
+                }
+            </div>
         }
     </div>
 </EditForm>
@@ -50,6 +61,7 @@
     [Parameter] public TripFormModel Model { get; set; } = new();
     [Parameter] public bool IsEdit { get; set; }
     [Parameter] public string? CancelHref { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public EventCallback<TripFormModel> OnSubmit { get; set; }
 
     private bool _isSubmitting;

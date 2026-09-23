@@ -119,9 +119,7 @@ else if (_model is not null)
             </div>
         </div>
 
-        <div class="d-flex justify-content-end mt-4">
-            <button class="btn btn-primary" type="submit" disabled="@_isSaving"><ActionIcon Name="save" CssClass="me-1 align-text-bottom" />@(_isSaving ? "Saving..." : "Save profile")</button>
-        </div>
+        <button class="btn btn-primary mt-4" type="submit" disabled="@_isSaving"><ActionIcon Name="save" CssClass="me-1 align-text-bottom" />@(_isSaving ? "Saving..." : "Save profile")</button>
     </EditForm>
 }
 </section>

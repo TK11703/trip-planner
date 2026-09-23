@@ -353,17 +353,39 @@ public class TripLegFormTests : TestContext
 
     // --- Removing a leg ---
 
-    /// <summary>Save is the rightmost action, with Delete to its left, so the primary action is never buried.</summary>
+    /// <summary>Save leads the left action group, with the de-emphasized Delete beside it.</summary>
     [Fact]
-    public void DeleteSitsToTheLeftOfSave()
+    public void SaveLeadsTheLeftActionGroupWithDeleteBesideIt()
     {
         var cut = RenderEdit(TripLegModeTestData.StayLeg());
 
-        var actions = cut.Find("#leg-delete").ParentElement!.Children;
+        var actions = cut.Find(".tp-modal-actions-start").Children;
         Assert.Equal(2, actions.Length);
-        Assert.Equal("leg-delete", actions[0].Id);
-        Assert.Equal("submit", actions[1].GetAttribute("type"));
+        Assert.Equal("submit", actions[0].GetAttribute("type"));
+        Assert.Equal("leg-delete", actions[1].Id);
+        Assert.Contains("btn-sm", actions[1].ClassList);
         Assert.All(actions, button => Assert.NotNull(button.QuerySelector("svg")));
+    }
+
+    /// <summary>Cancel is opt-in: it only appears when a host (the modal) supplies a way to dismiss.</summary>
+    [Fact]
+    public void CancelSitsInTheRightActionGroupOnlyWhenTheHostHandlesIt()
+    {
+        Assert.Empty(RenderEdit(TripLegModeTestData.StayLeg()).FindAll("#leg-cancel"));
+
+        var cancelled = 0;
+        var leg = TripLegModeTestData.StayLeg();
+        var cut = RenderComponent<TripLegForm>(p => p
+            .Add(x => x.TripId, leg.TripId)
+            .Add(x => x.Leg, leg)
+            .Add(x => x.CanEditContent, true)
+            .Add(x => x.OnCancel, () => cancelled++));
+
+        var cancel = cut.Find(".tp-modal-actions-end #leg-cancel");
+        cancel.Click();
+
+        Assert.Equal(1, cancelled);
+        Assert.Empty(cut.FindAll(".tp-modal-actions-end [type=submit]"));
     }
 
     [Fact]

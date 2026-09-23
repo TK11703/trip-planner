@@ -190,12 +190,20 @@
     {
         <div class="alert alert-danger py-2 small">@_error</div>
     }
-    <div class="d-flex justify-content-end align-items-center gap-2">
-        @if (CanDelete)
+    <div class="tp-modal-actions">
+        <div class="tp-modal-actions-start">
+            <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save item" : "Add item")</button>
+            @if (CanDelete)
+            {
+                <button type="button" id="item-delete" class="btn btn-sm btn-outline-secondary tp-delete-action" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete item</button>
+            }
+        </div>
+        @if (OnCancel.HasDelegate)
         {
-            <button type="button" id="item-delete" class="btn btn-sm btn-outline-secondary tp-delete-action" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete item</button>
+            <div class="tp-modal-actions-end">
+                <button type="button" id="item-cancel" class="btn btn-outline-secondary" disabled="@(_submitting || _deleting)" @onclick="OnCancel"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</button>
+            </div>
         }
-        <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save item" : "Add item")</button>
     </div>
     @if (_confirmDelete)
     {
@@ -276,6 +284,7 @@
     [Parameter] public Guid? InitialTripLegId { get; set; }
     [Parameter] public DateTime? InitialStartsAt { get; set; }
     [Parameter] public EventCallback OnSaved { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
 
     // Only an owner or a collaborator may remove an item. Defaults to denied so a host that forgets
     // to pass it hides the action instead of offering one the API will reject.

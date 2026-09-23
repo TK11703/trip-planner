@@ -273,19 +273,19 @@ else
                                 <div class="alert alert-warning small" role="alert">
                                     Changing trip dates can leave existing legs or items outside the trip range. Review the calendar after saving.
                                 </div>
-                                <TripForm Model="_tripEditModel" IsEdit="true" OnSubmit="HandleTripEditAsync" />
+                                <TripForm Model="_tripEditModel" IsEdit="true" OnSubmit="HandleTripEditAsync" OnCancel="CloseModal" />
                                 break;
                             case ActiveModal.CreateLeg:
-                                <TripLegForm TripId="@TripId" TripStartDate="_trip.StartDate" TripEndDate="_trip.EndDate" OnSaved="HandleModalSavedAsync" />
+                                <TripLegForm TripId="@TripId" TripStartDate="_trip.StartDate" TripEndDate="_trip.EndDate" OnSaved="HandleModalSavedAsync" OnCancel="CloseModal" />
                                 break;
                             case ActiveModal.EditLeg:
-                                <TripLegForm TripId="@TripId" Leg="_editingLeg" TripStartDate="_trip.StartDate" TripEndDate="_trip.EndDate" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" />
+                                <TripLegForm TripId="@TripId" Leg="_editingLeg" TripStartDate="_trip.StartDate" TripEndDate="_trip.EndDate" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" OnCancel="CloseModal" />
                                 break;
                             case ActiveModal.CreateItem:
-                                <TrackedItemForm TripId="@TripId" Legs="_trip.Legs" InitialTripLegId="_initialItemLegId" InitialStartsAt="_initialItemStart" OnSaved="HandleModalSavedAsync" />
+                                <TrackedItemForm TripId="@TripId" Legs="_trip.Legs" InitialTripLegId="_initialItemLegId" InitialStartsAt="_initialItemStart" OnSaved="HandleModalSavedAsync" OnCancel="CloseModal" />
                                 break;
                             case ActiveModal.EditItem:
-                                <TrackedItemForm TripId="@TripId" Item="_editingItem" Legs="_trip.Legs" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" />
+                                <TrackedItemForm TripId="@TripId" Item="_editingItem" Legs="_trip.Legs" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" OnCancel="CloseModal" />
                                 break;
                         }
                     </div>
