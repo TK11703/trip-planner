@@ -148,6 +148,14 @@ public class TripLegFormTests : TestContext
         Assert.Empty(cut.FindAll("[data-testid=leg-item-restriction]"));
     }
 
+    [Fact]
+    public void NoModeChosen_ShowsNoRestrictionWarning()
+    {
+        var cut = RenderCreate();
+
+        Assert.Empty(cut.FindAll("[data-testid=leg-item-restriction]"));
+    }
+
     [Theory]
     [InlineData(TransportationModes.Flight)]
     [InlineData(TransportationModes.Train)]

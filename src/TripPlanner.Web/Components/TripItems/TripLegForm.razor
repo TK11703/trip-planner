@@ -125,7 +125,7 @@
         <label class="form-label">Notes</label>
         <InputTextArea class="form-control" rows="2" @bind-Value="_model.Notes" />
     </div>
-    @if (_model.Kind == LegKind.Travel && !_model.CanContainItems)
+    @if (_model.Kind == LegKind.Travel && TransportationModes.IsValid(_model.TransportationMode) && !_model.CanContainItems)
     {
         <div class="alert alert-warning py-2 small mb-2" role="note" data-testid="leg-item-restriction">
             You're a passenger on this leg, so you can't schedule stops along the way. Items belong on a stay or a car leg.
