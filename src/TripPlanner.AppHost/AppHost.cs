@@ -16,6 +16,22 @@ var api = builder.AddProject<Projects.TripPlanner_Api>("api", launchProfileName:
     .WithReference(tripPlannerDb)
     .WaitFor(tripPlannerDb);
 
+// Pin which developer credential the API authenticates Azure OpenAI with locally.
+//
+// DefaultAzureCredential tries VisualStudioCredential before AzureCliCredential, and Visual
+// Studio is frequently signed in as a different account than `az login`. It then returns a
+// perfectly valid token that the data plane rejects with a 401 — which reads as a broken
+// endpoint rather than the wrong identity, and is correspondingly slow to diagnose.
+//
+// `az login` is already the documented prerequisite for recognition, so the chain is reduced to
+// that one credential. Only the local run is affected: hosted deployments never run the AppHost
+// and continue to use managed identity. A developer who authenticates another way can override
+// this by exporting AZURE_TOKEN_CREDENTIALS themselves before starting.
+if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AZURE_TOKEN_CREDENTIALS")))
+{
+    api.WithEnvironment("AZURE_TOKEN_CREDENTIALS", "AzureCliCredential");
+}
+
 builder.AddProject<Projects.TripPlanner_Web>("web", launchProfileName: "https")
     .WithReference(api)
     .WaitFor(api);
