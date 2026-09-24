@@ -26,11 +26,18 @@ public sealed class StubTripApiClient : ITripApiClient
     /// </summary>
     public Exception? RecentFailure { get; set; }
 
+    /// <summary>
+    /// When set, <see cref="GetDetailAsync"/> throws it instead of returning a trip.
+    /// </summary>
+    public Exception? DetailFailure { get; set; }
+
     public Task<TripListResponse> GetTripsAsync(int page = 1, int pageSize = 12, CancellationToken ct = default) => Task.FromResult(new TripListResponse(_recent, page, pageSize, _recent.Count));
     public Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default) => RecentFailure is null
         ? Task.FromResult(_recent)
         : Task.FromException<IReadOnlyList<TripSummary>>(RecentFailure);
-    public Task<TripDetail?> GetDetailAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult(Details.TryGetValue(tripId, out var detail) ? detail : null);
+    public Task<TripDetail?> GetDetailAsync(Guid tripId, CancellationToken ct = default) => DetailFailure is not null
+        ? Task.FromException<TripDetail?>(DetailFailure)
+        : Task.FromResult(Details.TryGetValue(tripId, out var detail) ? detail : null);
     public Task<CreateTripResponse> CreateAsync(CreateTripRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<CreateTripResponse> UpdateAsync(Guid tripId, UpdateTripRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     public Task DeleteTripAsync(Guid tripId, CancellationToken ct = default) => throw new NotSupportedException();

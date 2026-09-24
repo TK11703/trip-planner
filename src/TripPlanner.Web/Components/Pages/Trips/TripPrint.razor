@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @layout PrintLayout
+@inherits ApiComponentBase
 @using TripPlanner.Web.Components.Trips
 @using TripPlanner.Web.Features.Trips
 @inject ITripApiClient TripApi
@@ -40,9 +41,12 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
-        _trip = await TripApi.GetDetailAsync(TripId);
+        _trip = null;
+        await CallApiAsync(
+            async () => _trip = await TripApi.GetDetailAsync(TripId),
+            _ => _trip = null);
         _printable = _trip is null ? null : TripPrintFormatting.BuildPrintableTrip(_trip);
-        _loading = false;
+        _loading = IsReauthenticating;
     }
 
     private async Task PrintAsync()

@@ -1,6 +1,7 @@
 @page "/trips/{TripId:guid}"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inherits ApiComponentBase
 @inject ITripApiClient TripApi
 @inject NavigationManager Nav
 @inject IJSRuntime JS
@@ -418,23 +419,21 @@ else
         {
             _loading = true;
         }
-        try
-        {
-            _trip = await TripApi.GetDetailAsync(TripId);
-            if (_trip is not null && _activeModal != ActiveModal.EditTrip)
+        await CallApiAsync(
+            async () =>
             {
-                PopulateTripEditModel();
-            }
-        }
-        catch
-        {
-            _trip = null;
-        }
-        finally
-        {
-            _loading = false;
-        }
-        if (_timeline is not null)
+                _trip = await TripApi.GetDetailAsync(TripId);
+                if (_trip is not null && _activeModal != ActiveModal.EditTrip)
+                {
+                    PopulateTripEditModel();
+                }
+            },
+            _ => _trip = null);
+
+        // A lost token cache sends the browser back through Entra; stay on "Loading" until it
+        // leaves rather than briefly claiming the trip does not exist.
+        _loading = IsReauthenticating;
+        if (_timeline is not null && !IsReauthenticating)
         {
             await _timeline.RefreshAsync();
         }

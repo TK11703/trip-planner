@@ -1,4 +1,5 @@
 @rendermode InteractiveServer
+@inherits ApiComponentBase
 @implements IDisposable
 @inject ThemeStateService ThemeState
 @inject IThemePreferenceApiClient ThemePreferenceApi
@@ -30,7 +31,15 @@
             // island) is responsible for syncing the applied theme into state on
             // load. Without this the toggle resets to its default after a refresh
             // while the page still shows the persisted theme.
-            await AccountThemeInitializer.InitializeAsync();
+            try
+            {
+                await AccountThemeInitializer.InitializeAsync();
+            }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException)
+            {
+                // The server-rendered theme is already on the page; a browser that went away or
+                // a script that is not ready yet must not take the whole circuit down with it.
+            }
 
             // Reveal the selector only after the applied theme is synced so the
             // active button doesn't visibly flip from Light to Dark on load.
@@ -41,9 +50,14 @@
 
     private async Task SetThemeAsync(TripPlanner.Contracts.Theme.ThemeMode mode)
     {
-        var response = await ThemePreferenceApi.SaveAsync(mode);
-        await ThemeState.ApplyAccountPreferenceAsync(response.ThemeMode);
-        _message = $"{response.ThemeMode} theme saved to your account.";
+        await CallApiAsync(
+            async () =>
+            {
+                var response = await ThemePreferenceApi.SaveAsync(mode);
+                await ThemeState.ApplyAccountPreferenceAsync(response.ThemeMode);
+                _message = $"{response.ThemeMode} theme saved to your account.";
+            },
+            _ => _message = "We couldn't save your theme preference. Please try again.");
     }
 
     public void Dispose() => ThemeState.Changed -= StateHasChanged;

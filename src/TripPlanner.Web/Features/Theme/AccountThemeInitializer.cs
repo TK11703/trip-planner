@@ -24,7 +24,19 @@ public sealed class AccountThemeInitializer
             return;
         }
 
-        var preference = await _client.GetAsync(cancellationToken);
+        TripPlanner.Contracts.Theme.ThemePreferenceResponse? preference;
+        try
+        {
+            preference = await _client.GetAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The theme is cosmetic and already applied from the cookie at first paint, so a lost
+            // token (e.g. the circuit resumed on a restarted process) or an API outage must not
+            // tear down the circuit. The page's own data calls handle re-authentication.
+            preference = null;
+        }
+
         if (preference is null)
         {
             await _themeState.InitializeFromBrowserAsync(cancellationToken);

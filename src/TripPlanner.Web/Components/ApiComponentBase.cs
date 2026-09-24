@@ -12,6 +12,12 @@ public abstract class ApiComponentBase : ComponentBase
     [Inject] protected IServiceProvider Services { get; set; } = default!;
 
     /// <summary>
+    /// <c>true</c> once a call has handed the browser back to Entra, so the component can keep
+    /// showing a neutral state instead of flashing an empty or "not found" view before it leaves.
+    /// </summary>
+    protected bool IsReauthenticating { get; private set; }
+
+    /// <summary>
     /// Runs an API call, routing a lost or stale access token back through Entra instead of
     /// showing the traveler a protocol error they cannot act on.
     /// </summary>
@@ -34,7 +40,11 @@ public abstract class ApiComponentBase : ComponentBase
         {
             // Resolved per call rather than injected, so component tests that never provoke a
             // challenge do not have to register the Entra consent stack in order to render.
-            if (Services.GetService<IApiChallengeHandler>()?.TryHandle(ex) != true)
+            if (Services.GetService<IApiChallengeHandler>()?.TryHandle(ex) == true)
+            {
+                IsReauthenticating = true;
+            }
+            else
             {
                 onError(ex.Message);
             }

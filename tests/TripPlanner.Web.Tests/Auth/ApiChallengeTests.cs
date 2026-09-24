@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Web;
+using TripPlanner.Web.Components.Pages.Trips;
 using TripPlanner.Web.Components.Trips;
 using TripPlanner.Web.Features.Authentication;
 using TripPlanner.Web.Features.Trips;
@@ -63,6 +64,51 @@ public class ApiChallengeTests : TestContext
         var cut = RenderComponent<RecentTripsList>();
 
         cut.WaitForAssertion(() => Assert.DoesNotContain("couldn't load your trips", cut.Markup, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TripDetailsChallengeStaysLoadingInsteadOfClaimingTheTripIsMissing()
+    {
+        // Returning to a tab whose circuit was resumed on a process that lost its token cache must
+        // hand off to sign-in, not tell the traveler their trip does not exist.
+        var challenge = NewChallenge();
+        var handler = new FakeChallengeHandler(handles: true);
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient { DetailFailure = challenge });
+        Services.AddSingleton<IApiChallengeHandler>(handler);
+
+        var cut = RenderComponent<TripDetails>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+
+        cut.WaitForAssertion(() => Assert.Same(challenge, handler.Received));
+        Assert.DoesNotContain("isn't available", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("Loading trip", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TripDetailsGenuineFailureStillShowsNotAvailable()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient { DetailFailure = new HttpRequestException("down") });
+        Services.AddSingleton<IApiChallengeHandler>(new FakeChallengeHandler(handles: false));
+
+        var cut = RenderComponent<TripDetails>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+
+        cut.WaitForAssertion(() => Assert.Contains("isn't available", cut.Markup, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TripPrintChallengeIsHandledRatherThanThrown()
+    {
+        var challenge = NewChallenge();
+        var handler = new FakeChallengeHandler(handles: true);
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient { DetailFailure = challenge });
+        Services.AddSingleton<IApiChallengeHandler>(handler);
+
+        var cut = RenderComponent<TripPrint>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+
+        cut.WaitForAssertion(() => Assert.Same(challenge, handler.Received));
+        Assert.DoesNotContain("isn't available", cut.Markup, StringComparison.Ordinal);
     }
 
     private void Arrange(Exception failure, FakeChallengeHandler? handler)
