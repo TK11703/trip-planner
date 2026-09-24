@@ -1,3 +1,4 @@
+using TripPlanner.Contracts.Common;
 using TripPlanner.Contracts.Notifications;
 using TripPlanner.Database.Notifications;
 using TripPlanner.Database.TripSharing;
@@ -24,29 +25,39 @@ public enum ItineraryChangeKind
 /// </summary>
 public interface IItineraryNotificationService
 {
+    /// <param name="entityId">The leg, item, or trip that changed. Forms the deduplication key.</param>
     Task NotifyChangeAsync(
         Guid tripId,
         string ownerUserId,
         string actorUserId,
         string? actorDisplayName,
         ItineraryChangeKind change,
+        Guid entityId,
         CancellationToken ct);
 }
 
 public sealed class ItineraryNotificationService : IItineraryNotificationService
 {
+    // A resent request or a double-clicked Save lands within seconds of the original. Bucketing the
+    // key by the minute lets the stored unique index on (recipient, source event key) collapse those,
+    // while a genuine later edit of the same entity still notifies.
+    private const long DeduplicationWindowSeconds = 60;
+
     private readonly INotificationService _notifications;
     private readonly ITripSharingRepository _sharing;
     private readonly IUserProfileRepository _profiles;
+    private readonly IClock _clock;
 
     public ItineraryNotificationService(
         INotificationService notifications,
         ITripSharingRepository sharing,
-        IUserProfileRepository profiles)
+        IUserProfileRepository profiles,
+        IClock clock)
     {
         _notifications = notifications;
         _sharing = sharing;
         _profiles = profiles;
+        _clock = clock;
     }
 
     public async Task NotifyChangeAsync(
@@ -55,6 +66,7 @@ public sealed class ItineraryNotificationService : IItineraryNotificationService
         string actorUserId,
         string? actorDisplayName,
         ItineraryChangeKind change,
+        Guid entityId,
         CancellationToken ct)
     {
         // Failure to notify must never fail the underlying itinerary change.
@@ -69,7 +81,7 @@ public sealed class ItineraryNotificationService : IItineraryNotificationService
             var actorName = string.IsNullOrWhiteSpace(actorDisplayName) ? "Someone" : actorDisplayName;
             var title = "A shared trip changed";
             var message = $"{actorName} {DescribeChange(change)}.";
-            var eventToken = Guid.NewGuid().ToString("N");
+            var window = _clock.UtcNow.ToUnixTimeSeconds() / DeduplicationWindowSeconds;
 
             foreach (var recipient in recipients)
             {
@@ -81,7 +93,7 @@ public sealed class ItineraryNotificationService : IItineraryNotificationService
                     RelatedTripId: tripId,
                     Title: title,
                     Message: message,
-                    SourceEventKey: $"itinerary-change:{change}:{tripId}:{recipient.UserId}:{eventToken}",
+                    SourceEventKey: $"itinerary-change:{change}:{tripId}:{entityId}:{recipient.UserId}:{window}",
                     RecipientEmail: recipient.Email), ct);
             }
         }

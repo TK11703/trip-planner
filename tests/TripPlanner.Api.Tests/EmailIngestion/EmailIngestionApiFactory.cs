@@ -449,7 +449,7 @@ internal sealed class RecordingItineraryNotificationService : IItineraryNotifica
         get { lock (_raised) { return _raised.ToArray(); } }
     }
 
-    public Task NotifyChangeAsync(Guid tripId, string ownerUserId, string actorUserId, string? actorDisplayName, ItineraryChangeKind change, CancellationToken ct)
+    public Task NotifyChangeAsync(Guid tripId, string ownerUserId, string actorUserId, string? actorDisplayName, ItineraryChangeKind change, Guid entityId, CancellationToken ct)
     {
         lock (_raised) { _raised.Add((tripId, change)); }
         return Task.CompletedTask;

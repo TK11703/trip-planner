@@ -88,7 +88,7 @@ public static class TripLegEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripLegCreate, "trip-leg", id.Value.ToString(), AuditResults.Success, clock.UtcNow, ct);
-        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegCreated, ct);
+        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegCreated, id.Value, ct);
         return TypedResults.Created($"/api/trips/{tripId}/legs/{id}");
     }
 
@@ -146,7 +146,7 @@ public static class TripLegEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
-        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegUpdated, ct);
+        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegUpdated, tripLegId, ct);
         return TypedResults.NoContent();
     }
 
@@ -178,7 +178,7 @@ public static class TripLegEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripLegDelete, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
-        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegDeleted, ct);
+        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegDeleted, tripLegId, ct);
         return TypedResults.NoContent();
     }
 }

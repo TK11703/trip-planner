@@ -54,7 +54,7 @@ public static class UpdateTripEndpoint
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripUpdate, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
-        await itineraryNotifications.NotifyChangeAsync(tripId, access.OwnerUserId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripUpdated, cancellationToken);
+        await itineraryNotifications.NotifyChangeAsync(tripId, access.OwnerUserId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripUpdated, tripId, cancellationToken);
         return TypedResults.Ok(new CreateTripResponse(tripId, request.Name, request.Description, request.StartDate, request.EndDate));
     }
 }

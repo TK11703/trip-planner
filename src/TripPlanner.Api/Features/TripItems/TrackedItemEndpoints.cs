@@ -69,7 +69,7 @@ public static class TrackedItemEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TrackedItemCreate, "tracked-item", id.Value.ToString(), AuditResults.Success, clock.UtcNow, ct);
-        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemCreated, ct);
+        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemCreated, id.Value, ct);
         return TypedResults.Created($"/api/trips/{tripId}/items/{id}");
     }
 
@@ -117,7 +117,7 @@ public static class TrackedItemEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TrackedItemUpdate, "tracked-item", trackedItemId.ToString(), AuditResults.Success, clock.UtcNow, ct);
-        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemUpdated, ct);
+        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemUpdated, trackedItemId, ct);
         return TypedResults.NoContent();
     }
 
@@ -140,7 +140,7 @@ public static class TrackedItemEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TrackedItemDelete, "tracked-item", trackedItemId.ToString(), AuditResults.Success, clock.UtcNow, ct);
-        await itineraryNotifications.NotifyChangeAsync(tripId, access.OwnerUserId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemDeleted, ct);
+        await itineraryNotifications.NotifyChangeAsync(tripId, access.OwnerUserId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemDeleted, trackedItemId, ct);
         return TypedResults.NoContent();
     }
 }

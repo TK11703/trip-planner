@@ -114,16 +114,25 @@ public static class ConfirmDraftEndpoint
         // itinerary entry traceable (FR-025).
         await draftRepository.SetReviewStatusAsync(id, callerId, "confirmed", createdId.Value, cancellationToken);
         await audit.RecordAsync(callerId, AuditOperations.TrackedItemCreate, "tracked-item", createdId.Value.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
-        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemCreated, cancellationToken);
+        await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemCreated, createdId.Value, cancellationToken);
 
         return TypedResults.Ok(new ConfirmParsedItemDraftResponse(createdId.Value, tripId, draft.TripLegId));
     }
 
+    /// <summary>
+    /// A draft holds either a recognizer type ("flight", "hotel", "car_rental", "other") or one of
+    /// the tracked types the traveler picked in the draft editor. A tracked type is honoured as
+    /// chosen; a recognizer type maps onto the closest one.
+    /// </summary>
     private static string NormalizeItemType(string? raw)
     {
-        return raw?.ToLowerInvariant() switch
+        var value = raw?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(value)) return TrackedItemTypes.Event;
+        if (TrackedItemTypes.All.Contains(value)) return value;
+
+        return value switch
         {
-            "flight" or "hotel" or "car_rental" or "activity" => TrackedItemTypes.Reservation,
+            "flight" or "hotel" or "car_rental" => TrackedItemTypes.Reservation,
             _ => TrackedItemTypes.Event
         };
     }
