@@ -1,5 +1,6 @@
 @inherits ApiComponentBase
 @using System.ComponentModel.DataAnnotations
+@using System.Globalization
 @using TripPlanner.Contracts.EmailIngestion
 @using TripPlanner.Contracts.Trips
 @using TripPlanner.Web.Features.EmailIngestion
@@ -38,7 +39,7 @@
 
                     <div class="mb-2">
                         <label class="form-label" for="draft-leg">Trip leg</label>
-                        <InputSelect id="draft-leg" class="form-select" @bind-Value="_model.TripLegId" disabled="@(_model.TripId is null || _loadingLegs)">
+                        <InputSelect id="draft-leg" class="form-select" @bind-Value="_model.TripLegId" @bind-Value:after="OnLegChanged" disabled="@(_model.TripId is null || _loadingLegs)">
                             <option value="">No trip leg yet</option>
                             @foreach (var leg in _legs)
                             {
@@ -75,11 +76,15 @@
                     <div class="row g-2 mb-2">
                         <div class="col-md-6">
                             <label class="form-label" for="draft-start">Start</label>
-                            <InputDate id="draft-start" Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.StartLocal" />
+                            <InputDate id="draft-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" step="1" @bind-Value="_model.StartLocal" />
                             <ValidationMessage For="@(() => _model.StartLocal)" />
                             @if (SelectedLeg is not null)
                             {
                                 <div class="form-text">Must fall within @SelectedLeg.Title: @LegWindowHint()</div>
+                            }
+                            else if (_tripStart is { } tripStart && _tripEnd is { } tripEnd)
+                            {
+                                <div class="form-text">Trip runs @tripStart.ToString("MMM d, yyyy") – @tripEnd.ToString("MMM d, yyyy")</div>
                             }
                             <label class="form-label mt-2" for="draft-start-tz">Start timezone</label>
                             <TimezoneSelect Id="draft-start-tz" @bind-Value="_model.StartTimeZoneId" Placeholder="Select a timezone" />
@@ -87,7 +92,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="draft-end">End</label>
-                            <InputDate id="draft-end" Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndLocal" />
+                            <InputDate id="draft-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" step="1" @bind-Value="_model.EndLocal" />
                             <ValidationMessage For="@(() => _model.EndLocal)" />
                             <label class="form-label mt-2" for="draft-end-tz">End timezone</label>
                             <TimezoneSelect Id="draft-end-tz" @bind-Value="_model.EndTimeZoneId" Placeholder="Same as start" />
@@ -189,6 +194,8 @@
     private DraftModel _model = new();
     private IReadOnlyList<TripSummary> _trips = Array.Empty<TripSummary>();
     private List<TripLegDto> _legs = new();
+    private DateOnly? _tripStart;
+    private DateOnly? _tripEnd;
     private bool _loadingLegs;
     private bool _saving;
     private string? _error;
@@ -228,12 +235,31 @@
         // is cleared before the new trip's legs arrive (FR-018).
         _model.TripLegId = null;
         await LoadLegsAsync();
+        SeedDatesFromWindow();
+    }
+
+    private void OnLegChanged()
+    {
+        // The parser's timezone came from the booking itself, so it only gives way to the leg's
+        // when the parser found none.
+        if (SelectedLeg is { } leg && string.IsNullOrWhiteSpace(_model.StartTimeZoneId))
+        {
+            _model.StartTimeZoneId = leg.StartTimeZoneId;
+            _model.EndTimeZoneId ??= leg.EndTimeZoneId;
+        }
+
+        ApplyLegWindow();
+        SeedDatesFromWindow();
     }
 
     private async Task LoadLegsAsync()
     {
         _legs.Clear();
         ApplyLegWindow();
+
+        var trip = _model.TripId is { } selected ? _trips.FirstOrDefault(t => t.TripId == selected) : null;
+        _tripStart = trip?.StartDate;
+        _tripEnd = trip?.EndDate;
 
         if (_model.TripId is not { } tripId) return;
 
@@ -281,6 +307,66 @@
         if (_model.LegStartUtc is not { } start || _model.LegEndUtc is not { } end) return string.Empty;
         var zoneId = _model.StartTimeZoneId;
         return $"{FormatBound(start, zoneId)} – {FormatBound(end, zoneId)}";
+    }
+
+    private const string PickerFormat = "yyyy-MM-ddTHH:mm:ss";
+
+    private string? EndZoneId => string.IsNullOrWhiteSpace(_model.EndTimeZoneId) ? _model.StartTimeZoneId : _model.EndTimeZoneId;
+
+    private string? StartMin => WindowStart(_model.StartTimeZoneId)?.ToString(PickerFormat, CultureInfo.InvariantCulture);
+    private string? StartMax => WindowEnd(_model.StartTimeZoneId)?.ToString(PickerFormat, CultureInfo.InvariantCulture);
+    private string? EndMin => WindowStart(EndZoneId)?.ToString(PickerFormat, CultureInfo.InvariantCulture);
+    private string? EndMax => WindowEnd(EndZoneId)?.ToString(PickerFormat, CultureInfo.InvariantCulture);
+
+    // A leg's window is the rule the API enforces; without a leg the trip's own dates are still
+    // the only sensible range to offer.
+    private DateTime? WindowStart(string? zoneId)
+        => _model.LegStartUtc is { } legStart
+            ? ToLocal(legStart, zoneId)
+            : _tripStart?.ToDateTime(TimeOnly.MinValue);
+
+    private DateTime? WindowEnd(string? zoneId)
+        => _model.LegEndUtc is { } legEnd
+            ? ToLocal(legEnd, zoneId)
+            : _tripEnd?.ToDateTime(new TimeOnly(23, 59, 59));
+
+    // A draft often carries no date at all, and an empty picker opens on today, which is almost
+    // never inside the trip just chosen. A leg window is enforced, so a date outside it is pulled
+    // in; a trip's dates are guidance only, so they seed an empty field and nothing more.
+    private void SeedDatesFromWindow()
+    {
+        var enforced = _model.LegStartUtc is not null;
+
+        if (WindowStart(_model.StartTimeZoneId) is { } startMin && WindowEnd(_model.StartTimeZoneId) is { } startMax)
+        {
+            _model.StartLocal = _model.StartLocal is { } start
+                ? (enforced ? Clamp(start, startMin, startMax) : start)
+                : startMin;
+        }
+
+        if (enforced
+            && _model.EndLocal is { } end
+            && WindowStart(EndZoneId) is { } endMin
+            && WindowEnd(EndZoneId) is { } endMax)
+        {
+            _model.EndLocal = Clamp(end, endMin, endMax);
+        }
+    }
+
+    private static DateTime Clamp(DateTime value, DateTime min, DateTime max)
+        => value < min ? min : value > max ? max : value;
+
+    private static DateTime? ToLocal(DateTimeOffset instant, string? timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId)) return null;
+        try
+        {
+            return TimeZoneInfo.ConvertTime(instant, TimeZoneInfo.FindSystemTimeZoneById(timeZoneId)).DateTime;
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return null;
+        }
     }
 
     private async Task SaveAsync()

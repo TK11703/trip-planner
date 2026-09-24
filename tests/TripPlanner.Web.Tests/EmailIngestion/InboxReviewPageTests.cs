@@ -328,6 +328,58 @@ public class InboxReviewPageTests : TestContext
         });
     }
 
+    // FR-020: the leg's window is the rule the API enforces, so the picker has to offer exactly
+    // that range — projected into the draft's own timezone, not the leg's.
+    [Fact]
+    public void SelectingALegBoundsTheDatePickersToItsWindow()
+    {
+        var tripId = Guid.NewGuid();
+        var leg = Leg(tripId, "San Francisco", 11, 14);
+        var draft = Draft(tripId, start: new DateTime(2026, 8, 12, 9, 30, 0));
+        var (cut, _, _) = RenderQueueWithEditableTrips(draft,
+            (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", leg)));
+
+        OpenEditModal(cut);
+        cut.Find("#draft-leg").Change(leg.TripLegId.ToString());
+
+        cut.WaitForAssertion(() =>
+        {
+            // The leg runs Aug 11 00:00 – Aug 14 23:59 UTC; the draft is in Pacific time.
+            var start = cut.Find("#draft-start");
+            Assert.Equal("2026-08-10T17:00:00", start.GetAttribute("min"));
+            Assert.Equal("2026-08-14T16:59:00", start.GetAttribute("max"));
+
+            var end = cut.Find("#draft-end");
+            Assert.Equal("2026-08-10T17:00:00", end.GetAttribute("min"));
+            Assert.Equal("2026-08-14T16:59:00", end.GetAttribute("max"));
+        });
+    }
+
+    // A parser that found no date leaves the picker sitting on today, which is never inside the
+    // trip the traveler then chooses. Choosing a placement seeds the window's start instead.
+    [Fact]
+    public void ChoosingATripAndLegSeedsAnUndatedDraftIntoThatWindow()
+    {
+        var tripId = Guid.NewGuid();
+        var leg = Leg(tripId, "San Francisco", 11, 14);
+        var (cut, _, _) = RenderQueueWithEditableTrips(Draft(),
+            (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", leg)));
+
+        OpenEditModal(cut);
+        Assert.True(string.IsNullOrEmpty(cut.Find("#draft-start").GetAttribute("value")));
+
+        cut.Find("#draft-trip").Change(tripId.ToString());
+        cut.WaitForAssertion(() => Assert.Contains("San Francisco", cut.Find("#draft-leg").InnerHtml, StringComparison.Ordinal));
+        cut.Find("#draft-leg").Change(leg.TripLegId.ToString());
+
+        cut.WaitForAssertion(() =>
+        {
+            var start = cut.Find("#draft-start");
+            Assert.Equal("2026-08-10T17:00:00", start.GetAttribute("min"));
+            Assert.Equal(start.GetAttribute("min"), start.GetAttribute("value"));
+        });
+    }
+
     // FR-003: a trip the traveler can only view is not a placement they could complete, so it
     // never appears in the picker.
     [Fact]
