@@ -1,0 +1,168 @@
+@using TripPlanner.Contracts.Common
+@using TripPlanner.Web.Features.Timezones
+@inherits InputBase<string>
+@inject ITimezoneOptionsProvider TimezoneOptions
+
+<div class="position-relative">
+    <input id="@Id" type="text" class="form-control @CssClass" autocomplete="off"
+           role="combobox" aria-autocomplete="list" aria-controls="@ListId" aria-expanded="@(_open ? "true" : "false")"
+           placeholder="@Placeholder" value="@_text"
+           @oninput="OnInput" @onfocus="OnFocus" @onfocusout="Close" @onkeydown="OnKeyDown" />
+    @if (_open)
+    {
+        <ul id="@ListId" class="list-group tp-option-list shadow-sm" role="listbox" aria-label="Timezones">
+            @if (_matches.Count == 0)
+            {
+                <li class="list-group-item small text-secondary">No timezone matches that search.</li>
+            }
+            @foreach (var match in _matches)
+            {
+                var option = match.Option;
+                var selected = string.Equals(option.Id, CurrentValue, StringComparison.Ordinal);
+                <li>
+                    <button type="button" class="list-group-item list-group-item-action text-start @(selected ? "active" : null)"
+                            role="option" aria-selected="@selected"
+                            @onmousedown:preventDefault="true"
+                            @onclick="() => Select(option)">
+                        <span class="d-block">@option.DisplayName</span>
+                        <span class="d-block small @(selected ? "opacity-75" : "text-secondary")">@option.Id · @option.CurrentOffsetLabel@(match.Alias is null ? null : $" · covers {match.Alias}")</span>
+                    </button>
+                </li>
+            }
+            @if (_truncated)
+            {
+                <li class="list-group-item small text-secondary">Keep typing to narrow these results.</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private const int MaxMatches = 50;
+
+    [Parameter] public string? Id { get; set; }
+
+    [Parameter] public string Placeholder { get; set; } = "Search by city, region, or offset…";
+
+    private sealed record Match(TimezoneOption Option, string? Alias);
+
+    private IReadOnlyList<TimezoneOption> _all = Array.Empty<TimezoneOption>();
+    private List<Match> _matches = new();
+    private string _text = string.Empty;
+    private string? _syncedValue;
+    private bool _open;
+    private bool _truncated;
+
+    private string ListId => $"{Id}-options";
+
+    protected override void OnInitialized() => _all = TimezoneOptions.GetOptions();
+
+    protected override void OnParametersSet()
+    {
+        // While the list is open the box holds the traveler's search text, not the selection.
+        if (!_open && !string.Equals(_syncedValue, CurrentValue, StringComparison.Ordinal))
+        {
+            _syncedValue = CurrentValue;
+            _text = LabelFor(CurrentValue);
+        }
+    }
+
+    protected override bool TryParseValueFromString(string? value, out string? result, out string validationErrorMessage)
+    {
+        result = value;
+        validationErrorMessage = string.Empty;
+        return true;
+    }
+
+    // Focus clears the box so a search starts on an empty field; Close puts the selection back.
+    private void OnFocus()
+    {
+        _text = string.Empty;
+        _open = true;
+        Filter(string.Empty);
+    }
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        _text = e.Value?.ToString() ?? string.Empty;
+        _open = true;
+        Filter(_text);
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Close();
+        }
+    }
+
+    private void Close()
+    {
+        _open = false;
+        _text = LabelFor(CurrentValue);
+    }
+
+    private void Select(TimezoneOption option)
+    {
+        CurrentValue = option.Id;
+        _syncedValue = option.Id;
+        _text = LabelFor(option.Id);
+        _open = false;
+    }
+
+    private void Filter(string query)
+    {
+        var trimmed = query.Trim();
+        IEnumerable<TimezoneOption> matches = trimmed.Length == 0
+            ? _all
+            : _all.Where(o => IsMatch(o, trimmed))
+                .OrderBy(o => Rank(o, trimmed))
+                .ThenBy(o => o.DisplayName, StringComparer.OrdinalIgnoreCase);
+        _matches = matches
+            .Take(MaxMatches + 1)
+            .Select(o => new Match(o, trimmed.Length == 0 ? null : AliasHit(o, trimmed)))
+            .ToList();
+        _truncated = _matches.Count > MaxMatches;
+        if (_truncated)
+        {
+            _matches.RemoveAt(MaxMatches);
+        }
+    }
+
+    // Only worth surfacing when the zone's own name doesn't already explain the hit.
+    private static string? AliasHit(TimezoneOption option, string query)
+        => option.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : TimezoneSearchAliases.For(option.Id).FirstOrDefault(a => a.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+    private static int Rank(TimezoneOption option, string query)
+        => string.Equals(option.Id, query, StringComparison.OrdinalIgnoreCase) ? 0
+        : option.Id.Contains(query, StringComparison.OrdinalIgnoreCase) ? 1
+        : 2;
+
+    private static bool IsMatch(TimezoneOption option, string query)
+        => option.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+        || option.Id.Contains(query, StringComparison.OrdinalIgnoreCase)
+        // Ids spell cities with underscores ("America/New_York"), so match what a traveler types.
+        || option.Id.Replace('_', ' ').Contains(query, StringComparison.OrdinalIgnoreCase)
+        || OffsetDigits(option).Contains(query, StringComparison.OrdinalIgnoreCase)
+        || TimezoneSearchAliases.For(option.Id).Any(a => a.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+    // Every offset label starts with "UTC", so only the signed part is worth searching.
+    private static string OffsetDigits(TimezoneOption option)
+        => option.CurrentOffsetLabel is { } label && label.StartsWith("UTC", StringComparison.Ordinal)
+            ? label[3..]
+            : option.CurrentOffsetLabel ?? string.Empty;
+
+    private string LabelFor(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return string.Empty;
+        }
+
+        var match = _all.FirstOrDefault(o => string.Equals(o.Id, id, StringComparison.Ordinal));
+        return match is null ? id : $"{match.DisplayName} ({match.Id})";
+    }
+}

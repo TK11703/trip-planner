@@ -361,7 +361,8 @@ public class InboxReviewPageTests : TestContext
         OpenEditModal(cut);
         cut.Find("#draft-title").Change("Flight ABC123 (corrected)");
         cut.Find("#draft-leg").Change(leg.TripLegId.ToString());
-        cut.Find("#draft-start-tz").Change("UTC");
+        cut.Find("#draft-start-tz").Input("UTC");
+        cut.Find(".tp-option-list button").Click();
         cut.Find("form").Submit();
 
         cut.WaitForAssertion(() =>
@@ -370,6 +371,7 @@ public class InboxReviewPageTests : TestContext
             Assert.Equal("Flight ABC123 (corrected)", request.Title);
             Assert.Equal(tripId, request.TripId);
             Assert.Equal(leg.TripLegId, request.TripLegId);
+            Assert.Equal("UTC", request.StartTimeZoneId);
         });
         cut.WaitForAssertion(() => Assert.DoesNotContain("Edit parsed item", cut.Markup, StringComparison.Ordinal));
     }

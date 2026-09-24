@@ -7,7 +7,6 @@
 @using TripPlanner.Web.Features.Timezones
 @inject IProfileApiClient ProfileApi
 @inject TripPlanner.Web.Features.Maps.IMapPreferenceProvider MapPreference
-@inject ITimezoneOptionsProvider TimezoneOptions
 
 <PageTitle>Profile</PageTitle>
 
@@ -58,13 +57,7 @@ else if (_model is not null)
             </div>
             <div class="col-md-6">
                 <label class="form-label" for="timeZoneId">Default timezone</label>
-                <InputSelect id="timeZoneId" class="form-select" @bind-Value="_model.TimeZoneId">
-                    <option value="">Select a timezone</option>
-                    @foreach (var option in TimezoneOptions.GetOptions())
-                    {
-                        <option value="@option.Id">@option.DisplayName (@option.Id)</option>
-                    }
-                </InputSelect>
+                <TimezoneSelect Id="timeZoneId" @bind-Value="_model.TimeZoneId" Placeholder="Select a timezone" />
                 <ValidationMessage For="@(() => _model.TimeZoneId)" />
             </div>
             <div class="col-md-6">

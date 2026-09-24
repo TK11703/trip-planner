@@ -1,7 +1,6 @@
 @inherits ApiComponentBase
 @using System.ComponentModel.DataAnnotations
 @inject ITripApiClient TripApi
-@inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
 
 <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName" class="d-flex flex-column overflow-hidden">
     <DataAnnotationsValidator />
@@ -86,24 +85,12 @@
     <div class="row g-2 mb-2">
         <div class="col-6">
             <label class="form-label" for="leg-start-timezone">Start timezone</label>
-            <InputSelect id="leg-start-timezone" class="form-select" @bind-Value="_model.StartTimeZoneId">
-                <option value="">Select a timezone</option>
-                @foreach (var option in TimezoneOptions.GetOptions())
-                {
-                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
-                }
-            </InputSelect>
+            <TimezoneSelect Id="leg-start-timezone" @bind-Value="_model.StartTimeZoneId" Placeholder="Select a timezone" />
             <ValidationMessage For="@(() => _model.StartTimeZoneId)" />
         </div>
         <div class="col-6">
             <label class="form-label" for="leg-end-timezone">End timezone</label>
-            <InputSelect id="leg-end-timezone" class="form-select" @bind-Value="_model.EndTimeZoneId">
-                <option value="">Select a timezone</option>
-                @foreach (var option in TimezoneOptions.GetOptions())
-                {
-                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
-                }
-            </InputSelect>
+            <TimezoneSelect Id="leg-end-timezone" @bind-Value="_model.EndTimeZoneId" Placeholder="Select a timezone" />
             <ValidationMessage For="@(() => _model.EndTimeZoneId)" />
         </div>
     </div>

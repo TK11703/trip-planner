@@ -341,8 +341,9 @@ body {
     justify-content: center;
 }
 
-/* Address typeahead suggestions dropdown under the location input. */
-.tp-place-suggestions {
+/* Filtered option lists that drop under a text input (address typeahead, timezone search). */
+.tp-place-suggestions,
+.tp-option-list {
     position: absolute;
     z-index: 1000;
     left: 0;
@@ -355,7 +356,8 @@ body {
     margin-bottom: 0;
 }
 
-.tp-place-suggestions .list-group-item-action {
+.tp-place-suggestions .list-group-item-action,
+.tp-option-list .list-group-item-action {
     cursor: pointer;
 }
 

@@ -49,6 +49,40 @@ public class TripLegFormTests : TestContext
         Assert.Equal("2026-09-06T14:00:00", cut.Find("#leg-end").GetAttribute("value"));
     }
 
+    // There are hundreds of zones, so the picker has to be searchable to be usable at all.
+    [Fact]
+    public void TypingInTheTimezoneBox_NarrowsTheListAndSelectsAMatch()
+    {
+        var cut = RenderCreate();
+
+        cut.Find("#leg-start-timezone").Input("Tokyo");
+
+        var options = cut.FindAll(".tp-option-list button");
+        Assert.All(options, o => Assert.Contains("Tokyo", o.TextContent, StringComparison.OrdinalIgnoreCase));
+
+        options[0].Click();
+
+        Assert.Contains("Asia/Tokyo", cut.Find("#leg-start-timezone").GetAttribute("value"));
+        Assert.Empty(cut.FindAll(".tp-option-list"));
+    }
+
+    // Zone names list only a couple of cities each, so most destinations need the alias table.
+    [Theory]
+    [InlineData("Seattle", "America/Los_Angeles")]
+    [InlineData("Boston", "America/New_York")]
+    [InlineData("Milan", "Europe/Berlin")]
+    [InlineData("Kyoto", "Asia/Tokyo")]
+    public void SearchingForACityNotInTheZoneName_StillFindsTheZone(string city, string expectedZoneId)
+    {
+        var cut = RenderCreate();
+
+        cut.Find("#leg-start-timezone").Input(city);
+        var first = cut.FindAll(".tp-option-list button")[0];
+
+        Assert.Contains(expectedZoneId, first.TextContent, StringComparison.Ordinal);
+        Assert.Contains($"covers {city}", first.TextContent, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void NewLeg_DefaultsToTripStartAndLimitsDatesToTripRange()
     {

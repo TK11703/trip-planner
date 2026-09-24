@@ -5,7 +5,6 @@
 @using TripPlanner.Web.Features.EmailIngestion
 @inject ITripApiClient TripApi
 @inject IEmailIngestionApiClient EmailIngestionApi
-@inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
 
 <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="draftEditTitle">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -83,13 +82,7 @@
                                 <div class="form-text">Must fall within @SelectedLeg.Title: @LegWindowHint()</div>
                             }
                             <label class="form-label mt-2" for="draft-start-tz">Start timezone</label>
-                            <InputSelect id="draft-start-tz" class="form-select" @bind-Value="_model.StartTimeZoneId">
-                                <option value="">Select a timezone</option>
-                                @foreach (var option in TimezoneOptions.GetOptions())
-                                {
-                                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
-                                }
-                            </InputSelect>
+                            <TimezoneSelect Id="draft-start-tz" @bind-Value="_model.StartTimeZoneId" Placeholder="Select a timezone" />
                             <ValidationMessage For="@(() => _model.StartTimeZoneId)" />
                         </div>
                         <div class="col-md-6">
@@ -97,13 +90,7 @@
                             <InputDate id="draft-end" Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="_model.EndLocal" />
                             <ValidationMessage For="@(() => _model.EndLocal)" />
                             <label class="form-label mt-2" for="draft-end-tz">End timezone</label>
-                            <InputSelect id="draft-end-tz" class="form-select" @bind-Value="_model.EndTimeZoneId">
-                                <option value="">Same as start</option>
-                                @foreach (var option in TimezoneOptions.GetOptions())
-                                {
-                                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
-                                }
-                            </InputSelect>
+                            <TimezoneSelect Id="draft-end-tz" @bind-Value="_model.EndTimeZoneId" Placeholder="Same as start" />
                         </div>
                     </div>
 

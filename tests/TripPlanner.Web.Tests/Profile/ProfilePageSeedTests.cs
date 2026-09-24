@@ -24,6 +24,6 @@ public class ProfilePageSeedTests : TestContext
         Assert.Equal("Avery", cut.Find("#firstName").GetAttribute("value"));
         Assert.Equal("Traveler", cut.Find("#lastName").GetAttribute("value"));
         Assert.Equal("avery@example.test", cut.Find("#email").GetAttribute("value"));
-        Assert.Equal("UTC", cut.Find("#timeZoneId").GetAttribute("value"));
+        Assert.Equal("Coordinated Universal Time (UTC)", cut.Find("#timeZoneId").GetAttribute("value"));
     }
 }

@@ -3,7 +3,6 @@
 @using TripPlanner.Contracts.Profile
 @inject ITripApiClient TripApi
 @inject TripPlanner.Web.Features.Maps.IMapPreferenceProvider MapPreference
-@inject TripPlanner.Web.Features.Timezones.ITimezoneOptionsProvider TimezoneOptions
 @implements IDisposable
 
 <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName" class="d-flex flex-column overflow-hidden">
@@ -110,13 +109,7 @@
                 </div>
             }
             <label class="form-label mt-2" for="item-start-timezone">Start timezone</label>
-            <InputSelect id="item-start-timezone" class="form-select" @bind-Value="_model.StartTimeZoneId">
-                <option value="">Select a timezone</option>
-                @foreach (var option in TimezoneOptions.GetOptions())
-                {
-                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
-                }
-            </InputSelect>
+            <TimezoneSelect Id="item-start-timezone" @bind-Value="_model.StartTimeZoneId" Placeholder="Select a timezone" />
             <ValidationMessage For="@(() => _model.StartTimeZoneId)" />
         </div>
         <div class="col-md-6">
@@ -141,13 +134,7 @@
                 </div>
             }
             <label class="form-label mt-2" for="item-end-timezone">End timezone</label>
-            <InputSelect id="item-end-timezone" class="form-select" @bind-Value="_model.EndTimeZoneId">
-                <option value="">Select a timezone</option>
-                @foreach (var option in TimezoneOptions.GetOptions())
-                {
-                    <option value="@option.Id">@option.DisplayName (@option.Id)</option>
-                }
-            </InputSelect>
+            <TimezoneSelect Id="item-end-timezone" @bind-Value="_model.EndTimeZoneId" Placeholder="Select a timezone" />
         </div>
     </div>
     <div class="mb-2">
