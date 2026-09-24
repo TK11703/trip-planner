@@ -35,18 +35,18 @@
                     <div class="mb-3">
                         <label class="form-label d-block">This booking is</label>
                         <div class="btn-group" role="group" aria-label="What this booking becomes">
-                            <input type="radio" class="btn-check" name="draft-outcome" id="draft-outcome-item"
-                                   checked="@(_model.Outcome == DraftOutcome.Item)"
-                                   @onchange="@(() => OnOutcomeChanged(DraftOutcome.Item))" />
-                            <label class="btn btn-outline-primary btn-sm" for="draft-outcome-item" data-testid="draft-outcome-item">
-                                Something on the itinerary
-                            </label>
-
                             <input type="radio" class="btn-check" name="draft-outcome" id="draft-outcome-leg"
                                    checked="@(_model.Outcome == DraftOutcome.Leg)"
                                    @onchange="@(() => OnOutcomeChanged(DraftOutcome.Leg))" />
                             <label class="btn btn-outline-primary btn-sm" for="draft-outcome-leg" data-testid="draft-outcome-leg">
                                 A trip leg
+                            </label>
+
+                            <input type="radio" class="btn-check" name="draft-outcome" id="draft-outcome-item"
+                                   checked="@(_model.Outcome == DraftOutcome.Item)"
+                                   @onchange="@(() => OnOutcomeChanged(DraftOutcome.Item))" />
+                            <label class="btn btn-outline-primary btn-sm" for="draft-outcome-item" data-testid="draft-outcome-item">
+                                Something on the itinerary
                             </label>
                         </div>
                         <div class="form-text">
