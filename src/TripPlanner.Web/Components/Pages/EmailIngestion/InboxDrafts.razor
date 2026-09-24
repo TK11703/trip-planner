@@ -40,11 +40,25 @@
                         <div class="d-flex justify-content-between align-items-start gap-3">
                             <div class="flex-grow-1">
                                 <div class="fw-semibold mb-1">@(draft.Title ?? draft.ItemType ?? "Untitled item")</div>
-                                @if (!string.IsNullOrWhiteSpace(draft.ItemType))
+                                @if (draft.ProposedOutcome == DraftOutcome.Leg)
+                                {
+                                    <span class="badge text-bg-primary me-1" data-testid="draft-outcome-badge">Trip leg</span>
+                                    @if (!string.IsNullOrWhiteSpace(draft.TransportationMode))
+                                    {
+                                        <span class="badge text-bg-secondary me-1">@TransportationModes.Label(draft.TransportationMode)</span>
+                                    }
+                                }
+                                else if (!string.IsNullOrWhiteSpace(draft.ItemType))
                                 {
                                     <span class="badge text-bg-secondary me-1">@draft.ItemType</span>
                                 }
-                                @if (!string.IsNullOrWhiteSpace(draft.Location))
+                                @if (draft.ProposedOutcome == DraftOutcome.Leg
+                                     && !string.IsNullOrWhiteSpace(draft.Origin)
+                                     && !string.IsNullOrWhiteSpace(draft.Destination))
+                                {
+                                    <div class="small text-secondary mt-1">@draft.Origin → @draft.Destination</div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(draft.Location))
                                 {
                                     <div class="small text-secondary mt-1">📍 @draft.Location</div>
                                 }
@@ -74,8 +88,9 @@
                                 }
 
                                 @* Where this item could go. The suggestion is advisory — nothing
-                                   reaches the timeline until the traveler confirms (FR-006). *@
-                                @if (draft.Placement is { } placement)
+                                   reaches the timeline until the traveler confirms (FR-006).
+                                   Suppressed for a leg outcome: a leg is not placed inside a leg. *@
+                                @if (draft.ProposedOutcome == DraftOutcome.Item && draft.Placement is { } placement)
                                 {
                                     @switch (placement.Status)
                                     {
@@ -236,9 +251,25 @@
 
     // A leg is optional — an item confirmed without one waits in the timeline's unassigned area.
     // A trip is not: an item has to belong somewhere (FR-011).
+    //
+    // A leg outcome asks a different question. It is never placed inside a leg, and it needs the
+    // end, the route, and the mode the API will demand, so offering Confirm before those exist
+    // would only produce a refusal the traveler cannot act on from here (FR-011, FR-031).
     private bool CanConfirm(ParsedItemDraftDto draft)
     {
         if (draft.StartLocal is null) return false;
+
+        if (draft.ProposedOutcome == DraftOutcome.Leg)
+        {
+            return draft.TripId is not null
+                && draft.EndLocal is not null
+                && !string.IsNullOrWhiteSpace(draft.StartTimeZoneId)
+                && !string.IsNullOrWhiteSpace(draft.EndTimeZoneId)
+                && !string.IsNullOrWhiteSpace(draft.TransportationMode)
+                && !string.IsNullOrWhiteSpace(draft.Origin)
+                && !string.IsNullOrWhiteSpace(draft.Destination);
+        }
+
         if (ChosenCandidate(draft) is not null) return true;
         return draft.TripId is not null;
     }
@@ -264,13 +295,23 @@
         {
             // The confirm endpoint acts on the draft's saved state, so the traveler's chosen
             // placement is written first — this click is the explicit action FR-006 requires.
+            //
+            // Every field has to be carried through, not just the placement: this request
+            // replaces the stored row, so omitting the outcome and the route would silently
+            // reset the draft to an item and discard the journey the traveler confirmed
+            // (FR-024, FR-025). A leg is never placed inside a leg, so this only ever runs for
+            // an item outcome, but the values are passed through regardless.
             var chosen = ChosenCandidate(draft);
-            if (chosen is not null && (draft.TripId != chosen.TripId || draft.TripLegId != chosen.TripLegId))
+            if (draft.ProposedOutcome == DraftOutcome.Item
+                && chosen is not null
+                && (draft.TripId != chosen.TripId || draft.TripLegId != chosen.TripLegId))
             {
                 var saved = await EmailIngestionApi.UpdateDraftAsync(draft.ParsedItemDraftId, new UpdateParsedItemDraftRequest(
                     chosen.TripId, chosen.TripLegId, draft.ItemType, draft.Title, draft.Location,
                     draft.StartLocal, draft.StartTimeZoneId, draft.EndLocal, draft.EndTimeZoneId,
-                    draft.ConfirmationCode, draft.Notes));
+                    draft.ConfirmationCode, draft.Notes,
+                    draft.ProposedOutcome, draft.Origin, draft.Destination,
+                    draft.TransportationMode, draft.TravelCost));
 
                 if (!saved.Succeeded)
                 {

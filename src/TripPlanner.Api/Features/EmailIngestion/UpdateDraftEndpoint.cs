@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using TripPlanner.Api.Security;
 using TripPlanner.Contracts.EmailIngestion;
 using TripPlanner.Contracts.Errors;
+using TripPlanner.Contracts.TripItems;
 using TripPlanner.Database.EmailIngestion;
 
 namespace TripPlanner.Api.Features.EmailIngestion;
@@ -46,10 +47,26 @@ public static class UpdateDraftEndpoint
                 return TypedResults.BadRequest(ApiError.ValidationFailed("That leg does not belong to the selected trip.", "tripLegId"));
         }
 
+        // A leg is not placed inside another leg, so a draft that proposes one carries no
+        // placement. Clearing it here keeps a stale choice from surviving an outcome switch
+        // (FR-024).
+        var tripLegId = request.ProposedOutcome == DraftOutcome.Leg ? null : request.TripLegId;
+
+        if (request.TransportationMode is { } mode
+            && !string.IsNullOrWhiteSpace(mode)
+            && !TransportationModes.IsValid(mode))
+        {
+            return TypedResults.BadRequest(ApiError.ValidationFailed(
+                "Choose how you are traveling: flight, train, bus, boat, or car.", "transportationMode"));
+        }
+
         var update = new DraftUpdate(
-            request.TripId, request.TripLegId, request.ItemType, request.Title, request.Location,
+            request.TripId, tripLegId, request.ItemType, request.Title, request.Location,
             request.StartLocal, request.StartTimeZoneId, request.EndLocal, request.EndTimeZoneId,
-            request.ConfirmationCode, request.Notes);
+            request.ConfirmationCode, request.Notes,
+            request.ProposedOutcome.ToPersisted(),
+            request.Origin, request.Destination,
+            TransportationModes.Normalize(request.TransportationMode), request.TravelCost);
 
         var record = await draftRepository.UpdateAsync(id, currentUser.UserId, update, cancellationToken);
         if (record is null) return TypedResults.NotFound();

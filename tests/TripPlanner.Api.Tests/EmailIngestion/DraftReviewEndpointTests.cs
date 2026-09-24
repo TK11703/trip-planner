@@ -150,6 +150,88 @@ public sealed class DraftReviewEndpointTests : IDisposable
         Assert.Equal(leg.TripLegId, stored.TripLegId);
     }
 
+    // FR-012, FR-022, FR-025: the route and the outcome are traveler-editable, and switching the
+    // outcome clears nothing — a misclassified booking has to be recoverable both ways.
+    [Fact]
+    public async Task EditingADraftPersistsTheRouteAndOutcome()
+    {
+        var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId);
+        var request = new UpdateParsedItemDraftRequest(
+            Guid.NewGuid(), null, "flight", "Flight ABC123", "SEA",
+            new DateTime(2026, 8, 12, 10, 0, 0), "America/Los_Angeles",
+            new DateTime(2026, 8, 12, 18, 0, 0), "America/New_York", "ABC123", null,
+            DraftOutcome.Leg, "SEA", "JFK", TransportationModes.Flight, 412.50m);
+
+        var response = await CreateTravelerClient().PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var stored = _factory.Drafts.Rows.Single();
+        Assert.Equal(DraftOutcomes.Leg, stored.ProposedOutcome);
+        Assert.Equal("SEA", stored.Origin);
+        Assert.Equal("JFK", stored.Destination);
+        Assert.Equal(TransportationModes.Flight, stored.TransportationMode);
+        Assert.Equal(412.50m, stored.TravelCost);
+    }
+
+    [Fact]
+    public async Task SwitchingTheOutcomeToItemLeavesTheRouteOnTheDraft()
+    {
+        var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId);
+        var client = CreateTravelerClient();
+
+        await client.PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", new UpdateParsedItemDraftRequest(
+            Guid.NewGuid(), null, "flight", "Flight ABC123", "SEA",
+            new DateTime(2026, 8, 12, 10, 0, 0), "America/Los_Angeles", null, null, "ABC123", null,
+            DraftOutcome.Leg, "SEA", "JFK", TransportationModes.Flight, 412.50m));
+
+        // Switching back to Item keeps every route value, so switching again restores them.
+        await client.PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", new UpdateParsedItemDraftRequest(
+            Guid.NewGuid(), null, "flight", "Flight ABC123", "SEA",
+            new DateTime(2026, 8, 12, 10, 0, 0), "America/Los_Angeles", null, null, "ABC123", null,
+            DraftOutcome.Item, "SEA", "JFK", TransportationModes.Flight, 412.50m));
+
+        var stored = _factory.Drafts.Rows.Single();
+        Assert.Equal(DraftOutcomes.Item, stored.ProposedOutcome);
+        Assert.Equal("SEA", stored.Origin);
+        Assert.Equal("JFK", stored.Destination);
+        Assert.Equal(TransportationModes.Flight, stored.TransportationMode);
+        Assert.Equal(412.50m, stored.TravelCost);
+    }
+
+    [Fact]
+    public async Task AnUnsupportedTransportationModeIsRefusedAgainstItsOwnField()
+    {
+        var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId);
+        var request = new UpdateParsedItemDraftRequest(
+            Guid.NewGuid(), null, "flight", "Flight ABC123", "SEA",
+            new DateTime(2026, 8, 12, 10, 0, 0), "America/Los_Angeles", null, null, "ABC123", null,
+            DraftOutcome.Leg, "SEA", "JFK", "spaceship", null);
+
+        var response = await CreateTravelerClient().PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<ApiError>(Web))!;
+        Assert.Equal("transportationMode", error.Details!["field"]);
+    }
+
+    // A leg is not placed inside another leg, so a leg outcome carries no placement (FR-024).
+    [Fact]
+    public async Task SwitchingToALegOutcomeClearsTheContainingLeg()
+    {
+        var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId);
+        var leg = CandidateLeg(12, 16);
+        _factory.Drafts.CandidateLegs.Add(leg);
+
+        var response = await CreateTravelerClient().PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}",
+            new UpdateParsedItemDraftRequest(
+                leg.TripId, leg.TripLegId, "flight", "Flight ABC123", "SEA",
+                new DateTime(2026, 8, 12, 10, 0, 0), "America/Los_Angeles", null, null, "ABC123", null,
+                DraftOutcome.Leg, "SEA", "JFK", TransportationModes.Flight, null));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(_factory.Drafts.Rows.Single().TripLegId);
+    }
+
     // Feature 024, FR-018: a leg from another trip would silently move the item somewhere the
     // traveler did not choose, so the edit is refused against the field that caused it.
     [Fact]

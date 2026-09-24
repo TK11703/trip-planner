@@ -245,25 +245,7 @@ public sealed partial class RelayMessageProcessor
     private partial void LogDraftsCreated(Guid inboxEmailId, string userId, int draftCount);
 
     private static string AssembleText(string subject, string? bodyText, string[] attachmentText)
-    {
-        var builder = new System.Text.StringBuilder();
-        if (!string.IsNullOrWhiteSpace(subject))
-        {
-            builder.Append("Subject: ").AppendLine(subject).AppendLine();
-        }
-
-        if (!string.IsNullOrWhiteSpace(bodyText))
-        {
-            builder.AppendLine(bodyText).AppendLine();
-        }
-
-        for (var i = 0; i < attachmentText.Length; i++)
-        {
-            builder.AppendLine($"--- Attachment {i + 1} ---").AppendLine(attachmentText[i]).AppendLine();
-        }
-
-        return builder.ToString().Trim();
-    }
+        => EmailTextAssembler.Assemble(subject, bodyText, attachmentText);
 
     private static RelayIngestionResult Error(int statusCode, string status, string detail)
         => new(statusCode, new IngestRelayMessageResponse(status, null, [], detail));

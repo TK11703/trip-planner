@@ -17,9 +17,51 @@
             <EditForm Model="_model" OnValidSubmit="SaveAsync" FormName="@($"draft-edit-{Draft.ParsedItemDraftId}")">
                 <DataAnnotationsValidator />
                 <div class="modal-body">
+                    @if (_reRecognizing)
+                    {
+                        <div class="alert alert-info py-2 small" role="status" data-testid="draft-re-recognizing">
+                            Checking this booking for travel details…
+                        </div>
+                    }
+
                     @if (_error is not null)
                     {
                         <div class="alert alert-danger py-2 small" role="alert">@_error</div>
+                    }
+
+                    @* Recognition proposes the outcome; the traveler decides it. A misclassified
+                       booking has to be recoverable in both directions, so this switches freely
+                       and nothing is cleared either way (FR-022, FR-024, FR-025). *@
+                    <div class="mb-3">
+                        <label class="form-label d-block">This booking is</label>
+                        <div class="btn-group" role="group" aria-label="What this booking becomes">
+                            <input type="radio" class="btn-check" name="draft-outcome" id="draft-outcome-item"
+                                   checked="@(_model.Outcome == DraftOutcome.Item)"
+                                   @onchange="@(() => OnOutcomeChanged(DraftOutcome.Item))" />
+                            <label class="btn btn-outline-primary btn-sm" for="draft-outcome-item" data-testid="draft-outcome-item">
+                                Something on the itinerary
+                            </label>
+
+                            <input type="radio" class="btn-check" name="draft-outcome" id="draft-outcome-leg"
+                                   checked="@(_model.Outcome == DraftOutcome.Leg)"
+                                   @onchange="@(() => OnOutcomeChanged(DraftOutcome.Leg))" />
+                            <label class="btn btn-outline-primary btn-sm" for="draft-outcome-leg" data-testid="draft-outcome-leg">
+                                A trip leg
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            A trip leg is how you get from one place to the next. Everything else — a hotel,
+                            a dinner, a ticket — belongs on the itinerary.
+                        </div>
+                    </div>
+
+                    @* Shown at the moment of the switch. Worded as "won't appear on" because
+                       nothing is erased: switching back restores every value (FR-026). *@
+                    @if (_carryNotice is not null)
+                    {
+                        <div class="alert alert-info py-2 small" role="note" data-testid="draft-carry-notice">
+                            @_carryNotice
+                        </div>
                     }
 
                     @* The traveler owns the placement: whatever the parser proposed can be
@@ -37,28 +79,78 @@
                         <ValidationMessage For="@(() => _model.TripId)" />
                     </div>
 
-                    <div class="mb-2">
-                        <label class="form-label" for="draft-leg">Trip leg</label>
-                        <InputSelect id="draft-leg" class="form-select" @bind-Value="_model.TripLegId" @bind-Value:after="OnLegChanged" disabled="@(_model.TripId is null || _loadingLegs)">
-                            <option value="">No trip leg yet</option>
-                            @foreach (var leg in _legs)
-                            {
-                                <option value="@leg.TripLegId">@leg.Title</option>
-                            }
-                        </InputSelect>
-                        <div class="form-text">Optional. An item saved without a leg waits in the trip's unassigned area.</div>
-                        <ValidationMessage For="@(() => _model.TripLegId)" />
-                    </div>
+                    @* A leg is not placed inside another leg, so the picker is meaningless for a
+                       leg outcome and is hidden rather than disabled. *@
+                    @if (_model.Outcome == DraftOutcome.Item)
+                    {
+                        <div class="mb-2">
+                            <label class="form-label" for="draft-leg">Trip leg</label>
+                            <InputSelect id="draft-leg" class="form-select" @bind-Value="_model.TripLegId" @bind-Value:after="OnLegChanged" disabled="@(_model.TripId is null || _loadingLegs)">
+                                <option value="">No trip leg yet</option>
+                                @foreach (var leg in _legs)
+                                {
+                                    <option value="@leg.TripLegId">@leg.Title</option>
+                                }
+                            </InputSelect>
+                            <div class="form-text">Optional. An item saved without a leg waits in the trip's unassigned area.</div>
+                            <ValidationMessage For="@(() => _model.TripLegId)" />
+                        </div>
+                    }
+
+                    @* Route and mode, laid out as TripLegForm lays them out. *@
+                    @if (_model.Outcome == DraftOutcome.Leg)
+                    {
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label" for="draft-mode">Travel Mode</label>
+                                <InputSelect id="draft-mode" class="form-select" @bind-Value="_model.TransportationMode">
+                                    <option value="">Select how you're traveling</option>
+                                    @foreach (var mode in TransportationModes.All)
+                                    {
+                                        <option value="@mode">@TransportationModes.Label(mode)</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="@(() => _model.TransportationMode)" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label" for="draft-travel-cost">
+                                    Cost <span class="text-body-secondary fw-normal">(optional)</span>
+                                    @if (!string.IsNullOrWhiteSpace(Draft.TravelCostCurrency))
+                                    {
+                                        <span class="badge text-bg-light ms-1" data-testid="draft-travel-cost-currency">@Draft.TravelCostCurrency</span>
+                                    }
+                                </label>
+                                <InputNumber id="draft-travel-cost" class="form-control" step="0.01" @bind-Value="_model.TravelCost" />
+                                <ValidationMessage For="@(() => _model.TravelCost)" />
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label" for="draft-origin">Origin</label>
+                                <InputText id="draft-origin" class="form-control" placeholder="@PlacePlaceholder" @bind-Value="_model.Origin" />
+                                <ValidationMessage For="@(() => _model.Origin)" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label" for="draft-destination">Destination</label>
+                                <InputText id="draft-destination" class="form-control" placeholder="@PlacePlaceholder" @bind-Value="_model.Destination" />
+                                <ValidationMessage For="@(() => _model.Destination)" />
+                            </div>
+                        </div>
+                    }
 
                     <div class="row g-2 mb-2">
                         <div class="col-5">
-                            <label class="form-label" for="draft-type">Type</label>
-                            <InputSelect id="draft-type" class="form-select" @bind-Value="_model.ItemType">
-                                <option value="activity">Activity</option>
-                                <option value="reservation">Reservation</option>
-                                <option value="event">Event</option>
-                                <option value="reminder">Reminder</option>
-                            </InputSelect>
+                            @if (_model.Outcome == DraftOutcome.Item)
+                            {
+                                <label class="form-label" for="draft-type">Type</label>
+                                <InputSelect id="draft-type" class="form-select" @bind-Value="_model.ItemType">
+                                    <option value="activity">Activity</option>
+                                    <option value="reservation">Reservation</option>
+                                    <option value="event">Event</option>
+                                    <option value="reminder">Reminder</option>
+                                </InputSelect>
+                            }
                         </div>
                         <div class="col-7">
                             <label class="form-label" for="draft-title">Title</label>
@@ -67,11 +159,14 @@
                         </div>
                     </div>
 
-                    <div class="mb-2">
-                        <label class="form-label" for="draft-location">Location</label>
-                        <InputText id="draft-location" class="form-control" @bind-Value="_model.Location" />
-                        <ValidationMessage For="@(() => _model.Location)" />
-                    </div>
+                    @if (_model.Outcome == DraftOutcome.Item)
+                    {
+                        <div class="mb-2">
+                            <label class="form-label" for="draft-location">Location</label>
+                            <InputText id="draft-location" class="form-control" @bind-Value="_model.Location" />
+                            <ValidationMessage For="@(() => _model.Location)" />
+                        </div>
+                    }
 
                     <div class="row g-2 mb-2">
                         <div class="col-md-6">
@@ -94,8 +189,20 @@
                             <label class="form-label" for="draft-end">End</label>
                             <InputDate id="draft-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" step="1" @bind-Value="_model.EndLocal" />
                             <ValidationMessage For="@(() => _model.EndLocal)" />
+                            @* No suggestion is offered for a missing end date/time. Every candidate
+                               would either be invented or produce a zero-length leg (research D5). *@
                             <label class="form-label mt-2" for="draft-end-tz">End timezone</label>
-                            <TimezoneSelect Id="draft-end-tz" @bind-Value="_model.EndTimeZoneId" Placeholder="Same as start" />
+                            <TimezoneSelect Id="draft-end-tz" @bind-Value="_model.EndTimeZoneId" Placeholder="@EndZonePlaceholder" />
+                            <ValidationMessage For="@(() => _model.EndTimeZoneId)" />
+                            @* Computed here in the browser from the start zone already bound to the
+                               model. No server path produces this value, so a leg can only ever
+                               carry an arrival zone the traveler saw and accepted (FR-034). *@
+                            @if (EndZoneSuggestion is { } suggested)
+                            {
+                                <DraftSuggestionRow Field="endTimeZoneId"
+                                                    Why="@($"The email didn't state an arrival time zone. Use the departure zone ({suggested})?")"
+                                                    OnAccept="@(() => AcceptEndZoneSuggestion(suggested))" />
+                            }
                         </div>
                     </div>
 
@@ -128,6 +235,15 @@
         // trip without a leg is a legitimate destination (FR-011).
         public Guid? TripId { get; set; }
         public Guid? TripLegId { get; set; }
+
+        /// <summary>What this draft becomes. Decides which details below are required.</summary>
+        public DraftOutcome Outcome { get; set; } = DraftOutcome.Item;
+
+        public string? TransportationMode { get; set; }
+        public string? Origin { get; set; }
+        public string? Destination { get; set; }
+        public decimal? TravelCost { get; set; }
+
         public string ItemType { get; set; } = "activity";
         [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
         public string? Location { get; set; }
@@ -158,6 +274,54 @@
             if (string.IsNullOrWhiteSpace(StartTimeZoneId))
             {
                 yield return new ValidationResult("Start timezone is required.", new[] { nameof(StartTimeZoneId) });
+            }
+
+            // A leg demands more than an item does. Every missing detail is yielded on this pass
+            // rather than one at a time, so the traveler sees the whole gap at once instead of
+            // being sent round the loop repeatedly (FR-029, FR-030, FR-031).
+            if (Outcome == DraftOutcome.Leg)
+            {
+                if (TripId is null)
+                {
+                    yield return new ValidationResult("Choose a trip before confirming this trip leg.", new[] { nameof(TripId) });
+                }
+
+                if (EndLocal is null)
+                {
+                    yield return new ValidationResult("End date and time is required for a trip leg.", new[] { nameof(EndLocal) });
+                }
+
+                if (string.IsNullOrWhiteSpace(EndTimeZoneId))
+                {
+                    yield return new ValidationResult("End timezone is required for a trip leg.", new[] { nameof(EndTimeZoneId) });
+                }
+
+                if (string.IsNullOrWhiteSpace(TransportationMode))
+                {
+                    yield return new ValidationResult("Choose how you are traveling: flight, train, bus, boat, or car.", new[] { nameof(TransportationMode) });
+                }
+
+                if (string.IsNullOrWhiteSpace(Origin))
+                {
+                    yield return new ValidationResult("Enter where this travel leg starts from.", new[] { nameof(Origin) });
+                }
+
+                if (string.IsNullOrWhiteSpace(Destination))
+                {
+                    yield return new ValidationResult("Enter where this travel leg arrives.", new[] { nameof(Destination) });
+                }
+
+                if (TravelCost is { } cost)
+                {
+                    if (cost < 0)
+                    {
+                        yield return new ValidationResult("Travel cost cannot be negative.", new[] { nameof(TravelCost) });
+                    }
+                    else if (decimal.Round(cost, 2) != cost)
+                    {
+                        yield return new ValidationResult("Enter a travel cost with up to two decimal places.", new[] { nameof(TravelCost) });
+                    }
+                }
             }
 
             // The leg's travel window binds an email-sourced item exactly as it binds a typed one
@@ -198,16 +362,104 @@
     private DateOnly? _tripEnd;
     private bool _loadingLegs;
     private bool _saving;
+    private bool _reRecognizing;
     private string? _error;
+    private string? _carryNotice;
+
+    /// <summary>
+    /// Fields the traveler filled in by hand this session. Used only to stop an accepted
+    /// suggestion from being offered again once it has been taken.
+    /// </summary>
+    private readonly HashSet<string> _travelerSupplied = new(StringComparer.Ordinal);
 
     private TripLegDto? SelectedLeg => _model.TripLegId is { } id ? _legs.FirstOrDefault(l => l.TripLegId == id) : null;
 
+    private string EndZonePlaceholder => _model.Outcome == DraftOutcome.Leg ? "Select a timezone" : "Same as start";
+
+    /// <summary>
+    /// The arrival zone worth proposing, or null when there is nothing to propose. Only offered
+    /// for a leg, only when the field is genuinely empty, and never once the traveler has
+    /// supplied one (FR-034).
+    /// </summary>
+    private string? EndZoneSuggestion
+        => _model.Outcome == DraftOutcome.Leg
+           && string.IsNullOrWhiteSpace(_model.EndTimeZoneId)
+           && !_travelerSupplied.Contains(nameof(DraftModel.EndTimeZoneId))
+           && !string.IsNullOrWhiteSpace(_model.StartTimeZoneId)
+            ? _model.StartTimeZoneId
+            : null;
+
+    private void AcceptEndZoneSuggestion(string zoneId)
+    {
+        _model.EndTimeZoneId = zoneId;
+        _travelerSupplied.Add(nameof(DraftModel.EndTimeZoneId));
+    }
+
+    private string PlacePlaceholder => _model.TransportationMode switch
+    {
+        TransportationModes.Flight => "Airport name or code, like IAD",
+        TransportationModes.Train => "Station name, city, or address",
+        TransportationModes.Bus => "Station or stop name, city, or address",
+        TransportationModes.Boat => "Port or terminal name, city, or address",
+        TransportationModes.Car => "Address, city, or place name",
+        _ => "Place name, city, or address"
+    };
+
+    /// <summary>
+    /// Switching outcome changes which fields apply but erases nothing, so the traveler can
+    /// switch back and find their work intact. The notice names what will not carry across
+    /// rather than warning about loss that does not happen (FR-025, FR-026).
+    /// </summary>
+    private void OnOutcomeChanged(DraftOutcome outcome)
+    {
+        if (_model.Outcome == outcome) return;
+
+        _model.Outcome = outcome;
+        _carryNotice = outcome == DraftOutcome.Item
+            ? "Origin, destination, travel mode, and cost won't appear on an itinerary item. They're kept in case you switch back."
+            : "The item type and the containing trip leg won't appear on a trip leg — a leg isn't placed inside another leg. They're kept in case you switch back.";
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        // A draft recognized before transport recognition existed carries none of the route
+        // detail, so it is re-read once, here, at the moment the traveler opens it. Never from the
+        // list: the queue is read on every visit and would otherwise charge every traveler for
+        // every draft each time (FR-045).
+        if (Draft.TransportRecognitionState == DraftRecognitionState.Pending)
+        {
+            _reRecognizing = true;
+            StateHasChanged();
+            try
+            {
+                if (await EmailIngestionApi.ReRecognizeDraftAsync(Draft.ParsedItemDraftId) is { } refreshed)
+                {
+                    Draft = refreshed;
+                }
+            }
+            catch
+            {
+                // Re-reading the email is a courtesy, not the traveler's action. They asked to
+                // open a draft, and the draft must open — with whatever it already held — no
+                // matter how this fails. Letting anything escape here tears down the circuit and
+                // leaves an empty form on screen, which is far worse than an un-enriched draft
+                // (FR-047).
+            }
+            finally
+            {
+                _reRecognizing = false;
+            }
+        }
+
         _model = new DraftModel
         {
             TripId = Draft.TripId,
             TripLegId = Draft.TripLegId,
+            Outcome = Draft.ProposedOutcome,
+            TransportationMode = Draft.TransportationMode,
+            Origin = Draft.Origin,
+            Destination = Draft.Destination,
+            TravelCost = Draft.TravelCost,
             ItemType = string.IsNullOrWhiteSpace(Draft.ItemType) ? "activity" : Draft.ItemType,
             Title = Draft.Title ?? string.Empty,
             Location = Draft.Location,
@@ -388,7 +640,8 @@
         var result = await EmailIngestionApi.UpdateDraftAsync(Draft.ParsedItemDraftId, new UpdateParsedItemDraftRequest(
             _model.TripId, _model.TripLegId, _model.ItemType, _model.Title, _model.Location,
             _model.StartLocal, _model.StartTimeZoneId, _model.EndLocal, _model.EndTimeZoneId,
-            _model.ConfirmationCode, _model.Notes));
+            _model.ConfirmationCode, _model.Notes,
+            _model.Outcome, _model.Origin, _model.Destination, _model.TransportationMode, _model.TravelCost));
 
         if (!result.Succeeded)
         {
@@ -414,7 +667,13 @@
         "startLocal" => "Start",
         "endLocal" => "End",
         "startTimeZoneId" => "Start timezone",
+        "endTimeZoneId" => "End timezone",
         "itemType" => "Type",
+        "proposedOutcome" => "This booking is",
+        "transportationMode" => "Travel Mode",
+        "origin" => "Origin",
+        "destination" => "Destination",
+        "travelCost" => "Cost",
         _ => field
     };
 

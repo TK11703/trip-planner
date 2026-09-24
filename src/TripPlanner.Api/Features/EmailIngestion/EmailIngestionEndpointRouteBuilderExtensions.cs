@@ -24,6 +24,7 @@ public static class EmailIngestionEndpointRouteBuilderExtensions
 
         group.MapGetDraftList();
         group.MapUpdateDraft();
+        group.MapReRecognizeDraft();
         group.MapConfirmDraft();
         group.MapDiscardDraft();
         group.MapGetInboxHistory();

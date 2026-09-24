@@ -36,7 +36,30 @@ internal static class EmailIngestionMapping
         record.Confidence,
         ParseReviewStatus(record.ReviewStatus),
         record.CreatedAtUtc,
-        placement);
+        placement,
+        ParseOutcome(record.ProposedOutcome),
+        record.Origin,
+        record.Destination,
+        record.TransportationMode,
+        record.TravelCost,
+        record.TravelCostCurrency,
+        record.CreatedTripLegId,
+        ParseRecognitionState(record.TransportRecognitionState));
+
+    /// <summary>The persisted outcome, defaulting to Item so an unreadable value cannot turn a
+    /// draft into a leg the traveler never asked for.</summary>
+    public static DraftOutcome ParseOutcome(string? value) =>
+        string.Equals(value, DraftOutcomes.Leg, StringComparison.Ordinal) ? DraftOutcome.Leg : DraftOutcome.Item;
+
+    public static string ToPersisted(this DraftOutcome outcome) =>
+        outcome == DraftOutcome.Leg ? DraftOutcomes.Leg : DraftOutcomes.Item;
+
+    private static DraftRecognitionState ParseRecognitionState(string? value) => value switch
+    {
+        DraftRecognitionStates.Pending => DraftRecognitionState.Pending,
+        DraftRecognitionStates.Unavailable => DraftRecognitionState.Unavailable,
+        _ => DraftRecognitionState.Current
+    };
 
     private static ParseStatus ParseParseStatus(string value) => value switch
     {

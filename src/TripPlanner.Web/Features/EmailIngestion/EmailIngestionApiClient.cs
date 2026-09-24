@@ -24,6 +24,12 @@ public interface IEmailIngestionApiClient
     Task<DraftMutationResult<ParsedItemDraftDto>> UpdateDraftAsync(Guid draftId, UpdateParsedItemDraftRequest request, CancellationToken ct = default);
     Task<DraftMutationResult<ConfirmParsedItemDraftResponse>> ConfirmDraftAsync(Guid draftId, CancellationToken ct = default);
     Task<bool> DiscardDraftAsync(Guid draftId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Asks the API to bring a draft recognized before transport recognition up to date. Returns
+    /// null when there is nothing to show; the caller keeps the draft it already had.
+    /// </summary>
+    Task<ParsedItemDraftDto?> ReRecognizeDraftAsync(Guid draftId, CancellationToken ct = default);
 }
 
 public sealed class EmailIngestionApiClient : IEmailIngestionApiClient
@@ -49,7 +55,28 @@ public sealed class EmailIngestionApiClient : IEmailIngestionApiClient
     public async Task<DraftMutationResult<ConfirmParsedItemDraftResponse>> ConfirmDraftAsync(Guid draftId, CancellationToken ct = default)
     {
         var response = await _http.PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", content: null, ct);
-        return await ReadResultAsync<ConfirmParsedItemDraftResponse>(response, "We couldn't add this item. Please try again.", ct);
+        return await ReadResultAsync<ConfirmParsedItemDraftResponse>(response, "We couldn't add this booking to your trip. Please try again.", ct);
+    }
+
+    /// <summary>
+    /// A best-effort refresh. Anything other than a usable answer leaves the caller with the
+    /// draft it already had, because the traveler asked to open a draft, not to re-read an email.
+    /// </summary>
+    public async Task<ParsedItemDraftDto?> ReRecognizeDraftAsync(Guid draftId, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await _http.PostAsync($"/api/email-ingestion/drafts/{draftId}/re-recognize", content: null, ct);
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<ParsedItemDraftDto>(cancellationToken: ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Every failure mode is the same to the caller: no refresh. A malformed body, a
+            // refused connection, a 500 — none of them are the traveler's problem, and none may
+            // interrupt opening the draft.
+            return null;
+        }
     }
 
     private static async Task<DraftMutationResult<T>> ReadResultAsync<T>(

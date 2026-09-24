@@ -128,9 +128,14 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton<EmailAttachmentTextExtractor>();
         builder.Services.AddSingleton<DraftPlacementMatcher>();
         builder.Services.AddScoped<EmailSenderResolver>();
-        builder.Services.AddSingleton<AzureOpenAIClient>(_ => CreateOpenAIClient(builder.Configuration));
+        builder.Services.AddSingleton<AzureOpenAIClient>(_ => CreateOpenAIClient(builder.Configuration, builder.Environment.IsDevelopment()));
         builder.Services.AddScoped<IItemRecognizer, EmailParserService>();
         builder.Services.AddScoped<RelayMessageProcessor>();
+
+        // A factory, not the recognizer itself: re-recognition must survive a provider that
+        // cannot even be constructed, and construction happens during resolution (FR-047).
+        builder.Services.AddScoped<Func<IItemRecognizer>>(sp => sp.GetRequiredService<IItemRecognizer>);
+        builder.Services.AddScoped<DraftReRecognitionService>();
 
         return builder;
     }
@@ -158,12 +163,23 @@ public static class WebApplicationBuilderExtensions
         return new DefaultAzureCredential(options);
     }
 
-    private static AzureOpenAIClient CreateOpenAIClient(ConfigurationManager configuration)
+    private static AzureOpenAIClient CreateOpenAIClient(ConfigurationManager configuration, bool isDevelopment)
     {
         // AzureOpenAI:Endpoint must be set; credential uses DefaultAzureCredential —
         // managed identity when hosted in Azure Container Apps, developer sign-in locally.
         var endpoint = configuration["AzureOpenAI:Endpoint"]
             ?? throw new InvalidOperationException("AzureOpenAI:Endpoint configuration is required for email parsing.");
-        return new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential());
+
+        // On a developer machine DefaultAzureCredential reaches VisualStudioCredential before
+        // AzureCliCredential, and Visual Studio is frequently signed in as a different account
+        // than `az login`. That credential then returns a perfectly valid token which the data
+        // plane rejects with a 401 — an outage that looks like a configuration error and costs
+        // an afternoon to trace. Excluding it locally makes `az login` the single source of
+        // developer identity. Hosted environments are untouched and still use managed identity.
+        var credential = isDevelopment
+            ? new DefaultAzureCredential(new DefaultAzureCredentialOptions { ExcludeVisualStudioCredential = true })
+            : new DefaultAzureCredential();
+
+        return new AzureOpenAIClient(new Uri(endpoint), credential);
     }
 }
