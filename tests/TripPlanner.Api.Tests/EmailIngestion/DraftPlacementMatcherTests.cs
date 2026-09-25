@@ -186,12 +186,53 @@ public class DraftPlacementMatcherTests
     [Fact]
     public void TripWithNoLegsPlanned_IsNoLegCovers()
     {
+        var trip = TripWithNoLegs(new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 20));
         var placement = NewMatcher().Match(
             Draft(new DateTime(2026, 8, 13, 15, 0, 0)),
-            new[] { TripWithNoLegs(new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 20)) });
+            new[] { trip });
 
         Assert.Equal(DraftPlacementStatus.NoLegCovers, placement.Status);
+        Assert.Equal(trip.TripId, placement.SuggestedTripId);
+        Assert.Equal(trip.TripName, placement.SuggestedTripName);
         Assert.Empty(placement.Candidates);
+    }
+
+    [Fact]
+    public void ProposedLegCoveredByTwoTrips_SuggestsTheNarrowerTrip()
+    {
+        var wider = TripWithNoLegs(new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 20));
+        var narrower = TripWithNoLegs(new DateOnly(2026, 8, 12), new DateOnly(2026, 8, 16));
+        var draft = Draft(
+            new DateTime(2026, 8, 13, 15, 0, 0),
+            endLocal: new DateTime(2026, 8, 15, 15, 0, 0)) with
+        {
+            ProposedOutcome = DraftOutcomes.Leg
+        };
+
+        var placement = NewMatcher().Match(
+            draft,
+            new[] { wider, narrower });
+
+        Assert.Equal(DraftPlacementStatus.NoLegCovers, placement.Status);
+        Assert.Equal(narrower.TripId, placement.SuggestedTripId);
+        Assert.Equal(narrower.TripName, placement.SuggestedTripName);
+    }
+
+    [Fact]
+    public void ProposedLegEndingAfterATrip_DoesNotSuggestThatTrip()
+    {
+        var trip = TripWithNoLegs(new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 14));
+        var draft = Draft(
+            new DateTime(2026, 8, 13, 15, 0, 0),
+            endLocal: new DateTime(2026, 8, 15, 15, 0, 0)) with
+        {
+            ProposedOutcome = DraftOutcomes.Leg
+        };
+
+        var placement = NewMatcher().Match(draft, new[] { trip });
+
+        Assert.Equal(DraftPlacementStatus.OutsideTripDates, placement.Status);
+        Assert.Null(placement.SuggestedTripId);
     }
 
     /// <summary>

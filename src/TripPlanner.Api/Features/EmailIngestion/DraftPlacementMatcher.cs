@@ -37,6 +37,25 @@ public sealed class DraftPlacementMatcher
 
         var start = TripInstant.ToInstant(startLocal, startZone);
 
+        // Trip dates are calendar dates, so they are matched against the parsed local date rather
+        // than an instant. A unique trip can be suggested even when it has no existing legs yet.
+        var localDate = DateOnly.FromDateTime(startLocal);
+        var localEndDate = DateOnly.FromDateTime(draft.EndLocal ?? startLocal);
+        var isLegProposal = string.Equals(draft.ProposedOutcome, DraftOutcomes.Leg, StringComparison.Ordinal);
+        var matchingTrips = candidateLegs
+            .Where(candidate => localDate >= candidate.TripStart
+                && localDate <= candidate.TripEnd
+                && (!isLegProposal || localEndDate <= candidate.TripEnd))
+            .DistinctBy(candidate => candidate.TripId)
+            .ToArray();
+        var suggestedTrip = isLegProposal
+            ? matchingTrips
+                .OrderBy(candidate => candidate.TripEnd.DayNumber - candidate.TripStart.DayNumber)
+                .ThenByDescending(candidate => candidate.TripStart)
+                .ThenBy(candidate => candidate.TripId)
+                .FirstOrDefault()
+            : matchingTrips.Length == 1 ? matchingTrips[0] : null;
+
         DateTimeOffset? end = null;
         if (draft.EndLocal is { } endLocal)
         {
@@ -51,19 +70,23 @@ public sealed class DraftPlacementMatcher
             .ToArray();
 
         if (matches.Length == 1)
-            return new DraftPlacement(DraftPlacementStatus.Matched, matches[0].TripId, matches[0].TripLegId, matches);
+            return new DraftPlacement(DraftPlacementStatus.Matched, matches[0].TripId, matches[0].TripLegId, matches, matches[0].TripName);
         if (matches.Length > 1)
-            return new DraftPlacement(DraftPlacementStatus.Ambiguous, null, null, matches);
+            return new DraftPlacement(
+                DraftPlacementStatus.Ambiguous,
+                suggestedTrip?.TripId,
+                null,
+                matches,
+                suggestedTrip?.TripName);
 
         // No leg fits. Whether that is a gap the traveler can live with or a sign the email has
         // nothing to do with any planned trip depends on the trips' own dates (FR-009, FR-010).
         // Trips are planned in calendar dates, so the draft is judged by its local date here.
-        var localDate = DateOnly.FromDateTime(startLocal);
-        var insideATrip = candidateLegs.Any(leg => localDate >= leg.TripStart && localDate <= leg.TripEnd);
+        var insideATrip = matchingTrips.Length > 0;
 
         return new DraftPlacement(
             insideATrip ? DraftPlacementStatus.NoLegCovers : DraftPlacementStatus.OutsideTripDates,
-            null, null, None);
+            suggestedTrip?.TripId, null, None, suggestedTrip?.TripName);
     }
 
     /// <summary>A leg covers a draft when the whole draft falls inside the leg's travel window.

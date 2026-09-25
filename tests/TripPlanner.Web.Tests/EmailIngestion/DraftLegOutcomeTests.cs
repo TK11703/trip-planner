@@ -30,12 +30,14 @@ public class DraftLegOutcomeTests : TestContext
         string? mode = TransportationModes.Flight,
         bool omitEnd = false,
         decimal? travelCost = 412.50m,
-        string? currency = "USD") =>
-        new(Guid.NewGuid(), Guid.NewGuid(), TripId, null, "flight", "Flight ABC123", "SEA",
+        string? currency = "USD",
+        bool unassigned = false,
+        DraftPlacement? placement = null) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), unassigned ? null : TripId, null, "flight", "Flight ABC123", "SEA",
             new DateTime(2026, 8, 12, 9, 30, 0), "America/Los_Angeles",
             omitEnd ? null : DefaultEnd, endZone,
             "ABC123", null, 0.92,
-            ReviewStatus.PendingReview, DateTimeOffset.UtcNow, null,
+            ReviewStatus.PendingReview, DateTimeOffset.UtcNow, placement,
             DraftOutcome.Leg, origin, destination, mode, travelCost, currency, null,
             DraftRecognitionState.Current);
 
@@ -78,6 +80,53 @@ public class DraftLegOutcomeTests : TestContext
     {
         cut.FindAll("button").Single(b => b.TextContent.Trim() == "Edit").Click();
         cut.WaitForAssertion(() => Assert.Contains("Edit parsed item", cut.Markup, StringComparison.Ordinal));
+    }
+
+    private static DraftPlacement SuggestedTripPlacement()
+        => new(DraftPlacementStatus.NoLegCovers, TripId, null, [], "West Coast");
+
+    [Fact]
+    public void AProposedLegWithAUniqueDateRangeTripIsReadyToConfirm()
+    {
+        var (cut, ingestion) = RenderQueue(LegDraft(unassigned: true, placement: SuggestedTripPlacement()));
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Will be added to", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("West Coast", cut.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("Assign this item", cut.Markup, StringComparison.Ordinal);
+            Assert.False(cut.FindAll("button").Single(button => button.TextContent.Trim() == "Confirm").HasAttribute("disabled"));
+        });
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Confirm").Click();
+
+        cut.WaitForAssertion(() => Assert.Single(ingestion.Updated));
+        Assert.Equal(TripId, ingestion.Updated[0].Request.TripId);
+        Assert.Null(ingestion.Updated[0].Request.TripLegId);
+    }
+
+    [Fact]
+    public void EditingAProposedLegPreselectsItsSuggestedTrip()
+    {
+        var (cut, _) = RenderQueue(LegDraft(unassigned: true, placement: SuggestedTripPlacement()));
+
+        OpenEditModal(cut);
+
+        cut.WaitForAssertion(() => Assert.Equal(TripId.ToString(), cut.Find("#draft-trip").GetAttribute("value")));
+    }
+
+    [Fact]
+    public void AProposedLegWithoutAUniqueTripDirectsTheTravelerToEdit()
+    {
+        var placement = new DraftPlacement(DraftPlacementStatus.NoLegCovers, null, null, []);
+        var (cut, _) = RenderQueue(LegDraft(unassigned: true, placement: placement));
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Assign this trip leg to a trip", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Use Edit", cut.Markup, StringComparison.Ordinal);
+            Assert.True(cut.FindAll("button").Single(button => button.TextContent.Trim() == "Confirm").HasAttribute("disabled"));
+        });
     }
 
     [Fact]

@@ -44,7 +44,8 @@ public sealed record DraftPlacement(
     DraftPlacementStatus Status,
     Guid? SuggestedTripId,
     Guid? SuggestedTripLegId,
-    IReadOnlyList<PlacementCandidate> Candidates);
+    IReadOnlyList<PlacementCandidate> Candidates,
+    string? SuggestedTripName = null);
 
 /// <summary>
 /// What a draft proposes to become when it is confirmed. Recognition proposes it, the traveler

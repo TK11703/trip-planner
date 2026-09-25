@@ -87,7 +87,7 @@
                                     <div class="alert alert-danger mt-2 py-1 px-2 small" role="alert" data-draft-error="@draft.ParsedItemDraftId">@draftError</div>
                                 }
 
-                                @* Where this item could go. The suggestion is advisory — nothing
+                                          @* Where this item could go. The suggestion is advisory — nothing
                                    reaches the timeline until the traveler confirms (FR-006).
                                    Suppressed for a leg outcome: a leg is not placed inside a leg. *@
                                 @if (draft.ProposedOutcome == DraftOutcome.Item && draft.Placement is { } placement)
@@ -143,10 +143,24 @@
                                             break;
                                     }
                                 }
-                                else if (draft.TripId is null)
+                                else if (draft.ProposedOutcome == DraftOutcome.Item && draft.TripId is null)
                                 {
                                     <div class="alert alert-warning mt-2 py-1 px-2 small" role="alert">
                                         Assign this item to a trip before confirming.
+                                    </div>
+                                }
+                                @if (draft.ProposedOutcome == DraftOutcome.Leg
+                                     && draft.TripId is null
+                                     && draft.Placement?.SuggestedTripId is not null)
+                                {
+                                    <div class="alert alert-success mt-2 py-1 px-2 small" role="status" data-placement="trip-matched">
+                                        Will be added to <strong>@draft.Placement.SuggestedTripName</strong>, whose dates cover this trip leg.
+                                    </div>
+                                }
+                                else if (draft.ProposedOutcome == DraftOutcome.Leg && draft.TripId is null)
+                                {
+                                    <div class="alert alert-warning mt-2 py-1 px-2 small" role="alert" data-placement="trip-ambiguous">
+                                        Assign this trip leg to a trip before confirming. Use Edit to choose the right trip.
                                     </div>
                                 }
                             </div>
@@ -157,7 +171,7 @@
                                     Confirm
                                 </button>
                                 <button class="btn btn-sm btn-outline-secondary"
-                                        @onclick="() => _editing = draft"
+                                    @onclick="() => _editing = WithSuggestedTrip(draft)"
                                         disabled="@_isBusy">
                                     Edit
                                 </button>
@@ -249,6 +263,11 @@
         return placement.Candidates.FirstOrDefault(c => c.TripLegId == legId);
     }
 
+    private static ParsedItemDraftDto WithSuggestedTrip(ParsedItemDraftDto draft)
+        => draft.TripId is null && draft.Placement?.SuggestedTripId is { } tripId
+            ? draft with { TripId = tripId }
+            : draft;
+
     // A leg is optional — an item confirmed without one waits in the timeline's unassigned area.
     // A trip is not: an item has to belong somewhere (FR-011).
     //
@@ -261,7 +280,7 @@
 
         if (draft.ProposedOutcome == DraftOutcome.Leg)
         {
-            return draft.TripId is not null
+            return (draft.TripId is not null || draft.Placement?.SuggestedTripId is not null)
                 && draft.EndLocal is not null
                 && !string.IsNullOrWhiteSpace(draft.StartTimeZoneId)
                 && !string.IsNullOrWhiteSpace(draft.EndTimeZoneId)
@@ -302,12 +321,14 @@
             // (FR-024, FR-025). A leg is never placed inside a leg, so this only ever runs for
             // an item outcome, but the values are passed through regardless.
             var chosen = ChosenCandidate(draft);
-            if (draft.ProposedOutcome == DraftOutcome.Item
-                && chosen is not null
-                && (draft.TripId != chosen.TripId || draft.TripLegId != chosen.TripLegId))
+            var suggestedTripId = draft.TripId ?? draft.Placement?.SuggestedTripId;
+            var targetTripId = chosen?.TripId ?? suggestedTripId;
+            var targetLegId = draft.ProposedOutcome == DraftOutcome.Item ? chosen?.TripLegId ?? draft.TripLegId : draft.TripLegId;
+            if (targetTripId is not null
+                && (draft.TripId != targetTripId || draft.TripLegId != targetLegId))
             {
                 var saved = await EmailIngestionApi.UpdateDraftAsync(draft.ParsedItemDraftId, new UpdateParsedItemDraftRequest(
-                    chosen.TripId, chosen.TripLegId, draft.ItemType, draft.Title, draft.Location,
+                    targetTripId, targetLegId, draft.ItemType, draft.Title, draft.Location,
                     draft.StartLocal, draft.StartTimeZoneId, draft.EndLocal, draft.EndTimeZoneId,
                     draft.ConfirmationCode, draft.Notes,
                     draft.ProposedOutcome, draft.Origin, draft.Destination,
