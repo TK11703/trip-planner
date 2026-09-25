@@ -18,7 +18,8 @@ namespace TripPlanner.Database.Tests.EmailIngestion;
 /// record, and a caller that quietly reset a column it did not name.
 /// </summary>
 [Trait("Category", "DatabaseIntegration")]
-public class ParsedItemDraftMergeTests : IClassFixture<PostgresFixture>
+[Collection(SharedPostgres.Name)]
+public class ParsedItemDraftMergeTests
 {
     private readonly PostgresFixture _fixture;
     private readonly ParsedItemDraftRepository _repository;

@@ -13,7 +13,8 @@ namespace TripPlanner.Database.Tests.EmailIngestion;
 /// allow even if a future caller stops checking (FR-008, FR-010, FR-042, FR-045).
 /// </summary>
 [Trait("Category", "DatabaseIntegration")]
-public class ParsedItemDraftTransportTests : IClassFixture<PostgresFixture>
+[Collection(SharedPostgres.Name)]
+public class ParsedItemDraftTransportTests
 {
     private readonly PostgresFixture _fixture;
     private readonly ParsedItemDraftRepository _repository;

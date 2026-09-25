@@ -12,7 +12,8 @@ namespace TripPlanner.Database.Tests.TripItems;
 /// consistent, so one of the two has to lose.
 /// </summary>
 [Trait("Category", "DatabaseIntegration")]
-public class TripLegModeInvariantTests : IClassFixture<PostgresFixture>
+[Collection(SharedPostgres.Name)]
+public class TripLegModeInvariantTests
 {
     private const string ConstraintName = "trip_legs_item_eligibility";
 
