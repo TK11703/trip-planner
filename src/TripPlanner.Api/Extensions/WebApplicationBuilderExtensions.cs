@@ -132,6 +132,11 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IItemRecognizer, EmailParserService>();
         builder.Services.AddScoped<RelayMessageProcessor>();
 
+        // A factory, not the recognizer itself: re-recognition must survive a provider that
+        // cannot even be constructed, and construction happens during resolution (FR-047).
+        builder.Services.AddScoped<Func<IItemRecognizer>>(sp => sp.GetRequiredService<IItemRecognizer>);
+        builder.Services.AddScoped<DraftReRecognitionService>();
+
         return builder;
     }
 
@@ -161,9 +166,18 @@ public static class WebApplicationBuilderExtensions
     private static AzureOpenAIClient CreateOpenAIClient(ConfigurationManager configuration)
     {
         // AzureOpenAI:Endpoint must be set; credential uses DefaultAzureCredential —
-        // managed identity when hosted in Azure Container Apps, developer sign-in locally.
+        // managed identity when hosted, developer sign-in locally.
+        //
+        // Which developer credential answers locally is not decided here. DefaultAzureCredential
+        // reaches VisualStudioCredential before AzureCliCredential, and Visual Studio is often
+        // signed in as a different account than `az login`; that credential then returns a valid
+        // token the data plane rejects with a 401, which reads as a configuration error rather
+        // than an identity mismatch. The AppHost pins the chain for local runs by setting
+        // AZURE_TOKEN_CREDENTIALS, so the choice lives in orchestration where it belongs and this
+        // code stays the same in every environment.
         var endpoint = configuration["AzureOpenAI:Endpoint"]
             ?? throw new InvalidOperationException("AzureOpenAI:Endpoint configuration is required for email parsing.");
+
         return new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential());
     }
 }

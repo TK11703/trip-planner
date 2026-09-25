@@ -1,0 +1,29 @@
+@*
+    One sanctioned, inert suggestion for a detail the email did not state.
+
+    The value is shown and explained but never written into the bound field until the traveler
+    presses Use this. That is the whole point: a leg must not carry a value the traveler did not
+    see and accept, so this renders a proposal rather than applying a default (FR-028, FR-034).
+
+    Taking the proposal as a parameter rather than computing one internally means a second
+    sanctioned default arrives as data, not as another component.
+*@
+<div class="border-start border-3 ps-2 mt-1 small text-body-secondary" role="note" data-testid="draft-suggestion-@Field">
+    <span>@Why</span>
+    <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-testid="draft-suggestion-accept-@Field" @onclick="AcceptAsync">
+        Use this
+    </button>
+</div>
+
+@code {
+    /// <summary>Field name this suggestion belongs to, used only to key the test hooks.</summary>
+    [Parameter, EditorRequired] public string Field { get; set; } = default!;
+
+    /// <summary>The sentence explaining what was missing and what is being proposed.</summary>
+    [Parameter, EditorRequired] public string Why { get; set; } = default!;
+
+    /// <summary>Raised only when the traveler presses Use this.</summary>
+    [Parameter] public EventCallback OnAccept { get; set; }
+
+    private Task AcceptAsync() => OnAccept.InvokeAsync();
+}

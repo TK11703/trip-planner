@@ -15,7 +15,16 @@ SELECT d.parsed_item_draft_id AS ParsedItemDraftId,
        d.confidence AS Confidence,
        d.review_status AS ReviewStatus,
        d.created_at_utc AS CreatedAtUtc,
-       d.tracked_item_id AS TrackedItemId
+       d.tracked_item_id AS TrackedItemId,
+       d.proposed_outcome AS ProposedOutcome,
+       d.origin AS Origin,
+       d.destination AS Destination,
+       d.transportation_mode AS TransportationMode,
+       d.travel_cost AS TravelCost,
+       d.travel_cost_currency AS TravelCostCurrency,
+       d.created_trip_leg_id AS CreatedTripLegId,
+       d.transport_recognition_state AS TransportRecognitionState,
+       d.traveler_edited_fields AS TravelerEditedFields
 FROM parsed_item_drafts d
 WHERE d.user_id = @UserId
   AND d.review_status = 'pending_review'

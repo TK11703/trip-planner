@@ -81,7 +81,7 @@ public sealed partial class EmailParserService : IItemRecognizer
             "The text may describe more than one booking. " +
             "Return ONLY a JSON object of the form {\"items\":[ ... ]}. " +
             "Each element may contain (omit fields you cannot determine): " +
-            "itemType (string: 'flight'|'hotel'|'car_rental'|'activity'|'other'), " +
+            "itemType (string: 'flight'|'train'|'bus'|'boat'|'car_rental'|'hotel'|'activity'|'other'), " +
             "title (string), location (string), " +
             "startLocal (ISO-8601 datetime without timezone, e.g. '2026-07-15T09:30:00'), " +
             "startTimeZoneId (IANA tz id), " +
@@ -89,6 +89,15 @@ public sealed partial class EmailParserService : IItemRecognizer
             "endTimeZoneId (IANA tz id), " +
             "confirmationCode (string), notes (string), " +
             "confidence (number 0.0-1.0 reflecting how certain you are). " +
+            "For a transportation booking — a flight, train, bus, boat, or car rental — also return: " +
+            "origin (string: where the journey departs from), " +
+            "destination (string: where it arrives), " +
+            "travelCost (number: the total price, digits and decimal point only, no currency symbol), " +
+            "travelCostCurrency (string: the ISO currency code of that price, e.g. 'USD'). " +
+            "For a car rental, origin is the pickup location and destination is the return location; " +
+            "when the car is returned to the same place, repeat it in both fields rather than omitting one. " +
+            "For a flight, origin is the departure airport and destination is the arrival airport. " +
+            "Do not guess an origin or destination the text does not state. " +
             "Booking emails rarely name a time zone, so infer it from where the booking happens " +
             "rather than omitting it: a museum in London, UK is 'Europe/London'; a hotel in " +
             "Denver is 'America/Denver'. Times in a booking email are local to the venue, so use " +
@@ -197,21 +206,48 @@ public sealed partial class EmailParserService : IItemRecognizer
         }
     }
 
-    private static NewParsedItemDraft ToDraft(Guid inboxEmailId, string userId, RecognizedItem recognized) => new(
-        InboxEmailId: inboxEmailId,
-        UserId: userId,
-        TripId: null,
-        TripLegId: null,
-        ItemType: Redact(recognized.ItemType),
-        Title: Redact(recognized.Title),
-        Location: Redact(recognized.Location),
-        StartLocal: ParseDateTime(recognized.StartLocal),
-        StartTimeZoneId: NormalizeTimeZoneId(recognized.StartTimeZoneId),
-        EndLocal: ParseDateTime(recognized.EndLocal),
-        EndTimeZoneId: NormalizeTimeZoneId(recognized.EndTimeZoneId),
-        ConfirmationCode: Redact(recognized.ConfirmationCode),
-        Notes: Redact(recognized.Notes),
-        Confidence: recognized.Confidence);
+    private static NewParsedItemDraft ToDraft(Guid inboxEmailId, string userId, RecognizedItem recognized)
+    {
+        // Redaction runs over the route and currency exactly as it does over the other free-text
+        // fields, so a booking reference embedded in a pickup address is masked too (FR-007).
+        var origin = Redact(recognized.Origin);
+        var destination = Redact(recognized.Destination);
+        var mode = TransportationModeInterpreter.Resolve(recognized.ItemType, recognized.TransportationMode);
+
+        return new NewParsedItemDraft(
+            InboxEmailId: inboxEmailId,
+            UserId: userId,
+            TripId: null,
+            TripLegId: null,
+            ItemType: Redact(recognized.ItemType),
+            Title: Redact(recognized.Title),
+            Location: Redact(recognized.Location),
+            StartLocal: ParseDateTime(recognized.StartLocal),
+            StartTimeZoneId: NormalizeTimeZoneId(recognized.StartTimeZoneId),
+            EndLocal: ParseDateTime(recognized.EndLocal),
+            EndTimeZoneId: NormalizeTimeZoneId(recognized.EndTimeZoneId),
+            ConfirmationCode: Redact(recognized.ConfirmationCode),
+            Notes: Redact(recognized.Notes),
+            Confidence: recognized.Confidence,
+            ProposedOutcome: DraftOutcomeClassifier.Classify(recognized.ItemType, recognized.TransportationMode),
+            Origin: origin,
+            Destination: destination,
+            TransportationMode: mode,
+            TravelCost: NormalizeTravelCost(recognized.TravelCost),
+            TravelCostCurrency: Redact(recognized.TravelCostCurrency));
+    }
+
+    /// <summary>
+    /// Keeps a recognized price only when a leg could actually store it. The amount is carried
+    /// across whatever currency the email stated, because the traveler reviews it before
+    /// confirming; a negative or over-scale value is dropped rather than shown (FR-010).
+    /// </summary>
+    private static decimal? NormalizeTravelCost(decimal? value)
+    {
+        if (value is not { } cost || cost < 0) return null;
+        var rounded = decimal.Round(cost, 2);
+        return rounded is >= 0 and <= 9_999_999_999.99m ? rounded : null;
+    }
 
     private static List<RecognizedItem>? Deserialize(string content)
     {
@@ -310,5 +346,10 @@ public sealed partial class EmailParserService : IItemRecognizer
         public string? ConfirmationCode { get; set; }
         public string? Notes { get; set; }
         public double Confidence { get; set; }
+        public string? Origin { get; set; }
+        public string? Destination { get; set; }
+        public string? TransportationMode { get; set; }
+        public decimal? TravelCost { get; set; }
+        public string? TravelCostCurrency { get; set; }
     }
 }

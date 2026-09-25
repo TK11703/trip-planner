@@ -46,6 +46,36 @@ public sealed record DraftPlacement(
     Guid? SuggestedTripLegId,
     IReadOnlyList<PlacementCandidate> Candidates);
 
+/// <summary>
+/// What a draft proposes to become when it is confirmed. Recognition proposes it, the traveler
+/// may change it, and it is binding at confirmation (FR-008, FR-024).
+/// </summary>
+public enum DraftOutcome
+{
+    /// <summary>A tracked item on the timeline. Zero so an unset value keeps today's behaviour.</summary>
+    Item = 0,
+
+    /// <summary>A trip leg — how the traveler gets from one place to the next.</summary>
+    Leg = 1
+}
+
+/// <summary>
+/// Whether a draft has been through transport recognition. Drafts that predate transport
+/// recognition are <see cref="Pending"/> until the review screen asks for them to be
+/// re-examined (FR-045).
+/// </summary>
+public enum DraftRecognitionState
+{
+    /// <summary>Recognized with the current rules; nothing further to do.</summary>
+    Current = 0,
+
+    /// <summary>Predates transport recognition and has not been re-examined yet.</summary>
+    Pending = 1,
+
+    /// <summary>Re-examination was attempted and the recognizer was unavailable (FR-047).</summary>
+    Unavailable = 2
+}
+
 /// <summary>A structured item extracted from an inbox email, awaiting user review.</summary>
 public sealed record ParsedItemDraftDto(
     Guid ParsedItemDraftId,
@@ -64,7 +94,19 @@ public sealed record ParsedItemDraftDto(
     double Confidence,
     ReviewStatus ReviewStatus,
     DateTimeOffset CreatedAt,
-    DraftPlacement? Placement = null);
+    DraftPlacement? Placement = null,
+    DraftOutcome ProposedOutcome = DraftOutcome.Item,
+    string? Origin = null,
+    string? Destination = null,
+    string? TransportationMode = null,
+    decimal? TravelCost = null,
+    // Recognized only so the review screen can label the amount. A leg has no currency of its
+    // own, so this is never written to one (FR-010).
+    string? TravelCostCurrency = null,
+    // The leg this draft became, once confirmed as a leg (FR-038). Null until then, and null
+    // again if that leg is later deleted.
+    Guid? CreatedTripLegId = null,
+    DraftRecognitionState TransportRecognitionState = DraftRecognitionState.Current);
 
 /// <summary>Request to update editable fields of a parsed item draft.</summary>
 public sealed record UpdateParsedItemDraftRequest(
@@ -78,10 +120,25 @@ public sealed record UpdateParsedItemDraftRequest(
     DateTime? EndLocal,
     string? EndTimeZoneId,
     string? ConfirmationCode,
-    string? Notes);
+    string? Notes,
+    DraftOutcome ProposedOutcome = DraftOutcome.Item,
+    string? Origin = null,
+    string? Destination = null,
+    string? TransportationMode = null,
+    decimal? TravelCost = null);
 
-/// <summary>Response returned after confirming a draft (the promoted item id).</summary>
-public sealed record ConfirmParsedItemDraftResponse(Guid TrackedItemId, Guid TripId, Guid? TripLegId);
+/// <summary>
+/// What a confirmed draft became. Exactly one of <paramref name="TrackedItemId"/> and
+/// <paramref name="CreatedTripLegId"/> is set, matching <paramref name="Outcome"/> (FR-014).
+/// <paramref name="TripLegId"/> is where an item was placed, which is a different question from
+/// what was created, so the two are kept apart.
+/// </summary>
+public sealed record ConfirmParsedItemDraftResponse(
+    DraftOutcome Outcome,
+    Guid TripId,
+    Guid? TrackedItemId,
+    Guid? TripLegId,
+    Guid? CreatedTripLegId);
 
 /// <summary>A page of inbox emails.</summary>
 public sealed record InboxEmailListResponse(IReadOnlyList<InboxEmailDto> Items);

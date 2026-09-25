@@ -9,9 +9,13 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Dapper" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- Npgsql is not referenced directly: TripPlanner.Api brings 10.x via Aspire.Npgsql, and
+         pinning the central 8.x version here would be a downgrade. -->
     <PackageReference Include="System.Security.Cryptography.Xml" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>

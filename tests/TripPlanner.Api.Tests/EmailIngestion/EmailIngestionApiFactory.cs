@@ -41,8 +41,15 @@ internal sealed class EmailIngestionApiFactory : TestApiFactory
     public RecordingAuditRepository Audit { get; } = new();
     public RecordingItineraryNotificationService ItineraryNotifications { get; } = new();
 
+    /// <summary>
+    /// How the recognizer is obtained. Defaults to the stub; a test can replace it with a
+    /// factory that throws, modelling a provider that cannot even be constructed.
+    /// </summary>
+    public Func<IItemRecognizer> RecognizerFactory { get; set; } = null!;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        RecognizerFactory ??= () => Recognizer;
         base.ConfigureWebHost(builder);
         builder.ConfigureTestServices(services =>
         {
@@ -57,6 +64,7 @@ internal sealed class EmailIngestionApiFactory : TestApiFactory
             services.RemoveAll<ITripAccessResolver>();
             services.RemoveAll<IAuditRepository>();
             services.RemoveAll<IItineraryNotificationService>();
+            services.RemoveAll<Func<IItemRecognizer>>();
 
             services.AddSingleton<IInboxEmailRepository>(Emails);
             services.AddSingleton<IEmailAttachmentRepository>(Attachments);
@@ -69,6 +77,9 @@ internal sealed class EmailIngestionApiFactory : TestApiFactory
             services.AddSingleton<ITripAccessResolver>(new StubTripAccessResolver(Trips));
             services.AddSingleton<IAuditRepository>(Audit);
             services.AddSingleton<IItineraryNotificationService>(ItineraryNotifications);
+
+            // Lets a test model a recognizer that cannot even be constructed.
+            services.AddScoped<Func<IItemRecognizer>>(_ => () => RecognizerFactory());
         });
     }
 
@@ -204,7 +215,17 @@ internal sealed class InMemoryParsedItemDraftRepository : IParsedItemDraftReposi
         var record = new ParsedItemDraftRecord(
             Guid.NewGuid(), draft.InboxEmailId, draft.UserId, draft.TripId, draft.TripLegId, draft.ItemType,
             draft.Title, draft.Location, draft.StartLocal, draft.StartTimeZoneId, draft.EndLocal, draft.EndTimeZoneId,
-            draft.ConfirmationCode, draft.Notes, draft.Confidence, "pending_review", DateTimeOffset.UtcNow);
+            draft.ConfirmationCode, draft.Notes, draft.Confidence, "pending_review", DateTimeOffset.UtcNow,
+            TrackedItemId: null,
+            ProposedOutcome: draft.ProposedOutcome,
+            Origin: draft.Origin,
+            Destination: draft.Destination,
+            TransportationMode: draft.TransportationMode,
+            TravelCost: draft.TravelCost,
+            TravelCostCurrency: draft.TravelCostCurrency,
+            CreatedTripLegId: null,
+            TransportRecognitionState: DraftRecognitionStates.Current,
+            TravelerEditedFields: []);
         lock (_rows) { _rows.Add(record); }
         return Task.FromResult<ParsedItemDraftRecord?>(record);
     }
@@ -236,7 +257,18 @@ internal sealed class InMemoryParsedItemDraftRepository : IParsedItemDraftReposi
                 return Task.FromResult<ParsedItemDraftRecord?>(null);
             }
 
-            _rows[index] = _rows[index] with
+            var current = _rows[index];
+
+            // Mirrors the FR-046 bookkeeping the real UPDATE does in SQL: a field the traveler
+            // changes by hand is recorded, including when they clear it.
+            var edited = new HashSet<string>(current.TravelerEditedFields ?? [], StringComparer.Ordinal);
+            if (update.ProposedOutcome != current.ProposedOutcome) edited.Add("proposed_outcome");
+            if (update.Origin != current.Origin) edited.Add("origin");
+            if (update.Destination != current.Destination) edited.Add("destination");
+            if (update.TransportationMode != current.TransportationMode) edited.Add("transportation_mode");
+            if (update.TravelCost != current.TravelCost) edited.Add("travel_cost");
+
+            _rows[index] = current with
             {
                 TripId = update.TripId,
                 TripLegId = update.TripLegId,
@@ -248,13 +280,26 @@ internal sealed class InMemoryParsedItemDraftRepository : IParsedItemDraftReposi
                 EndLocal = update.EndLocal,
                 EndTimeZoneId = update.EndTimeZoneId,
                 ConfirmationCode = update.ConfirmationCode,
-                Notes = update.Notes
+                Notes = update.Notes,
+                ProposedOutcome = update.ProposedOutcome,
+                Origin = update.Origin,
+                Destination = update.Destination,
+                TransportationMode = update.TransportationMode,
+                TravelCost = update.TravelCost,
+                TravelerEditedFields = edited.ToArray()
             };
             return Task.FromResult<ParsedItemDraftRecord?>(_rows[index]);
         }
     }
 
-    public Task<bool> SetReviewStatusAsync(Guid parsedItemDraftId, string userId, string reviewStatus, Guid? trackedItemId = null, CancellationToken ct = default)
+    public Task<bool> SetReviewStatusAsync(
+        Guid parsedItemDraftId,
+        string userId,
+        string reviewStatus,
+        Guid? trackedItemId = null,
+        string? proposedOutcome = null,
+        Guid? createdTripLegId = null,
+        CancellationToken ct = default)
     {
         lock (_rows)
         {
@@ -267,9 +312,83 @@ internal sealed class InMemoryParsedItemDraftRepository : IParsedItemDraftReposi
             _rows[index] = _rows[index] with
             {
                 ReviewStatus = reviewStatus,
-                TrackedItemId = trackedItemId ?? _rows[index].TrackedItemId
+                TrackedItemId = trackedItemId ?? _rows[index].TrackedItemId,
+                CreatedTripLegId = createdTripLegId ?? _rows[index].CreatedTripLegId,
+                ProposedOutcome = proposedOutcome ?? _rows[index].ProposedOutcome
             };
             return Task.FromResult(true);
+        }
+    }
+
+    /// <summary>
+    /// Mirrors `MergeParsedItemDraftRecognition.sql`: a field is written only when it is both
+    /// null and unedited. This is a restatement, not the rule itself — the rule is SQL, and
+    /// `ParsedItemDraftMergeTests` is what actually verifies it against PostgreSQL.
+    /// </summary>
+    public Task<ParsedItemDraftRecord?> MergeRecognitionAsync(
+        Guid parsedItemDraftId,
+        string userId,
+        DraftRecognitionMerge merge,
+        CancellationToken ct = default)
+    {
+        lock (_rows)
+        {
+            var index = _rows.FindIndex(r =>
+                r.ParsedItemDraftId == parsedItemDraftId
+                && r.UserId == userId
+                && r.ReviewStatus == "pending_review");
+            if (index < 0)
+            {
+                return Task.FromResult<ParsedItemDraftRecord?>(null);
+            }
+
+            var current = _rows[index];
+            var edited = new HashSet<string>(current.TravelerEditedFields ?? [], StringComparer.Ordinal);
+
+            string? Merge(string? existing, string? incoming, string field)
+                => existing is null && !edited.Contains(field) ? incoming : existing;
+
+            _rows[index] = current with
+            {
+                // Recognition may promote an item to a leg, never the reverse, and never over an
+                // outcome the traveler chose.
+                ProposedOutcome = merge.ProposedOutcome is not null
+                                  && current.ProposedOutcome == DraftOutcomes.Item
+                                  && !edited.Contains("proposed_outcome")
+                    ? merge.ProposedOutcome
+                    : current.ProposedOutcome,
+                Origin = Merge(current.Origin, merge.Origin, "origin"),
+                Destination = Merge(current.Destination, merge.Destination, "destination"),
+                TransportationMode = Merge(current.TransportationMode, merge.TransportationMode, "transportation_mode"),
+                TravelCost = current.TravelCost is null && !edited.Contains("travel_cost")
+                    ? merge.TravelCost
+                    : current.TravelCost,
+                TravelCostCurrency = Merge(current.TravelCostCurrency, merge.TravelCostCurrency, "travel_cost_currency"),
+                Title = Merge(current.Title, merge.Title, "title"),
+                Location = Merge(current.Location, merge.Location, "location"),
+                ConfirmationCode = Merge(current.ConfirmationCode, merge.ConfirmationCode, "confirmation_code"),
+                StartLocal = current.StartLocal is null && !edited.Contains("start_local")
+                    ? merge.StartLocal
+                    : current.StartLocal,
+                StartTimeZoneId = Merge(current.StartTimeZoneId, merge.StartTimeZoneId, "start_timezone_id"),
+                // The end and its zone are never merged (FR-034).
+                TransportRecognitionState = merge.TransportRecognitionState
+            };
+
+            return Task.FromResult<ParsedItemDraftRecord?>(_rows[index]);
+        }
+    }
+
+    /// <summary>
+    /// Rewrites a stored draft, so a test can stage the state a real legacy row would have —
+    /// `pending` recognition, or a field the traveler has already edited.
+    /// </summary>
+    public void Replace(Guid parsedItemDraftId, Func<ParsedItemDraftRecord, ParsedItemDraftRecord> update)
+    {
+        lock (_rows)
+        {
+            var index = _rows.FindIndex(r => r.ParsedItemDraftId == parsedItemDraftId);
+            if (index >= 0) _rows[index] = update(_rows[index]);
         }
     }
 
@@ -298,8 +417,12 @@ internal sealed class StubItemRecognizer : IItemRecognizer
 
     public string? LastAssembledText { get; private set; }
 
+    /// <summary>How many times recognition ran, so a test can prove a read path never calls it.</summary>
+    public int Calls { get; private set; }
+
     public Task<RecognitionResult> RecognizeAsync(Guid inboxEmailId, string userId, string assembledText, CancellationToken ct = default)
     {
+        Calls++;
         LastAssembledText = assembledText;
         return Task.FromResult(Behavior(inboxEmailId, userId, assembledText));
     }
@@ -374,9 +497,23 @@ internal sealed class RecordingTripItemRepository : ITripItemRepository
     /// <summary>Legs the confirm path validates against. Tests seed what the scenario needs.</summary>
     public List<TripLegDto> Legs { get; } = [];
 
+    private readonly List<(Guid TripId, CreateTripLegRequest Request)> _createdLegs = [];
+
+    /// <summary>Legs this repository was asked to create. Empty proves nothing was written.</summary>
+    public IReadOnlyList<(Guid TripId, CreateTripLegRequest Request)> CreatedLegs
+    {
+        get { lock (_createdLegs) { return _createdLegs.ToArray(); } }
+    }
+
     public Task<IReadOnlyList<TrackedItemDto>> GetTrackedItemsAsync(string ownerUserId, Guid tripId, CancellationToken ct) => Task.FromResult<IReadOnlyList<TrackedItemDto>>([]);
     public Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(string ownerUserId, Guid tripId, CancellationToken ct) => Task.FromResult<TripLegDefaultsResponse?>(new TripLegDefaultsResponse("UTC", "UTC", "profile"));
-    public Task<Guid?> CreateLegAsync(string ownerUserId, Guid tripId, CreateTripLegRequest request, DateTimeOffset nowUtc, CancellationToken ct) => Task.FromResult<Guid?>(Guid.NewGuid());
+
+    public Task<Guid?> CreateLegAsync(string ownerUserId, Guid tripId, CreateTripLegRequest request, DateTimeOffset nowUtc, CancellationToken ct)
+    {
+        lock (_createdLegs) { _createdLegs.Add((tripId, request)); }
+        return Task.FromResult<Guid?>(Guid.NewGuid());
+    }
+
     public Task<int> UpdateLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct) => Task.FromResult(1);
     public Task<int> DeleteLegAsync(string ownerUserId, Guid tripId, Guid tripLegId, CancellationToken ct) => Task.FromResult(1);
     public Task<int> UpdateTrackedItemAsync(string ownerUserId, Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct) => Task.FromResult(1);
