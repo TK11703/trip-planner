@@ -97,9 +97,16 @@
                         </div>
                     }
 
-                    @* Route and mode, laid out as TripLegForm lays them out. *@
+                    @* Route and mode, laid out as TripLegForm lays them out: the name of the leg
+                       leads, then how you travel and where between. *@
                     @if (_model.Outcome == DraftOutcome.Leg)
                     {
+                        <div class="mb-2">
+                            <label class="form-label" for="draft-title">Title</label>
+                            <InputText id="draft-title" class="form-control" @bind-Value="_model.Title" />
+                            <ValidationMessage For="@(() => _model.Title)" />
+                        </div>
+
                         <div class="row g-2 mb-2">
                             <div class="col-6">
                                 <label class="form-label" for="draft-mode">Travel Mode</label>
@@ -111,17 +118,6 @@
                                     }
                                 </InputSelect>
                                 <ValidationMessage For="@(() => _model.TransportationMode)" />
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label" for="draft-travel-cost">
-                                    Cost <span class="text-body-secondary fw-normal">(optional)</span>
-                                    @if (!string.IsNullOrWhiteSpace(Draft.TravelCostCurrency))
-                                    {
-                                        <span class="badge text-bg-light ms-1" data-testid="draft-travel-cost-currency">@Draft.TravelCostCurrency</span>
-                                    }
-                                </label>
-                                <InputNumber id="draft-travel-cost" class="form-control" step="0.01" @bind-Value="_model.TravelCost" />
-                                <ValidationMessage For="@(() => _model.TravelCost)" />
                             </div>
                         </div>
 
@@ -139,10 +135,10 @@
                         </div>
                     }
 
-                    <div class="row g-2 mb-2">
-                        <div class="col-5">
-                            @if (_model.Outcome == DraftOutcome.Item)
-                            {
+                    @if (_model.Outcome == DraftOutcome.Item)
+                    {
+                        <div class="row g-2 mb-2">
+                            <div class="col-5">
                                 <label class="form-label" for="draft-type">Type</label>
                                 <InputSelect id="draft-type" class="form-select" @bind-Value="_model.ItemType">
                                     <option value="activity">Activity</option>
@@ -150,17 +146,14 @@
                                     <option value="event">Event</option>
                                     <option value="reminder">Reminder</option>
                                 </InputSelect>
-                            }
+                            </div>
+                            <div class="col-7">
+                                <label class="form-label" for="draft-title">Title</label>
+                                <InputText id="draft-title" class="form-control" @bind-Value="_model.Title" />
+                                <ValidationMessage For="@(() => _model.Title)" />
+                            </div>
                         </div>
-                        <div class="col-7">
-                            <label class="form-label" for="draft-title">Title</label>
-                            <InputText id="draft-title" class="form-control" @bind-Value="_model.Title" />
-                            <ValidationMessage For="@(() => _model.Title)" />
-                        </div>
-                    </div>
 
-                    @if (_model.Outcome == DraftOutcome.Item)
-                    {
                         <div class="mb-2">
                             <label class="form-label" for="draft-location">Location</label>
                             <InputText id="draft-location" class="form-control" @bind-Value="_model.Location" />
@@ -206,10 +199,28 @@
                         </div>
                     </div>
 
-                    <div class="mb-2">
-                        <label class="form-label" for="draft-code">Confirmation/Reservation Code</label>
-                        <InputText id="draft-code" class="form-control" maxlength="255" @bind-Value="_model.ConfirmationCode" />
-                        <ValidationMessage For="@(() => _model.ConfirmationCode)" />
+                    @* Cost only exists on a leg, so it rides along with the code rather than
+                       leaving a gap on the item form. *@
+                    <div class="row g-2 mb-2">
+                        @if (_model.Outcome == DraftOutcome.Leg)
+                        {
+                            <div class="col-6">
+                                <label class="form-label" for="draft-travel-cost">
+                                    Cost <span class="text-body-secondary fw-normal">(optional)</span>
+                                    @if (!string.IsNullOrWhiteSpace(Draft.TravelCostCurrency))
+                                    {
+                                        <span class="badge text-bg-light ms-1" data-testid="draft-travel-cost-currency">@Draft.TravelCostCurrency</span>
+                                    }
+                                </label>
+                                <InputNumber id="draft-travel-cost" class="form-control" step="0.01" @bind-Value="_model.TravelCost" />
+                                <ValidationMessage For="@(() => _model.TravelCost)" />
+                            </div>
+                        }
+                        <div class="@(_model.Outcome == DraftOutcome.Leg ? "col-6" : "col-12")">
+                            <label class="form-label" for="draft-code">Confirmation/Reservation Code</label>
+                            <InputText id="draft-code" class="form-control" maxlength="255" @bind-Value="_model.ConfirmationCode" />
+                            <ValidationMessage For="@(() => _model.ConfirmationCode)" />
+                        </div>
                     </div>
 
                     <div class="mb-2">
