@@ -15,11 +15,11 @@
     <div class="row g-3">
         <div class="col-md-6">
             <label class="form-label" for="startDate">Start date</label>
-            <InputDate id="startDate" class="form-control" @bind-Value="Model.StartDate" />
+            <InputDate TValue="DateTime" id="startDate" class="form-control" Value="Model.StartDate" ValueChanged="@((DateTime value) => OnStartDateChanged(value))" ValueExpression="@(() => Model.StartDate)" />
         </div>
         <div class="col-md-6">
             <label class="form-label" for="endDate">End date</label>
-            <InputDate id="endDate" class="form-control" @bind-Value="Model.EndDate" />
+            <InputDate TValue="DateTime" id="endDate" class="form-control" min="@Model.StartDate.ToString("yyyy-MM-dd")" Value="Model.EndDate" ValueChanged="@((DateTime value) => OnEndDateChanged(value))" ValueExpression="@(() => Model.EndDate)" />
         </div>
     </div>
 
@@ -55,7 +55,7 @@
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
         public DateTime StartDate { get; set; } = DateTime.Today;
-        public DateTime EndDate { get; set; } = DateTime.Today.AddDays(1);
+        public DateTime EndDate { get; set; } = DateTime.Today;
     }
 
     [Parameter] public TripFormModel Model { get; set; } = new();
@@ -66,6 +66,24 @@
 
     private bool _isSubmitting;
     private string? _errorMessage;
+    private bool _endDateChosen;
+
+    protected override void OnParametersSet() => _endDateChosen |= IsEdit;
+
+    private void OnStartDateChanged(DateTime value)
+    {
+        Model.StartDate = value;
+        if (!_endDateChosen || Model.EndDate < value)
+        {
+            Model.EndDate = value;
+        }
+    }
+
+    private void OnEndDateChanged(DateTime value)
+    {
+        _endDateChosen = true;
+        Model.EndDate = value;
+    }
 
     private async Task SubmitAsync()
     {
