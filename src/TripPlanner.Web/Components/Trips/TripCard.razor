@@ -1,0 +1,36 @@
+<a class="card trip-card h-100 text-decoration-none text-reset shadow-sm" href="@($"/trips/{Trip.TripId}")">
+    <div class="card-body d-flex flex-column gap-3">
+        <div>
+            <h3 class="trip-card-name h5 mb-1" title="@Trip.Name">@Trip.Name</h3>
+            <p class="small text-secondary mb-0">@Trip.StartDate.ToString("MMM d") – @Trip.EndDate.ToString("MMM d, yyyy")</p>
+        </div>
+        <p class="trip-card-description mb-0 @(string.IsNullOrWhiteSpace(Trip.Description) ? "text-secondary fst-italic" : null)">@(string.IsNullOrWhiteSpace(Trip.Description) ? "No description yet." : Trip.Description.Trim())</p>
+        <div class="d-flex align-items-center justify-content-between gap-2 mt-auto">
+            <div class="d-flex flex-wrap gap-1">
+                <span class="badge rounded-pill text-bg-primary">@Trip.ItemCount itinerary items</span>
+                @if (ShowAccess)
+                {
+                    @if (Trip.IsOwner)
+                    {
+                        <span class="badge rounded-pill text-bg-secondary">Owned</span>
+                    }
+                    else
+                    {
+                        <span class="badge rounded-pill text-bg-info">Shared</span>
+                        <span class="badge rounded-pill @(Trip.AccessLevel == TripAccessLevel.Collaborator ? "text-bg-success" : "text-bg-secondary")">
+                            @(Trip.AccessLevel == TripAccessLevel.Collaborator ? "Collaborator" : "Viewer")
+                        </span>
+                    }
+                }
+            </div>
+            <span aria-hidden="true">→</span>
+        </div>
+    </div>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public TripSummary Trip { get; set; } = default!;
+
+    /// <summary>Shows owned/shared access badges; the recent list is owner-only so it omits them.</summary>
+    [Parameter] public bool ShowAccess { get; set; }
+}

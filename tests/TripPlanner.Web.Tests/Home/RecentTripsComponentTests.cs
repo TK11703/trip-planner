@@ -54,6 +54,37 @@ public class RecentTripsComponentTests : TestContext
     }
 
     [Fact]
+    public void SignedInUser_WithTrips_RendersNameAndDescriptionWithoutTripLabel()
+    {
+        var trip = new TripSummary(Guid.NewGuid(), "Paris planning", new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, 0,
+            Description: "Museums, cafés, and a day trip to Versailles.");
+        var client = new RecordingTripApiClient(new[] { trip });
+        Services.AddSingleton<ITripApiClient>(client);
+        Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
+
+        var cut = RenderComponent<RecentTripsList>();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal("Paris planning", cut.Find(".trip-card-name").TextContent);
+            Assert.Equal("Museums, cafés, and a day trip to Versailles.", cut.Find(".trip-card-description").TextContent);
+            Assert.Empty(cut.FindAll(".trip-card .brand-eyebrow"));
+        });
+    }
+
+    [Fact]
+    public void TripCard_WithoutDescription_ShowsPlaceholder()
+    {
+        var trip = new TripSummary(Guid.NewGuid(), "Paris planning", new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, 2);
+
+        var cut = RenderComponent<TripCard>(parameters => parameters.Add(p => p.Trip, trip));
+
+        Assert.Equal("No description yet.", cut.Find(".trip-card-description").TextContent);
+        Assert.Contains("2 itinerary items", cut.Markup);
+        Assert.DoesNotContain("Owned", cut.Markup);
+    }
+
+    [Fact]
     public async Task TripApiClient_UsesSuppliedHttpClientForDetailAndMutations()
     {
         var tripId = Guid.NewGuid();

@@ -32,6 +32,7 @@ public class TripSharingComponentTests : TestContext
             Assert.Contains("Owned", cut.Markup);
             Assert.Contains("Shared", cut.Markup);
             Assert.Contains("Collaborator", cut.Markup);
+            Assert.Equal(2, cut.FindAll("a.trip-card").Count);
         });
     }
 

@@ -842,6 +842,23 @@ body {
 .trip-card {
     transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
+/* Names and descriptions are clamped so every card in a row keeps the same height. */
+.trip-card-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.trip-card-description {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+    line-height: 1.5;
+    height: 3em;
+}
 .trip-card:hover,
 .trip-card:focus-visible {
     transform: translateY(-3px);

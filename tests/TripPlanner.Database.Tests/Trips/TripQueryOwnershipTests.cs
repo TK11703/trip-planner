@@ -53,6 +53,28 @@ public class TripQueryOwnershipTests
     }
 
     [Fact]
+    public async Task TripSummaries_IncludeDescriptionCappedForCards()
+    {
+        var owner = NewOwner();
+        var longDescription = new string('d', 800);
+        await _commands.InsertAsync(
+            owner,
+            new CreateTripRequest("Described", longDescription, new DateOnly(2026, 7, 10), new DateOnly(2026, 7, 20)),
+            DateTimeOffset.UtcNow,
+            default);
+        await SeedTripAsync(owner, "Undescribed");
+
+        var page = await _reads.GetPageAsync(owner, callerEmail: null, page: 1, pageSize: 50, default);
+        var recent = await _reads.GetRecentAsync(owner, 10, default);
+
+        foreach (var trips in new[] { page.Trips, recent })
+        {
+            Assert.Equal(500, trips.Single(t => t.Name == "Described").Description!.Length);
+            Assert.Null(trips.Single(t => t.Name == "Undescribed").Description);
+        }
+    }
+
+    [Fact]
     public async Task GetTripDetail_ReturnsNullForOtherOwner()
     {
         var owner = NewOwner();

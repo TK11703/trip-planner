@@ -1,8 +1,10 @@
 -- Owner-scoped recent trips for the current user. Item count is a left join aggregate
--- across legs and tracked items so the schema can change additively.
+-- across legs and tracked items so the schema can change additively. Description is capped
+-- because cards only show a short, clamped preview.
 SELECT
     t.trip_id        AS "TripId",
     t.name           AS "Name",
+    left(t.description, 500) AS "Description",
     t.start_date     AS "StartDate",
     t.end_date       AS "EndDate",
     t.updated_at_utc AS "UpdatedAtUtc",

@@ -21,7 +21,8 @@ public sealed record TripSummary(
     DateTimeOffset UpdatedAtUtc,
     int ItemCount,
     TripAccessLevel AccessLevel = TripAccessLevel.Owner,
-    bool IsOwner = true);
+    bool IsOwner = true,
+    string? Description = null);
 
 public sealed record TripListResponse(
     IReadOnlyList<TripSummary> Trips,

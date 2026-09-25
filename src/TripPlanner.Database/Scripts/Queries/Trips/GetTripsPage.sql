@@ -1,10 +1,12 @@
 -- Feature 010: paginated trips the caller can access, including trips they own and trips shared
--- with them. Access metadata lets the UI badge each card. Item counts join by trip only because a
+-- with them. Access metadata lets the UI badge each card; description is capped for the card
+-- preview. Item counts join by trip only because a
 -- trip's legs/items all belong to the trip's owner.
 WITH accessible AS (
     SELECT
         t.trip_id,
         t.name,
+        left(t.description, 500) AS description,
         t.start_date,
         t.end_date,
         t.updated_at_utc,
@@ -16,6 +18,7 @@ WITH accessible AS (
     SELECT
         t.trip_id,
         t.name,
+        left(t.description, 500) AS description,
         t.start_date,
         t.end_date,
         t.updated_at_utc,
@@ -38,6 +41,7 @@ item_counts AS (
 SELECT
     a.trip_id        AS "TripId",
     a.name           AS "Name",
+    a.description    AS "Description",
     a.start_date     AS "StartDate",
     a.end_date       AS "EndDate",
     a.updated_at_utc AS "UpdatedAtUtc",
@@ -47,6 +51,6 @@ SELECT
     COUNT(*) OVER()::int AS "TotalCount"
 FROM accessible a
 LEFT JOIN item_counts c ON c.trip_id = a.trip_id
-GROUP BY a.trip_id, a.name, a.start_date, a.end_date, a.updated_at_utc, a.access_level, a.is_owner
+GROUP BY a.trip_id, a.name, a.description, a.start_date, a.end_date, a.updated_at_utc, a.access_level, a.is_owner
 ORDER BY a.updated_at_utc DESC, a.end_date DESC, a.trip_id
 LIMIT @Limit OFFSET @Offset;

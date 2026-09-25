@@ -27,7 +27,7 @@ public sealed class TripReadRepository : ITripReadRepository
         var offset = (page - 1) * pageSize;
         var rows = (await conn.QueryAsync<TripSummaryPageRow>(new CommandDefinition(query, new { OwnerUserId = ownerUserId, CallerEmail = callerEmail, Limit = pageSize, Offset = offset }, cancellationToken: cancellationToken))).ToArray();
         var total = rows.FirstOrDefault()?.TotalCount ?? 0;
-        var trips = rows.Select(r => new TripSummary(r.TripId, r.Name, r.StartDate, r.EndDate, r.UpdatedAtUtc, r.ItemCount, TripAccessLevels.Parse(r.AccessLevel), r.IsOwner)).ToArray();
+        var trips = rows.Select(r => new TripSummary(r.TripId, r.Name, r.StartDate, r.EndDate, r.UpdatedAtUtc, r.ItemCount, TripAccessLevels.Parse(r.AccessLevel), r.IsOwner, r.Description)).ToArray();
         return new TripListResponse(trips, page, pageSize, total);
     }
 
@@ -36,7 +36,7 @@ public sealed class TripReadRepository : ITripReadRepository
         await using var conn = await _factory.CreateOpenConnectionAsync(cancellationToken);
         var query = _sql.Get("Queries/Trips/GetRecentTrips.sql");
         var rows = await conn.QueryAsync<TripSummaryRow>(new CommandDefinition(query, new { OwnerUserId = ownerUserId, Limit = limit }, cancellationToken: cancellationToken));
-        return rows.Select(r => new TripSummary(r.TripId, r.Name, r.StartDate, r.EndDate, r.UpdatedAtUtc, r.ItemCount)).ToArray();
+        return rows.Select(r => new TripSummary(r.TripId, r.Name, r.StartDate, r.EndDate, r.UpdatedAtUtc, r.ItemCount, Description: r.Description)).ToArray();
     }
 
     public async Task<TripDetail?> GetDetailAsync(string ownerUserId, Guid tripId, CancellationToken cancellationToken)
@@ -50,7 +50,7 @@ public sealed class TripReadRepository : ITripReadRepository
             Array.Empty<TripLegDto>(), Array.Empty<TrackedItemDto>());
     }
 
-    private sealed record TripSummaryRow(Guid TripId, string Name, DateOnly StartDate, DateOnly EndDate, DateTimeOffset UpdatedAtUtc, int ItemCount);
-    private sealed record TripSummaryPageRow(Guid TripId, string Name, DateOnly StartDate, DateOnly EndDate, DateTimeOffset UpdatedAtUtc, int ItemCount, string AccessLevel, bool IsOwner, int TotalCount);
+    private sealed record TripSummaryRow(Guid TripId, string Name, string? Description, DateOnly StartDate, DateOnly EndDate, DateTimeOffset UpdatedAtUtc, int ItemCount);
+    private sealed record TripSummaryPageRow(Guid TripId, string Name, string? Description, DateOnly StartDate, DateOnly EndDate, DateTimeOffset UpdatedAtUtc, int ItemCount, string AccessLevel, bool IsOwner, int TotalCount);
     private sealed record TripDetailRow(Guid TripId, string Name, string? Description, DateOnly StartDate, DateOnly EndDate, DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc);
 }

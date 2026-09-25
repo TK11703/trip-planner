@@ -31,27 +31,8 @@ else
     <div class="row g-3 mb-3">
         @foreach (var trip in _response.Trips)
         {
-            <div class="col-md-6 col-xl-4">
-                <a class="card h-100 text-decoration-none text-reset shadow-sm" href="@($"/trips/{trip.TripId}")">
-                    <div class="card-body">
-                        <h2 class="h5 mb-2">@trip.Name</h2>
-                        <div class="small mb-2 d-flex flex-wrap gap-1">
-                            <span class="badge bg-secondary">@trip.StartDate.ToShortDateString() - @trip.EndDate.ToShortDateString()</span>
-                            @if (trip.IsOwner)
-                            {
-                                <span class="badge text-bg-primary">Owned</span>
-                            }
-                            else
-                            {
-                                <span class="badge text-bg-info">Shared</span>
-                                <span class="badge @(trip.AccessLevel == TripAccessLevel.Collaborator ? "text-bg-success" : "text-bg-secondary")">
-                                    @(trip.AccessLevel == TripAccessLevel.Collaborator ? "Collaborator" : "Viewer")
-                                </span>
-                            }
-                        </div>
-                        <div class="small text-secondary">@trip.ItemCount itinerary items</div>
-                    </div>
-                </a>
+            <div class="col-md-6 col-lg-4">
+                <TripCard Trip="trip" ShowAccess="true" />
             </div>
         }
     </div>
