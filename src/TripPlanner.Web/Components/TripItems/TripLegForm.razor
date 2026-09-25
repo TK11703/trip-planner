@@ -75,11 +75,11 @@
     <div class="row g-2 mb-2">
         <div class="col-6">
             <label class="form-label" for="leg-start">Start</label>
-            <InputDate id="leg-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@TripRangeMin" max="@TripRangeMax" step="1" @bind-Value="_model.StartAt" @bind-Value:after="OnStartChanged" />
+            <InputDate id="leg-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@TripRangeMin" max="@TripRangeMax" step="60" @bind-Value="_model.StartAt" @bind-Value:after="OnStartChanged" />
         </div>
         <div class="col-6">
             <label class="form-label" for="leg-end">End</label>
-            <InputDate id="leg-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@TripRangeMin" max="@TripRangeMax" step="1" @bind-Value="_model.EndAt" />
+            <InputDate id="leg-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@TripRangeMin" max="@TripRangeMax" step="60" @bind-Value="_model.EndAt" />
         </div>
     </div>
     <div class="row g-2 mb-2">
@@ -187,8 +187,10 @@
         public string? TransportationMode { get; set; }
         public string? Origin { get; set; }
         public string? Destination { get; set; }
-        public DateTime StartAt { get; set; } = DateTime.Now;
-        public DateTime EndAt { get; set; } = DateTime.Now.AddHours(1);
+        private DateTime _startAt = MinutePrecision.Floor(DateTime.Now);
+        private DateTime _endAt = MinutePrecision.Floor(DateTime.Now.AddHours(1));
+        public DateTime StartAt { get => _startAt; set => _startAt = MinutePrecision.Floor(value); }
+        public DateTime EndAt { get => _endAt; set => _endAt = MinutePrecision.Floor(value); }
         [Required(ErrorMessage = "Start timezone is required.")] public string StartTimeZoneId { get; set; } = "UTC";
         [Required(ErrorMessage = "End timezone is required.")] public string EndTimeZoneId { get; set; } = "UTC";
         public decimal? TravelCost { get; set; }
@@ -261,9 +263,9 @@
     private bool CanDelete => IsEdit && CanEditContent;
     private string FormName => IsEdit ? $"trip-leg-edit-{Leg!.TripLegId}" : "trip-leg-create";
     private DateTime? TripRangeStart => TripStartDate?.ToDateTime(TimeOnly.MinValue);
-    private DateTime? TripRangeEnd => TripEndDate?.ToDateTime(new TimeOnly(23, 59, 59));
-    private string? TripRangeMin => TripRangeStart?.ToString("yyyy-MM-dd'T'HH:mm:ss");
-    private string? TripRangeMax => TripRangeEnd?.ToString("yyyy-MM-dd'T'HH:mm:ss");
+    private DateTime? TripRangeEnd => TripEndDate?.ToDateTime(new TimeOnly(23, 59));
+    private string? TripRangeMin => TripRangeStart?.ToString(MinutePrecision.PickerFormat);
+    private string? TripRangeMax => TripRangeEnd?.ToString(MinutePrecision.PickerFormat);
 
     protected override void OnParametersSet()
     {

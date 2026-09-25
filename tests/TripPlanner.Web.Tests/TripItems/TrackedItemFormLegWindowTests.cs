@@ -39,7 +39,7 @@ public class TrackedItemFormLegWindowTests : TestContext
     }
 
     [Fact]
-    public void DatePickers_WithSecondBearingBounds_AcceptAnyWholeSecond()
+    public void DatePickers_WithSecondBearingBounds_OfferWholeMinutesOnly()
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 8, 10, 20, 39, 39), new DateTime(2026, 8, 13, 8, 5, 39));
 
@@ -50,8 +50,10 @@ public class TrackedItemFormLegWindowTests : TestContext
             .Add(x => x.InitialStartsAt, new DateTime(2026, 8, 10, 21, 0, 0)));
 
         var dateInputs = cut.FindAll("input[type=datetime-local]");
-        Assert.All(dateInputs, input => Assert.Equal("1", input.GetAttribute("step")));
-        Assert.Equal("2026-08-10T20:39:39", dateInputs[0].GetAttribute("min"));
+        Assert.All(dateInputs, input => Assert.Equal("60", input.GetAttribute("step")));
+        // Pulled inward to the next whole minute so the bound stays inside the leg's window.
+        Assert.Equal("2026-08-10T20:40:00", dateInputs[0].GetAttribute("min"));
+        Assert.Equal("2026-08-13T08:05:00", dateInputs[0].GetAttribute("max"));
     }
 
     [Fact]

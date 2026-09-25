@@ -164,7 +164,7 @@
                     <div class="row g-2 mb-2">
                         <div class="col-md-6">
                             <label class="form-label" for="draft-start">Start</label>
-                            <InputDate id="draft-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" step="1" @bind-Value="_model.StartLocal" />
+                            <InputDate id="draft-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" step="60" @bind-Value="_model.StartLocal" />
                             <ValidationMessage For="@(() => _model.StartLocal)" />
                             @if (SelectedLeg is not null)
                             {
@@ -180,7 +180,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="draft-end">End</label>
-                            <InputDate id="draft-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" step="1" @bind-Value="_model.EndLocal" />
+                            <InputDate id="draft-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" step="60" @bind-Value="_model.EndLocal" />
                             <ValidationMessage For="@(() => _model.EndLocal)" />
                             @* No suggestion is offered for a missing end date/time. Every candidate
                                would either be invented or produce a zero-length leg (research D5). *@
@@ -258,9 +258,11 @@
         public string ItemType { get; set; } = "activity";
         [Required(ErrorMessage = "Title is required.")] public string Title { get; set; } = string.Empty;
         public string? Location { get; set; }
-        public DateTime? StartLocal { get; set; }
+        private DateTime? _startLocal;
+        private DateTime? _endLocal;
+        public DateTime? StartLocal { get => _startLocal; set => _startLocal = MinutePrecision.Floor(value); }
         public string? StartTimeZoneId { get; set; }
-        public DateTime? EndLocal { get; set; }
+        public DateTime? EndLocal { get => _endLocal; set => _endLocal = MinutePrecision.Floor(value); }
         public string? EndTimeZoneId { get; set; }
         [StringLength(255, ErrorMessage = "Confirmation/Reservation Code must be 255 characters or fewer.")] public string? ConfirmationCode { get; set; }
         [StringLength(2000, ErrorMessage = "Notes must be 2,000 characters or fewer.")] public string? Notes { get; set; }
@@ -572,7 +574,7 @@
         return $"{FormatBound(start, zoneId)} – {FormatBound(end, zoneId)}";
     }
 
-    private const string PickerFormat = "yyyy-MM-ddTHH:mm:ss";
+    private const string PickerFormat = MinutePrecision.PickerFormat;
 
     private string? EndZoneId => string.IsNullOrWhiteSpace(_model.EndTimeZoneId) ? _model.StartTimeZoneId : _model.EndTimeZoneId;
 
@@ -582,16 +584,17 @@
     private string? EndMax => WindowEnd(EndZoneId)?.ToString(PickerFormat, CultureInfo.InvariantCulture);
 
     // A leg's window is the rule the API enforces; without a leg the trip's own dates are still
-    // the only sensible range to offer.
+    // the only sensible range to offer. Both ends are pulled inward to a whole minute so a window
+    // saved with seconds cannot offer a bound the minute-resolution picker can never hit.
     private DateTime? WindowStart(string? zoneId)
-        => _model.LegStartUtc is { } legStart
+        => MinutePrecision.Ceiling(_model.LegStartUtc is { } legStart
             ? ToLocal(legStart, zoneId)
-            : _tripStart?.ToDateTime(TimeOnly.MinValue);
+            : _tripStart?.ToDateTime(TimeOnly.MinValue));
 
     private DateTime? WindowEnd(string? zoneId)
-        => _model.LegEndUtc is { } legEnd
+        => MinutePrecision.Floor(_model.LegEndUtc is { } legEnd
             ? ToLocal(legEnd, zoneId)
-            : _tripEnd?.ToDateTime(new TimeOnly(23, 59, 59));
+            : _tripEnd?.ToDateTime(new TimeOnly(23, 59)));
 
     // A draft often carries no date at all, and an empty picker opens on today, which is almost
     // never inside the trip just chosen. A leg window is enforced, so a date outside it is pulled

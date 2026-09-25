@@ -92,7 +92,7 @@
                 <label class="form-label mb-0">Start</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyStartFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate id="item-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" step="1" @bind-Value="_model.StartLocal" @bind-Value:after="OnStartChanged" />
+            <InputDate id="item-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@StartMin" max="@StartMax" step="60" @bind-Value="_model.StartLocal" @bind-Value:after="OnStartChanged" />
             <ValidationMessage For="@(() => _model.StartLocal)" />
             @if (SelectedLeg is not null)
             {
@@ -117,7 +117,7 @@
                 <label class="form-label mb-0">End</label>
                 <button type="button" class="btn btn-link btn-sm p-0" @onclick="RequestCopyEndFromLeg" disabled="@(SelectedLeg is null)">Copy from trip leg</button>
             </div>
-            <InputDate id="item-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" step="1" @bind-Value="_model.EndLocal" />
+            <InputDate id="item-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@EndMin" max="@EndMax" step="60" @bind-Value="_model.EndLocal" />
             <ValidationMessage For="@(() => _model.EndLocal)" />
             @if (SelectedLeg is not null)
             {
@@ -217,9 +217,11 @@
         public string ItemType { get; set; } = "activity";
         [Required(ErrorMessage = "Name is required.")] public string Title { get; set; } = string.Empty;
         public string? Location { get; set; }
-        public DateTime StartLocal { get; set; } = DateTime.Now;
+        private DateTime _startLocal = MinutePrecision.Floor(DateTime.Now);
+        private DateTime? _endLocal = MinutePrecision.Floor(DateTime.Now.AddHours(1));
+        public DateTime StartLocal { get => _startLocal; set => _startLocal = MinutePrecision.Floor(value); }
         [Required(ErrorMessage = "Start timezone is required.")] public string StartTimeZoneId { get; set; } = "UTC";
-        public DateTime? EndLocal { get; set; } = DateTime.Now.AddHours(1);
+        public DateTime? EndLocal { get => _endLocal; set => _endLocal = MinutePrecision.Floor(value); }
         public string? EndTimeZoneId { get; set; } = "UTC";
         public string DisplayColor { get; set; } = TrackedItemColors.Default;
         [StringLength(255, ErrorMessage = "Confirmation/Reservation Code must be 255 characters or fewer.")] public string? ConfirmationCode { get; set; }
@@ -309,14 +311,19 @@
     // An item belongs to a leg, so its start and end are restricted to that leg's travel window.
     // The bounds are carried as UTC instants and projected back into whichever timezone each
     // field uses, so the picker's disabled range matches the rule the API enforces.
-    private const string PickerFormat = "yyyy-MM-ddTHH:mm:ss";
+    private const string PickerFormat = MinutePrecision.PickerFormat;
 
     private string EndTimeZoneId => string.IsNullOrWhiteSpace(_model.EndTimeZoneId) ? _model.StartTimeZoneId : _model.EndTimeZoneId!;
 
-    private string? StartMin => FormatForPicker(_model.LegStartUtc, _model.StartTimeZoneId);
-    private string? StartMax => FormatForPicker(_model.LegEndUtc, _model.StartTimeZoneId);
-    private string? EndMin => FormatForPicker(_model.LegStartUtc, EndTimeZoneId);
-    private string? EndMax => FormatForPicker(_model.LegEndUtc, EndTimeZoneId);
+    private string? StartMin => FormatForPicker(WindowStart(_model.StartTimeZoneId));
+    private string? StartMax => FormatForPicker(WindowEnd(_model.StartTimeZoneId));
+    private string? EndMin => FormatForPicker(WindowStart(EndTimeZoneId));
+    private string? EndMax => FormatForPicker(WindowEnd(EndTimeZoneId));
+
+    // Both ends are pulled inward to a whole minute so a leg saved with seconds cannot offer a
+    // bound the minute-resolution picker can never hit.
+    private DateTime? WindowStart(string? timeZoneId) => MinutePrecision.Ceiling(ToLocal(_model.LegStartUtc, timeZoneId));
+    private DateTime? WindowEnd(string? timeZoneId) => MinutePrecision.Floor(ToLocal(_model.LegEndUtc, timeZoneId));
 
     private string LegWindowHint(string? timeZoneId)
         => $"{FormatBound(_model.LegStartUtc, timeZoneId)} – {FormatBound(_model.LegEndUtc, timeZoneId)}";
@@ -342,8 +349,8 @@
         return zone is null ? null : TimeZoneInfo.ConvertTime(utc, zone).DateTime;
     }
 
-    private static string? FormatForPicker(DateTimeOffset? instant, string? timeZoneId)
-        => ToLocal(instant, timeZoneId)?.ToString(PickerFormat, System.Globalization.CultureInfo.InvariantCulture);
+    private static string? FormatForPicker(DateTime? local)
+        => local?.ToString(PickerFormat, System.Globalization.CultureInfo.InvariantCulture);
 
     private static string FormatBound(DateTimeOffset? instant, string? timeZoneId)
         => ToLocal(instant, timeZoneId)?.ToString("g") ?? "—";
@@ -359,17 +366,17 @@
     // existing item's saved values stay untouched and are flagged by validation instead.
     private void ClampToLegWindow()
     {
-        if (_model.LegStartUtc is not { } legStart || _model.LegEndUtc is not { } legEnd)
+        if (_model.LegStartUtc is null || _model.LegEndUtc is null)
         {
             return;
         }
 
-        if (ToLocal(legStart, _model.StartTimeZoneId) is { } startMin && ToLocal(legEnd, _model.StartTimeZoneId) is { } startMax)
+        if (WindowStart(_model.StartTimeZoneId) is { } startMin && WindowEnd(_model.StartTimeZoneId) is { } startMax)
         {
             _model.StartLocal = Clamp(_model.StartLocal, startMin, startMax);
         }
 
-        if (_model.EndLocal is { } end && ToLocal(legStart, EndTimeZoneId) is { } endMin && ToLocal(legEnd, EndTimeZoneId) is { } endMax)
+        if (_model.EndLocal is { } end && WindowStart(EndTimeZoneId) is { } endMin && WindowEnd(EndTimeZoneId) is { } endMax)
         {
             _model.EndLocal = Clamp(end, endMin, endMax);
         }
@@ -601,7 +608,7 @@
     private void OnStartChanged()
     {
         var candidate = _model.StartLocal.AddHours(1);
-        if (ToLocal(_model.LegEndUtc, EndTimeZoneId) is { } endMax && candidate > endMax)
+        if (WindowEnd(EndTimeZoneId) is { } endMax && candidate > endMax)
         {
             candidate = endMax;
         }

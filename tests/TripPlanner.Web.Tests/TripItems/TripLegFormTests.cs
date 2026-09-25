@@ -94,9 +94,11 @@ public class TripLegFormTests : TestContext
         Assert.Equal("2026-09-05T00:00:00", start.GetAttribute("value"));
         Assert.Equal("2026-09-05T01:00:00", end.GetAttribute("value"));
         Assert.Equal("2026-09-05T00:00:00", start.GetAttribute("min"));
-        Assert.Equal("2026-09-12T23:59:59", start.GetAttribute("max"));
+        Assert.Equal("2026-09-12T23:59:00", start.GetAttribute("max"));
         Assert.Equal("2026-09-05T00:00:00", end.GetAttribute("min"));
-        Assert.Equal("2026-09-12T23:59:59", end.GetAttribute("max"));
+        Assert.Equal("2026-09-12T23:59:00", end.GetAttribute("max"));
+        Assert.Equal("60", start.GetAttribute("step"));
+        Assert.Equal("60", end.GetAttribute("step"));
     }
 
     [Fact]
