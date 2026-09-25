@@ -7,7 +7,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.Timeline;
 
 // User Story 2 (P2): Step between days quickly, bounded to the trip range.
-public class TripTimelineStepTests : TestContext
+public class TripTimelineStepTests : BunitContext
 {
     public TripTimelineStepTests()
     {
@@ -18,7 +18,7 @@ public class TripTimelineStepTests : TestContext
     {
         var response = TimelineNavTestData.Response(start, end);
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.Instance.TripDates));
         return cut;
     }

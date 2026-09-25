@@ -9,7 +9,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.TripItems;
 
 // User Story 1 (P1): The end reacts to one hour after the start on create and edit forms.
-public class TrackedItemFormReactiveEndTests : TestContext
+public class TrackedItemFormReactiveEndTests : BunitContext
 {
     public TrackedItemFormReactiveEndTests()
     {
@@ -20,7 +20,7 @@ public class TrackedItemFormReactiveEndTests : TestContext
     }
 
     private IRenderedComponent<TrackedItemForm> RenderCreate(TripLegDto leg, DateTime start)
-        => RenderComponent<TrackedItemForm>(p => p
+        => Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)
@@ -59,7 +59,7 @@ public class TrackedItemFormReactiveEndTests : TestContext
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
         var item = TrackedItemFormTestData.Item(leg.TripLegId, new DateTime(2026, 9, 5, 9, 0, 0), new DateTime(2026, 9, 5, 12, 0, 0));
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.Item, item));

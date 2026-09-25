@@ -12,13 +12,13 @@ namespace TripPlanner.Web.Tests.Trips;
 
 // User Story 1 (P1): the printable page renders a chrome-free trip document, offers a
 // Print action, and shows empty / denied states.
-public class TripPrintPageTests : TestContext
+public class TripPrintPageTests : BunitContext
 {
     private IRenderedComponent<TripPrint> Render(TripDetail? trip)
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton<ITripApiClient>(new PrintStubTripApiClient(trip));
-        return RenderComponent<TripPrint>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+        return Render<TripPrint>(p => p.Add(x => x.TripId, Guid.NewGuid()));
     }
 
     [Fact]

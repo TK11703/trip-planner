@@ -5,12 +5,12 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Brand;
 
-public class BrandingRefreshContractTests : TestContext
+public class BrandingRefreshContractTests : BunitContext
 {
     [Fact]
     public void BrandMark_RendersWireFrameGlobe_NotLegacyStar()
     {
-        var cut = RenderComponent<BrandMark>();
+        var cut = Render<BrandMark>();
 
         Assert.Contains("brand-globe", cut.Markup);
         Assert.Contains("Trip Planner", cut.Markup);
@@ -20,7 +20,7 @@ public class BrandingRefreshContractTests : TestContext
     [Fact]
     public void EmptyState_UsesGlobeAndRefreshedCopy()
     {
-        var cut = RenderComponent<NoTripsEmptyState>();
+        var cut = Render<NoTripsEmptyState>();
 
         Assert.Contains("empty-trip", cut.Markup);
         Assert.Contains("empty-trip-globe", cut.Markup);

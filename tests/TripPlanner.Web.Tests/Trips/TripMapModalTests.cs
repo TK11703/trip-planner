@@ -13,13 +13,13 @@ namespace TripPlanner.Web.Tests.Trips;
 
 // User Story 1 (P1): the built-in map modal shows an empty state when nothing resolves,
 // and renders a map canvas when locations exist.
-public class TripMapModalTests : TestContext
+public class TripMapModalTests : BunitContext
 {
     private IRenderedComponent<TripMapModal> Render(TripMapResponse map)
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton<ITripApiClient>(new MapStubTripApiClient(map));
-        return RenderComponent<TripMapModal>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+        return Render<TripMapModal>(p => p.Add(x => x.TripId, Guid.NewGuid()));
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class TripMapModalTests : TestContext
         Services.AddSingleton<ITripApiClient>(new MapStubTripApiClient(map));
 
         Guid? opened = null;
-        var cut = RenderComponent<TripMapModal>(p => p
+        var cut = Render<TripMapModal>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.OnOpenItem, EventCallback.Factory.Create<Guid>(this, id => opened = id)));
 

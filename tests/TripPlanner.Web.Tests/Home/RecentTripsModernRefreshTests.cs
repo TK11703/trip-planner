@@ -11,7 +11,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Home;
 
-public class RecentTripsModernRefreshTests : TestContext
+public class RecentTripsModernRefreshTests : BunitContext
 {
     [Fact]
     public void EmptyRecentTrips_UsesBrandedRecoveryState()
@@ -19,7 +19,7 @@ public class RecentTripsModernRefreshTests : TestContext
         Services.AddSingleton<ITripApiClient>(new EmptyTripApiClient());
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
-        var cut = RenderComponent<RecentTripsList>();
+        var cut = Render<RecentTripsList>();
 
         cut.WaitForAssertion(() => Assert.Contains("empty-trip", cut.Markup));
         cut.WaitForAssertion(() => Assert.Contains("Plan your first trip", cut.Markup));

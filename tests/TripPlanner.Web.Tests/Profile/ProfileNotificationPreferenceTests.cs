@@ -10,7 +10,7 @@ using ProfilePage = TripPlanner.Web.Components.Pages.Profile;
 
 namespace TripPlanner.Web.Tests.Profile;
 
-public class ProfileNotificationPreferenceTests : TestContext
+public class ProfileNotificationPreferenceTests : BunitContext
 {
     [Fact]
     public void ProfilePage_RendersSavedNotificationPreferences()
@@ -26,7 +26,7 @@ public class ProfileNotificationPreferenceTests : TestContext
         Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider, TripPlanner.Web.Features.Maps.MapPreferenceProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
-        var cut = RenderComponent<ProfilePage>();
+        var cut = Render<ProfilePage>();
 
         cut.WaitForAssertion(() => Assert.True(cut.Find("#notif-ItineraryChanges-inapp").HasAttribute("checked")));
         Assert.False(cut.Find("#notif-ItineraryChanges-email").HasAttribute("checked"));
@@ -41,7 +41,7 @@ public class ProfileNotificationPreferenceTests : TestContext
         Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
         Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider, TripPlanner.Web.Features.Maps.MapPreferenceProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
-        var cut = RenderComponent<ProfilePage>();
+        var cut = Render<ProfilePage>();
 
         cut.Find("form").Submit();
 

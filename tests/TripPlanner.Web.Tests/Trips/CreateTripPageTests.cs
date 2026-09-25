@@ -4,7 +4,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Trips;
 
-public class CreateTripPageTests : TestContext
+public class CreateTripPageTests : BunitContext
 {
     [Fact(Skip = "Requires bUnit AuthorizeView + HttpClient mock to render NewTrip.")]
     public void NewTripPage_ShowsValidationOnInvalidDates() { }
@@ -12,7 +12,7 @@ public class CreateTripPageTests : TestContext
     [Fact]
     public void TripForm_DoesNotCollectTripLevelDestination()
     {
-        var cut = RenderComponent<TripForm>(parameters => parameters
+        var cut = Render<TripForm>(parameters => parameters
             .Add(p => p.Model, new TripForm.TripFormModel()));
 
         Assert.DoesNotContain("Destination", cut.Markup);

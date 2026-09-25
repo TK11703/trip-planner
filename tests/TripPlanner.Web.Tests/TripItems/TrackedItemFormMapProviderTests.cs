@@ -9,7 +9,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.TripItems;
 
 // User Story 2 (P2): the globe opens the entered location in the user's preferred map provider.
-public class TrackedItemFormMapProviderTests : TestContext
+public class TrackedItemFormMapProviderTests : BunitContext
 {
     private IRenderedComponent<TrackedItemForm> RenderCreate(string provider)
     {
@@ -19,7 +19,7 @@ public class TrackedItemFormMapProviderTests : TestContext
         Services.AddSingleton<IMapPreferenceProvider>(new StubMapPreferenceProvider(provider));
 
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
-        return RenderComponent<TrackedItemForm>(p => p
+        return Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)

@@ -11,7 +11,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Trips;
 
-public class TripDetailsTableViewTests : TestContext
+public class TripDetailsTableViewTests : BunitContext
 {
     [Fact]
     public void DefaultsToTableAndSwitchesToTimelineInPlace()
@@ -149,7 +149,7 @@ public class TripDetailsTableViewTests : TestContext
         Services.AddSingleton<TripPlanner.Web.Features.Trips.ITripApiClient>(api);
         Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
         Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider>(new StubMapPreferenceProvider());
-        return RenderComponent<TripDetails>(parameters => parameters.Add(component => component.TripId, trip.TripId));
+        return Render<TripDetails>(parameters => parameters.Add(component => component.TripId, trip.TripId));
     }
 
     private static AngleSharp.Dom.IElement ViewButton(IRenderedComponent<TripDetails> cut, string label) =>

@@ -9,7 +9,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.TripItems;
 
 // User Story 3 (P3): A globe action opens a valid location on a map, and is absent otherwise.
-public class TrackedItemFormLocationMapTests : TestContext
+public class TrackedItemFormLocationMapTests : BunitContext
 {
     public TrackedItemFormLocationMapTests()
     {
@@ -22,7 +22,7 @@ public class TrackedItemFormLocationMapTests : TestContext
     private IRenderedComponent<TrackedItemForm> RenderCreate()
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
-        return RenderComponent<TrackedItemForm>(p => p
+        return Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)

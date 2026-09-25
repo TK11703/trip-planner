@@ -10,7 +10,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Timeline;
 
-public class TripTimelineTests : TestContext
+public class TripTimelineTests : BunitContext
 {
     public TripTimelineTests()
     {
@@ -92,7 +92,7 @@ public class TripTimelineTests : TestContext
             new[] { unassigned });
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() =>
         {
@@ -108,7 +108,7 @@ public class TripTimelineTests : TestContext
         var response = Response(Leg("Paris", new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 2, 8, 0, 0)));
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.Contains("0 items", cut.Markup));
     }
@@ -124,7 +124,7 @@ public class TripTimelineTests : TestContext
         var response = Response(leg);
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.Contains("1 item", cut.Markup));
         Assert.DoesNotContain("1 items", cut.Markup);
@@ -146,7 +146,7 @@ public class TripTimelineTests : TestContext
         var response = Response(leg);
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.Contains("3 items", cut.Markup));
     }
@@ -163,7 +163,7 @@ public class TripTimelineTests : TestContext
         var response = Response(legA, legB);
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() =>
         {
@@ -183,7 +183,7 @@ public class TripTimelineTests : TestContext
 
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
         TripTimeline.TimelineSlotSelection? captured = null;
-        var cut = RenderComponent<TripTimeline>(p => p
+        var cut = Render<TripTimeline>(p => p
             .Add(x => x.TripId, response.TripId)
             .Add(x => x.OnLegSlotSelected, s => captured = s));
 
@@ -209,7 +209,7 @@ public class TripTimelineTests : TestContext
         var response = Response(leg);
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() =>
         {
@@ -237,7 +237,7 @@ public class TripTimelineTests : TestContext
         var response = Response(leg);
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() =>
         {
@@ -268,7 +268,7 @@ public class TripTimelineTests : TestContext
         var response = Response(ModeLeg(TripLegKinds.Travel, mode));
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.Equal(label, cut.Find("[data-testid=leg-mode]").TextContent.Trim()));
         Assert.Contains("Paris", cut.Markup, StringComparison.Ordinal);
@@ -281,7 +281,7 @@ public class TripTimelineTests : TestContext
         var response = Response(ModeLeg(TripLegKinds.Stay, null));
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".ttl-leg-label")));
         Assert.Empty(cut.FindAll("[data-testid=leg-mode]"));
@@ -293,7 +293,7 @@ public class TripTimelineTests : TestContext
         var response = Response(ModeLeg(TripLegKinds.Travel, TransportationModes.Flight, confirmationCode: "ABC123"));
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.Contains("ABC123", cut.Find("[data-testid=leg-confirmation]").TextContent, StringComparison.Ordinal));
     }
@@ -304,7 +304,7 @@ public class TripTimelineTests : TestContext
         var response = Response(ModeLeg(TripLegKinds.Travel, TransportationModes.Flight));
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".ttl-leg-label")));
         Assert.Empty(cut.FindAll("[data-testid=leg-confirmation]"));
@@ -318,7 +318,7 @@ public class TripTimelineTests : TestContext
         var response = Response(ModeLeg(TripLegKinds.Travel, TransportationModes.Car, travelCost: 412.50m));
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.Contains("Travel cost", cut.Find("[data-testid=leg-travel-cost]").TextContent, StringComparison.Ordinal));
         Assert.Contains("Estimated total", cut.Markup, StringComparison.Ordinal);
@@ -334,7 +334,7 @@ public class TripTimelineTests : TestContext
         var response = Response(ModeLeg(TripLegKinds.Travel, mode));
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".ttl-leg-label")));
         Assert.Empty(cut.FindAll(".ttl-lane.ttl-lane-clickable"));
@@ -349,7 +349,7 @@ public class TripTimelineTests : TestContext
         var response = Response(ModeLeg(legKind, mode));
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".ttl-leg-label .ttl-leg-add")));
         Assert.NotEmpty(cut.FindAll(".ttl-lane.ttl-lane-clickable"));
@@ -363,7 +363,7 @@ public class TripTimelineTests : TestContext
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(response));
 
         TripTimeline.TimelineSlotSelection? captured = null;
-        var cut = RenderComponent<TripTimeline>(p => p
+        var cut = Render<TripTimeline>(p => p
             .Add(x => x.TripId, response.TripId)
             .Add(x => x.OnLegSlotSelected, s => captured = s));
 

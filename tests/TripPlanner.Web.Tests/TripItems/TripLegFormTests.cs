@@ -16,7 +16,7 @@ namespace TripPlanner.Web.Tests.TripItems;
 /// from the answer. Travel asks how, offers optional booking details, and warns when the traveler
 /// will be a passenger; a stay asks none of that and carries none of it away.
 /// </summary>
-public class TripLegFormTests : TestContext
+public class TripLegFormTests : BunitContext
 {
     private readonly RecordingLegApiClient _api = new();
 
@@ -28,13 +28,13 @@ public class TripLegFormTests : TestContext
     }
 
     private IRenderedComponent<TripLegForm> RenderCreate(Guid? tripId = null) =>
-        RenderComponent<TripLegForm>(p => p
+        Render<TripLegForm>(p => p
             .Add(x => x.TripId, tripId ?? Guid.NewGuid())
             .Add(x => x.TripStartDate, new DateOnly(2026, 9, 5))
             .Add(x => x.TripEndDate, new DateOnly(2026, 9, 12)));
 
     private IRenderedComponent<TripLegForm> RenderEdit(TripLegDto leg, bool canEditContent = true) =>
-        RenderComponent<TripLegForm>(p => p
+        Render<TripLegForm>(p => p
             .Add(x => x.TripId, leg.TripId)
             .Add(x => x.Leg, leg)
             .Add(x => x.CanEditContent, canEditContent));
@@ -419,7 +419,7 @@ public class TripLegFormTests : TestContext
 
         var cancelled = 0;
         var leg = TripLegModeTestData.StayLeg();
-        var cut = RenderComponent<TripLegForm>(p => p
+        var cut = Render<TripLegForm>(p => p
             .Add(x => x.TripId, leg.TripId)
             .Add(x => x.Leg, leg)
             .Add(x => x.CanEditContent, true)
@@ -466,7 +466,7 @@ public class TripLegFormTests : TestContext
     {
         var leg = TripLegModeTestData.StayLeg();
         var saved = false;
-        var cut = RenderComponent<TripLegForm>(p => p
+        var cut = Render<TripLegForm>(p => p
             .Add(x => x.TripId, leg.TripId)
             .Add(x => x.Leg, leg)
             .Add(x => x.CanEditContent, true)

@@ -4,12 +4,12 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Brand;
 
-public class BrandSystemContractTests : TestContext
+public class BrandSystemContractTests : BunitContext
 {
     [Fact]
     public void BrandMark_RendersCompactGlobeIdentity()
     {
-        var cut = RenderComponent<BrandMark>();
+        var cut = Render<BrandMark>();
         Assert.Contains("Trip Planner", cut.Markup);
         Assert.Contains("brand-mark", cut.Markup);
         Assert.Contains("brand-globe", cut.Markup);
@@ -18,7 +18,7 @@ public class BrandSystemContractTests : TestContext
     [Fact]
     public void StateMessage_ProvidesNonColorCueAndStatusRole()
     {
-        var cut = RenderComponent<StateMessage>(p => p
+        var cut = Render<StateMessage>(p => p
             .Add(x => x.Title, "Unavailable trail")
             .Add(x => x.Message, "Try again later.")
             .Add(x => x.Icon, "!")

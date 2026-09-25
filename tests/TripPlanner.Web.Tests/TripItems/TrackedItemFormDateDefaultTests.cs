@@ -9,7 +9,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.TripItems;
 
 // User Story 1 (P1): A new item defaults its start to the active date and its end to +1h.
-public class TrackedItemFormDateDefaultTests : TestContext
+public class TrackedItemFormDateDefaultTests : BunitContext
 {
     public TrackedItemFormDateDefaultTests()
     {
@@ -25,7 +25,7 @@ public class TrackedItemFormDateDefaultTests : TestContext
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
         var activeStart = new DateTime(2026, 9, 5, 14, 0, 0);
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)

@@ -9,10 +9,10 @@ namespace TripPlanner.Web.Tests.Trips;
 
 // User Story 2 (P2): the printable document shows every detail — metadata, legs as
 // chronological row dividers, item columns, and combined datetime+TZ cells.
-public class TripPrintDocumentTests : TestContext
+public class TripPrintDocumentTests : BunitContext
 {
     private IRenderedComponent<TripPrintDocument> Render(TripDetail trip) =>
-        RenderComponent<TripPrintDocument>(p => p.Add(x => x.Trip, TripPrintFormatting.BuildPrintableTrip(trip)));
+        Render<TripPrintDocument>(p => p.Add(x => x.Trip, TripPrintFormatting.BuildPrintableTrip(trip)));
 
     [Fact]
     public void RendersMetadataBlockFirst()
@@ -68,7 +68,7 @@ public class TripPrintDocumentTests : TestContext
     {
         var trip = populated ? TripFixtures.Representative() : TripFixtures.Empty();
         var model = TripPrintFormatting.BuildItineraryTable(trip);
-        var expected = RenderComponent<TripItineraryTable>(parameters => parameters
+        var expected = Render<TripItineraryTable>(parameters => parameters
             .Add(component => component.Model, model));
 
         var document = Render(trip);

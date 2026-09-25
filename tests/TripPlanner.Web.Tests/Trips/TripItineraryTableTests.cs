@@ -6,7 +6,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Trips;
 
-public class TripItineraryTableTests : TestContext
+public class TripItineraryTableTests : BunitContext
 {
     [Fact]
     public void RendersCaptionAndSevenColumnHeaders()
@@ -50,7 +50,7 @@ public class TripItineraryTableTests : TestContext
     {
         var addLegCount = 0;
         var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Empty());
-        var cut = RenderComponent<TripItineraryTable>(parameters => parameters
+        var cut = Render<TripItineraryTable>(parameters => parameters
             .Add(component => component.Model, model)
             .Add(component => component.OnAddLeg, () => addLegCount++)
             .Add(component => component.OnAddItem, _ => { }));
@@ -72,7 +72,7 @@ public class TripItineraryTableTests : TestContext
         Guid? editedItem = null;
         Guid? initialLeg = null;
         var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
-        var cut = RenderComponent<TripItineraryTable>(parameters => parameters
+        var cut = Render<TripItineraryTable>(parameters => parameters
             .Add(component => component.Model, model)
             .Add(component => component.OnEditLeg, id => editedLeg = id)
             .Add(component => component.OnEditItem, id => editedItem = id)
@@ -94,7 +94,7 @@ public class TripItineraryTableTests : TestContext
         var addLegCount = 0;
         Guid? initialLeg = TripFixtures.ArrivalLegId;
         var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
-        var cut = RenderComponent<TripItineraryTable>(parameters => parameters
+        var cut = Render<TripItineraryTable>(parameters => parameters
             .Add(component => component.Model, model)
             .Add(component => component.OnAddLeg, () => addLegCount++)
             .Add(component => component.OnAddItem, id => initialLeg = id));
@@ -132,7 +132,7 @@ public class TripItineraryTableTests : TestContext
     public void InteractiveActionsAreContextuallyNamedNativeButtons()
     {
         var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
-        var cut = RenderComponent<TripItineraryTable>(parameters => parameters
+        var cut = Render<TripItineraryTable>(parameters => parameters
             .Add(component => component.Model, model)
             .Add(component => component.OnEditLeg, _ => { })
             .Add(component => component.OnEditItem, _ => { })
@@ -185,6 +185,6 @@ public class TripItineraryTableTests : TestContext
     }
 
     private IRenderedComponent<TripItineraryTable> Render(TripPlanner.Contracts.Trips.TripDetail trip) =>
-        RenderComponent<TripItineraryTable>(parameters => parameters
+        Render<TripItineraryTable>(parameters => parameters
             .Add(component => component.Model, TripPrintFormatting.BuildItineraryTable(trip)));
 }

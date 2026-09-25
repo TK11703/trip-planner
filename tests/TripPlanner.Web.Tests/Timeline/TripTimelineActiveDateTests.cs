@@ -7,7 +7,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.Timeline;
 
 // User Story 1 (P1): Track the active (centered) date reported from scrolling.
-public class TripTimelineActiveDateTests : TestContext
+public class TripTimelineActiveDateTests : BunitContext
 {
     public TripTimelineActiveDateTests()
     {
@@ -21,7 +21,7 @@ public class TripTimelineActiveDateTests : TestContext
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
 
         DateOnly? raised = null;
-        var cut = RenderComponent<TripTimeline>(p => p
+        var cut = Render<TripTimeline>(p => p
             .Add(x => x.TripId, response.TripId)
             .Add(x => x.OnActiveDateChanged, d => raised = d));
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.Instance.TripDates));
@@ -38,7 +38,7 @@ public class TripTimelineActiveDateTests : TestContext
         var response = TimelineNavTestData.Response(new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 3));
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.Instance.TripDates));
 
         await cut.InvokeAsync(() => cut.Instance.SetCenteredDayIndex(99));
@@ -53,7 +53,7 @@ public class TripTimelineActiveDateTests : TestContext
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
 
         var raisedCount = 0;
-        var cut = RenderComponent<TripTimeline>(p => p
+        var cut = Render<TripTimeline>(p => p
             .Add(x => x.TripId, response.TripId)
             .Add(x => x.OnActiveDateChanged, _ => raisedCount++));
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.Instance.TripDates));

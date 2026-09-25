@@ -12,7 +12,7 @@ using HomePage = TripPlanner.Web.Components.Pages.Home;
 
 namespace TripPlanner.Web.Tests.Brand;
 
-public class BrandCopyContractTests : TestContext
+public class BrandCopyContractTests : BunitContext
 {
     private static readonly string[] OutdatedBrandTerms =
     {
@@ -27,14 +27,14 @@ public class BrandCopyContractTests : TestContext
     [Fact]
     public void PublicAndSharedSurfaces_AvoidOutdatedBrandAndTechnologyCopy()
     {
-        this.AddTestAuthorization().SetNotAuthorized();
+        this.AddAuthorization().SetNotAuthorized();
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
 
         var markup = string.Concat(
-            RenderComponent<CascadingAuthenticationState>(p => p.AddChildContent<HomePage>()).Markup,
-            RenderComponent<About>().Markup,
-            RenderComponent<Faq>().Markup,
-            RenderComponent<NoTripsEmptyState>().Markup);
+            Render<CascadingAuthenticationState>(p => p.AddChildContent<HomePage>()).Markup,
+            Render<About>().Markup,
+            Render<Faq>().Markup,
+            Render<NoTripsEmptyState>().Markup);
 
         foreach (var term in OutdatedBrandTerms)
         {
@@ -50,10 +50,10 @@ public class BrandCopyContractTests : TestContext
     [Fact]
     public void PublicHome_IncludesHelpfulPlanningGuidance()
     {
-        this.AddTestAuthorization().SetNotAuthorized();
+        this.AddAuthorization().SetNotAuthorized();
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
 
-        var cut = RenderComponent<CascadingAuthenticationState>(p => p.AddChildContent<HomePage>());
+        var cut = Render<CascadingAuthenticationState>(p => p.AddChildContent<HomePage>());
 
         Assert.Contains("Leave buffers between legs", cut.Markup);
         Assert.Contains("Group plans by day", cut.Markup);
@@ -64,7 +64,7 @@ public class BrandCopyContractTests : TestContext
     {
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
 
-        var cut = RenderComponent<TripsIndex>();
+        var cut = Render<TripsIndex>();
 
         cut.WaitForAssertion(() =>
         {

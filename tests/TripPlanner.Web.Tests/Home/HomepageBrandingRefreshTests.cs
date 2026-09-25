@@ -9,15 +9,15 @@ using HomePage = TripPlanner.Web.Components.Pages.Home;
 
 namespace TripPlanner.Web.Tests.Home;
 
-public class HomepageBrandingRefreshTests : TestContext
+public class HomepageBrandingRefreshTests : BunitContext
 {
     [Fact]
     public void AnonymousHome_IsImageLed_WithTransportCuesAndPlanningTips()
     {
-        this.AddTestAuthorization().SetNotAuthorized();
+        this.AddAuthorization().SetNotAuthorized();
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
 
-        var cut = RenderComponent<CascadingAuthenticationState>(p => p.AddChildContent<HomePage>());
+        var cut = Render<CascadingAuthenticationState>(p => p.AddChildContent<HomePage>());
 
         Assert.Contains("hero-welcome", cut.Markup);
         Assert.Contains("img/brand/home-welcome.svg", cut.Markup);
@@ -40,10 +40,10 @@ public class HomepageBrandingRefreshTests : TestContext
     [Fact]
     public void AuthorizedHome_RetainsRecentTripsNavigation()
     {
-        this.AddTestAuthorization().SetAuthorized("traveler@example.com");
+        this.AddAuthorization().SetAuthorized("traveler@example.com");
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
 
-        var cut = RenderComponent<CascadingAuthenticationState>(p => p.AddChildContent<HomePage>());
+        var cut = Render<CascadingAuthenticationState>(p => p.AddChildContent<HomePage>());
 
         cut.WaitForAssertion(() => Assert.Contains("Recent trips", cut.Markup));
         Assert.Contains("Plan a trip", cut.Markup);

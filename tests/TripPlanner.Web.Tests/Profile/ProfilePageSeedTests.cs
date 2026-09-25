@@ -8,7 +8,7 @@ using ProfilePage = TripPlanner.Web.Components.Pages.Profile;
 
 namespace TripPlanner.Web.Tests.Profile;
 
-public class ProfilePageSeedTests : TestContext
+public class ProfilePageSeedTests : BunitContext
 {
     [Fact]
     public void SignedInUser_DisplaysAzureSeededProfileValues()
@@ -18,7 +18,7 @@ public class ProfilePageSeedTests : TestContext
         Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider, TripPlanner.Web.Features.Maps.MapPreferenceProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
-        var cut = RenderComponent<ProfilePage>();
+        var cut = Render<ProfilePage>();
 
         cut.WaitForAssertion(() => Assert.Contains("Avery Traveler", cut.Markup));
         Assert.Equal("Avery", cut.Find("#firstName").GetAttribute("value"));

@@ -8,7 +8,7 @@ using ProfilePage = TripPlanner.Web.Components.Pages.Profile;
 
 namespace TripPlanner.Web.Tests.Profile;
 
-public class ProfileEditTests : TestContext
+public class ProfileEditTests : BunitContext
 {
     [Fact]
     public void ProfilePage_SavesEditedIdentityAndPreferenceValues()
@@ -18,7 +18,7 @@ public class ProfileEditTests : TestContext
         Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
         Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider, TripPlanner.Web.Features.Maps.MapPreferenceProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
-        var cut = RenderComponent<ProfilePage>();
+        var cut = Render<ProfilePage>();
 
         cut.Find("#displayName").Change("Avery Updated");
         cut.Find("#notif-TripSharing-email").Change(false);

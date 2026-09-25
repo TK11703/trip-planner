@@ -7,7 +7,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.Timeline;
 
 // User Story 1 (P1): Jump directly to a chosen date.
-public class TripTimelineJumpTests : TestContext
+public class TripTimelineJumpTests : BunitContext
 {
     public TripTimelineJumpTests()
     {
@@ -20,7 +20,7 @@ public class TripTimelineJumpTests : TestContext
         var response = TimelineNavTestData.Response(new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 10));
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.Equal(10, cut.Instance.TripDates.Count));
         Assert.Equal(new DateOnly(2026, 9, 1), cut.Instance.TripDates[0]);
@@ -33,7 +33,7 @@ public class TripTimelineJumpTests : TestContext
         var response = TimelineNavTestData.Response(new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 10));
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.Instance.TripDates));
 
         await cut.InvokeAsync(() => cut.Instance.ScrollToDateAsync(new DateOnly(2026, 9, 5)));
@@ -50,12 +50,12 @@ public class TripTimelineJumpTests : TestContext
         var response = TimelineNavTestData.Response(new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 3));
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
 
-        var editable = RenderComponent<TripTimeline>(p => p
+        var editable = Render<TripTimeline>(p => p
             .Add(x => x.TripId, response.TripId)
             .Add(x => x.CanEdit, true));
         editable.WaitForAssertion(() => Assert.Contains("ttl-leg-add-footer", editable.Markup));
 
-        var readOnly = RenderComponent<TripTimeline>(p => p
+        var readOnly = Render<TripTimeline>(p => p
             .Add(x => x.TripId, response.TripId)
             .Add(x => x.CanEdit, false));
         readOnly.WaitForAssertion(() => Assert.NotEmpty(readOnly.Instance.TripDates));
@@ -69,7 +69,7 @@ public class TripTimelineJumpTests : TestContext
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
 
         var invoked = false;
-        var cut = RenderComponent<TripTimeline>(p => p
+        var cut = Render<TripTimeline>(p => p
             .Add(x => x.TripId, response.TripId)
             .Add(x => x.CanEdit, true)
             .Add(x => x.OnAddLegRequested, () => invoked = true));

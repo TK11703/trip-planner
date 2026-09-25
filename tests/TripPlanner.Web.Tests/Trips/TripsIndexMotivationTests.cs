@@ -9,7 +9,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Trips;
 
-public class TripsIndexMotivationTests : TestContext
+public class TripsIndexMotivationTests : BunitContext
 {
     private static TripSummary Trip(string name) =>
         new(Guid.NewGuid(), name, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, 0, TripAccessLevel.Owner, true);
@@ -20,7 +20,7 @@ public class TripsIndexMotivationTests : TestContext
     {
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
 
-        var cut = RenderComponent<TripsIndex>();
+        var cut = Render<TripsIndex>();
 
         cut.WaitForAssertion(() =>
         {
@@ -36,7 +36,7 @@ public class TripsIndexMotivationTests : TestContext
     {
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
 
-        var cut = RenderComponent<TripsIndex>();
+        var cut = Render<TripsIndex>();
 
         cut.WaitForAssertion(() =>
         {
@@ -55,7 +55,7 @@ public class TripsIndexMotivationTests : TestContext
     {
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(new[] { Trip("Weekend away"), Trip("City break") }));
 
-        var cut = RenderComponent<TripsIndex>();
+        var cut = Render<TripsIndex>();
 
         cut.WaitForAssertion(() =>
         {
@@ -72,7 +72,7 @@ public class TripsIndexMotivationTests : TestContext
         var many = Enumerable.Range(0, 6).Select(i => Trip($"Trip {i}")).ToArray();
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient(many));
 
-        var cut = RenderComponent<TripsIndex>();
+        var cut = Render<TripsIndex>();
 
         cut.WaitForAssertion(() =>
         {
@@ -100,7 +100,7 @@ public class TripsIndexMotivationTests : TestContext
     {
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
 
-        var cut = RenderComponent<TripsIndex>();
+        var cut = Render<TripsIndex>();
 
         cut.WaitForAssertion(() =>
         {

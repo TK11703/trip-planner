@@ -12,13 +12,13 @@ namespace TripPlanner.Web.Tests.Trips;
 
 // User Story 3 (P3): the trip details page offers an owner-only Print action that
 // links to the printable page.
-public class TripDetailsPrintButtonTests : TestContext
+public class TripDetailsPrintButtonTests : BunitContext
 {
     private IRenderedComponent<TripDetails> Render(bool isOwner, Guid tripId)
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton<ITripApiClient>(new DetailsStubTripApiClient(isOwner, tripId));
-        return RenderComponent<TripDetails>(p => p.Add(x => x.TripId, tripId));
+        return Render<TripDetails>(p => p.Add(x => x.TripId, tripId));
     }
 
     [Fact]

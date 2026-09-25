@@ -1,3 +1,4 @@
+using Bunit;
 using Microsoft.AspNetCore.Authorization;
 using TripPlanner.Web.Components.Pages.Trips;
 using TripPlanner.Web.Components.Trips;
@@ -22,8 +23,8 @@ public class ProtectedRouteTests
     [Fact]
     public void SignInRequiredState_RendersRecoveryAction()
     {
-        using var ctx = new Bunit.TestContext();
-        var cut = ctx.RenderComponent<TripAccessState>(parameters => parameters.Add(p => p.State, TripAccessState.TripAccessStateKind.SignInRequired));
+        using var ctx = new BunitContext();
+        var cut = ctx.Render<TripAccessState>(parameters => parameters.Add(p => p.State, TripAccessState.TripAccessStateKind.SignInRequired));
 
         Assert.Contains("Sign in required", cut.Markup);
         Assert.Contains("MicrosoftIdentity/Account/SignIn", cut.Markup);

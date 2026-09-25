@@ -8,7 +8,7 @@ using ProfilePage = TripPlanner.Web.Components.Pages.Profile;
 
 namespace TripPlanner.Web.Tests.Profile;
 
-public class ProfilePersonalizationTests : TestContext
+public class ProfilePersonalizationTests : BunitContext
 {
     [Fact]
     public void ProfilePage_RendersPersonalizationFields()
@@ -19,7 +19,7 @@ public class ProfilePersonalizationTests : TestContext
         Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider, TripPlanner.Web.Features.Maps.MapPreferenceProvider>();
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
-        var cut = RenderComponent<ProfilePage>();
+        var cut = Render<ProfilePage>();
 
         cut.WaitForAssertion(() => Assert.Equal("museums", cut.Find("#travelInterests").GetAttribute("value")));
         Assert.Equal("SEA", cut.Find("#homeAirport").GetAttribute("value"));

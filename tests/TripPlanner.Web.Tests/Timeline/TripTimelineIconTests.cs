@@ -8,7 +8,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.Timeline;
 
 // User Story 2 (P2): Timeline items render a type icon that reflects their type.
-public class TripTimelineIconTests : TestContext
+public class TripTimelineIconTests : BunitContext
 {
     public TripTimelineIconTests()
     {
@@ -53,7 +53,7 @@ public class TripTimelineIconTests : TestContext
             Item(legId, "Museum", "activity", new DateTime(2026, 9, 1, 10, 0, 0)));
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll(".ttl-item .ttl-item-type-icon").Count));
     }
@@ -67,7 +67,7 @@ public class TripTimelineIconTests : TestContext
             Item(legId, "Event", "event", new DateTime(2026, 9, 1, 12, 0, 0)));
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
 
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
 
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll(".ttl-item .ttl-item-type-icon").Count));
         var glyphs = cut.FindAll(".ttl-item .ttl-item-type-icon").Select(svg => svg.InnerHtml).ToArray();

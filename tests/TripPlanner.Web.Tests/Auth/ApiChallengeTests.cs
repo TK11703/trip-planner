@@ -17,7 +17,7 @@ namespace TripPlanner.Web.Tests.Auth;
 /// scale-to-zero leaves a signed-in user with no access token. Entra answers that with a challenge,
 /// which is a redirect instruction rather than a failure worth showing anyone.
 /// </summary>
-public class ApiChallengeTests : TestContext
+public class ApiChallengeTests : BunitContext
 {
     [Fact]
     public void ChallengeIsHandedToTheChallengeHandlerRatherThanRendered()
@@ -26,7 +26,7 @@ public class ApiChallengeTests : TestContext
         var handler = new FakeChallengeHandler(handles: true);
         Arrange(challenge, handler);
 
-        var cut = RenderComponent<RecentTripsList>();
+        var cut = Render<RecentTripsList>();
 
         cut.WaitForAssertion(() => Assert.Same(challenge, handler.Received));
         Assert.DoesNotContain("IDW10502", cut.Markup, StringComparison.Ordinal);
@@ -39,7 +39,7 @@ public class ApiChallengeTests : TestContext
         var handler = new FakeChallengeHandler(handles: false);
         Arrange(new HttpRequestException("The trip service is unavailable."), handler);
 
-        var cut = RenderComponent<RecentTripsList>();
+        var cut = Render<RecentTripsList>();
 
         cut.WaitForAssertion(() => Assert.Contains("The trip service is unavailable.", cut.Markup, StringComparison.Ordinal));
     }
@@ -51,7 +51,7 @@ public class ApiChallengeTests : TestContext
         // behaviour rather than swallowing the error and rendering an empty panel.
         Arrange(new HttpRequestException("The trip service is unavailable."), handler: null);
 
-        var cut = RenderComponent<RecentTripsList>();
+        var cut = Render<RecentTripsList>();
 
         cut.WaitForAssertion(() => Assert.Contains("The trip service is unavailable.", cut.Markup, StringComparison.Ordinal));
     }
@@ -61,7 +61,7 @@ public class ApiChallengeTests : TestContext
     {
         Arrange(new OperationCanceledException(), new FakeChallengeHandler(handles: false));
 
-        var cut = RenderComponent<RecentTripsList>();
+        var cut = Render<RecentTripsList>();
 
         cut.WaitForAssertion(() => Assert.DoesNotContain("couldn't load your trips", cut.Markup, StringComparison.Ordinal));
     }
@@ -77,7 +77,7 @@ public class ApiChallengeTests : TestContext
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient { DetailFailure = challenge });
         Services.AddSingleton<IApiChallengeHandler>(handler);
 
-        var cut = RenderComponent<TripDetails>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+        var cut = Render<TripDetails>(p => p.Add(x => x.TripId, Guid.NewGuid()));
 
         cut.WaitForAssertion(() => Assert.Same(challenge, handler.Received));
         Assert.DoesNotContain("isn't available", cut.Markup, StringComparison.Ordinal);
@@ -91,7 +91,7 @@ public class ApiChallengeTests : TestContext
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient { DetailFailure = new HttpRequestException("down") });
         Services.AddSingleton<IApiChallengeHandler>(new FakeChallengeHandler(handles: false));
 
-        var cut = RenderComponent<TripDetails>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+        var cut = Render<TripDetails>(p => p.Add(x => x.TripId, Guid.NewGuid()));
 
         cut.WaitForAssertion(() => Assert.Contains("isn't available", cut.Markup, StringComparison.Ordinal));
     }
@@ -105,7 +105,7 @@ public class ApiChallengeTests : TestContext
         Services.AddSingleton<ITripApiClient>(new StubTripApiClient { DetailFailure = challenge });
         Services.AddSingleton<IApiChallengeHandler>(handler);
 
-        var cut = RenderComponent<TripPrint>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+        var cut = Render<TripPrint>(p => p.Add(x => x.TripId, Guid.NewGuid()));
 
         cut.WaitForAssertion(() => Assert.Same(challenge, handler.Received));
         Assert.DoesNotContain("isn't available", cut.Markup, StringComparison.Ordinal);

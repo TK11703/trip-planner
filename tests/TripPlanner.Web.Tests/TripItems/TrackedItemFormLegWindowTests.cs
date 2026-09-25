@@ -10,7 +10,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.TripItems;
 
 // An item belongs to a trip leg, so its date pickers are bounded to that leg's travel window.
-public class TrackedItemFormLegWindowTests : TestContext
+public class TrackedItemFormLegWindowTests : BunitContext
 {
     public TrackedItemFormLegWindowTests()
     {
@@ -25,7 +25,7 @@ public class TrackedItemFormLegWindowTests : TestContext
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)
@@ -43,7 +43,7 @@ public class TrackedItemFormLegWindowTests : TestContext
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 8, 10, 20, 39, 39), new DateTime(2026, 8, 13, 8, 5, 39));
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)
@@ -61,7 +61,7 @@ public class TrackedItemFormLegWindowTests : TestContext
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)
@@ -77,7 +77,7 @@ public class TrackedItemFormLegWindowTests : TestContext
     {
         var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)
@@ -95,7 +95,7 @@ public class TrackedItemFormLegWindowTests : TestContext
     [Fact]
     public void NoLegSelected_LeavesDatePickersUnbounded()
     {
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, Array.Empty<TripPlanner.Contracts.Trips.TripLegDto>()));
 
@@ -109,7 +109,7 @@ public class TrackedItemFormLegWindowTests : TestContext
     [Fact]
     public void NoLegSelected_StartFarFromAnyLeg_DoesNotBlockSubmit()
     {
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, Array.Empty<TripPlanner.Contracts.Trips.TripLegDto>()));
 
@@ -130,7 +130,7 @@ public class TrackedItemFormLegWindowTests : TestContext
         var elsewhere = TrackedItemFormTestData.Leg(new DateTime(2026, 10, 1, 8, 0, 0), new DateTime(2026, 10, 5, 18, 0, 0));
         var item = TrackedItemFormTestData.Item(null, new DateTime(2026, 9, 5, 14, 0, 0), new DateTime(2026, 9, 5, 16, 0, 0));
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { covering, elsewhere })
             .Add(x => x.Item, item));
@@ -148,7 +148,7 @@ public class TrackedItemFormLegWindowTests : TestContext
         var elsewhere = TrackedItemFormTestData.Leg(new DateTime(2026, 10, 1, 8, 0, 0), new DateTime(2026, 10, 5, 18, 0, 0));
         var item = TrackedItemFormTestData.Item(null, new DateTime(2026, 9, 5, 14, 0, 0), new DateTime(2026, 9, 5, 16, 0, 0));
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { covering, elsewhere })
             .Add(x => x.Item, item));
@@ -180,7 +180,7 @@ public class TrackedItemFormLegWindowTests : TestContext
         var stay = EligibleLeg();
         var restricted = RestrictedLeg(mode);
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { stay, restricted }));
 
@@ -195,7 +195,7 @@ public class TrackedItemFormLegWindowTests : TestContext
         var stay = EligibleLeg();
         var car = RestrictedLeg(TransportationModes.Car, "Road trip");
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { stay, car }));
 
@@ -211,7 +211,7 @@ public class TrackedItemFormLegWindowTests : TestContext
     [Fact]
     public void TripWithOnlyRestrictedLegs_ShowsTheEmptyState()
     {
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { RestrictedLeg(TransportationModes.Flight), RestrictedLeg(TransportationModes.Train, "Onward") }));
 
@@ -231,7 +231,7 @@ public class TrackedItemFormLegWindowTests : TestContext
         var stay = EligibleLeg();
         var item = TrackedItemFormTestData.Item(restricted.TripLegId, new DateTime(2026, 9, 5, 14, 0, 0), new DateTime(2026, 9, 5, 16, 0, 0));
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { stay, restricted })
             .Add(x => x.Item, item));

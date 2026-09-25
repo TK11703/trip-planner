@@ -17,7 +17,7 @@ namespace TripPlanner.Web.Tests.EmailIngestion;
 /// without losing work (FR-011, FR-022 to FR-027). Also covers the one labelled suggestion the
 /// review screen is allowed to offer (FR-034).
 /// </summary>
-public class DraftLegOutcomeTests : TestContext
+public class DraftLegOutcomeTests : BunitContext
 {
     private static readonly Guid TripId = Guid.NewGuid();
 
@@ -71,7 +71,7 @@ public class DraftLegOutcomeTests : TestContext
         Services.AddSingleton<ITripApiClient>(tripClient);
         Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
         cut.WaitForAssertion(() => Assert.Contains(draft.Title!, cut.Markup, StringComparison.Ordinal));
         return (cut, ingestion);
     }

@@ -11,7 +11,7 @@ namespace TripPlanner.Web.Tests.TripItems;
 /// An item the traveler no longer needs has to be removable from the same place it is edited,
 /// and because removal is irreversible the form asks before it acts.
 /// </summary>
-public class TrackedItemFormDeleteTests : TestContext
+public class TrackedItemFormDeleteTests : BunitContext
 {
     private readonly FormStubTripApiClient _api = new();
 
@@ -30,7 +30,7 @@ public class TrackedItemFormDeleteTests : TestContext
     {
         var leg = TrackedItemFormTestData.Leg(LegStart, LegEnd);
         var item = TrackedItemFormTestData.Item(leg.TripLegId, new DateTime(2026, 9, 5, 14, 0, 0), new DateTime(2026, 9, 5, 16, 0, 0));
-        return RenderComponent<TrackedItemForm>(p =>
+        return Render<TrackedItemForm>(p =>
         {
             p.Add(x => x.TripId, Guid.NewGuid());
             p.Add(x => x.Legs, new[] { leg });
@@ -48,7 +48,7 @@ public class TrackedItemFormDeleteTests : TestContext
     {
         var leg = TrackedItemFormTestData.Leg(LegStart, LegEnd);
 
-        var cut = RenderComponent<TrackedItemForm>(p => p
+        var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)

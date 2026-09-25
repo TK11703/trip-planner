@@ -13,19 +13,19 @@ using HomePage = TripPlanner.Web.Components.Pages.Home;
 
 namespace TripPlanner.Web.Tests.PublicContent;
 
-public class PublicPageTests : TestContext
+public class PublicPageTests : BunitContext
 {
     [Fact]
     public void FaqPage_RendersHeader()
     {
-        var cut = RenderComponent<Faq>();
+        var cut = Render<Faq>();
         Assert.Contains("Frequently asked questions", cut.Markup);
     }
 
     [Fact]
     public void AboutPage_RendersPurpose()
     {
-        var cut = RenderComponent<About>();
+        var cut = Render<About>();
         Assert.Contains("Trip Planner", cut.Markup);
     }
 
@@ -33,10 +33,10 @@ public class PublicPageTests : TestContext
     public void AnonymousHome_RendersPublicContentWithoutCallingProtectedTrips()
     {
         var client = new ThrowingTripApiClient();
-        this.AddTestAuthorization().SetNotAuthorized();
+        this.AddAuthorization().SetNotAuthorized();
         Services.AddSingleton<ITripApiClient>(client);
 
-        var cut = RenderComponent<CascadingAuthenticationState>(parameters => parameters.AddChildContent<HomePage>());
+        var cut = Render<CascadingAuthenticationState>(parameters => parameters.AddChildContent<HomePage>());
 
         Assert.Contains("Sign in to begin", cut.Markup);
         Assert.DoesNotContain("Recent trips", cut.Markup);

@@ -10,19 +10,19 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Theme;
 
-public class ThemeSelectorTests : TestContext
+public class ThemeSelectorTests : BunitContext
 {
     [Fact]
     public void ThemeSelector_RendersLightAndDarkOptions()
     {
         JSInterop.SetupVoid("tripPlannerTheme.applyTheme", _ => true);
         JSInterop.Setup<string>("tripPlannerTheme.getAppliedMode").SetResult("light");
-        this.AddTestAuthorization().SetNotAuthorized();
+        this.AddAuthorization().SetNotAuthorized();
         Services.AddScoped<ThemeStateService>();
         Services.AddSingleton<IThemePreferenceApiClient>(new RecordingThemePreferenceApiClient());
         Services.AddScoped<AccountThemeInitializer>();
 
-        var cut = RenderComponent<ThemeSelector>();
+        var cut = Render<ThemeSelector>();
 
         Assert.Contains("Light", cut.Markup);
         Assert.Contains("Dark", cut.Markup);
@@ -38,14 +38,14 @@ public class ThemeSelectorTests : TestContext
         JSInterop.SetupVoid("tripPlannerTheme.applyTheme", _ => true);
         var getApplied = JSInterop.Setup<string>("tripPlannerTheme.getAppliedMode");
         getApplied.SetResult("dark");
-        this.AddTestAuthorization().SetAuthorized("traveler");
+        this.AddAuthorization().SetAuthorized("traveler");
         Services.AddScoped<ThemeStateService>();
         Services.AddSingleton<IThemePreferenceApiClient>(new ThrowingThemePreferenceApiClient(
             new MicrosoftIdentityWebChallengeUserException(
                 new MsalUiRequiredException("invalid_grant", "interaction required"), ["api://trip-planner/access_as_user"])));
         Services.AddScoped<AccountThemeInitializer>();
 
-        var cut = RenderComponent<ThemeSelector>();
+        var cut = Render<ThemeSelector>();
 
         cut.WaitForAssertion(() => Assert.DoesNotContain("theme-selector-loading", cut.Markup, StringComparison.Ordinal));
         Assert.Single(getApplied.Invocations);

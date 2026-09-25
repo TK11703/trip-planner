@@ -9,7 +9,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.TripItems;
 
 // User Story 3 (P3): Location is optional but, when entered, must be map-capable.
-public class TrackedItemFormLocationValidationTests : TestContext
+public class TrackedItemFormLocationValidationTests : BunitContext
 {
     private const string FormatMessage = "Enter a place or address that can be shown on a map.";
     private const string LengthMessage = "Location must be 200 characters or fewer.";
@@ -23,7 +23,7 @@ public class TrackedItemFormLocationValidationTests : TestContext
     }
 
     private IRenderedComponent<TrackedItemForm> RenderCreate(TripLegDto leg)
-        => RenderComponent<TrackedItemForm>(p => p
+        => Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, new[] { leg })
             .Add(x => x.InitialTripLegId, leg.TripLegId)

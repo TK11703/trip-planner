@@ -18,7 +18,7 @@ namespace TripPlanner.Web.Tests.EmailIngestion;
 /// The review surface survived the move to relayed ingestion (FR-024): travelers can still see
 /// what arrived, review drafts, and act on them.
 /// </summary>
-public class InboxReviewPageTests : TestContext
+public class InboxReviewPageTests : BunitContext
 {
     private static ParsedItemDraftDto Draft(Guid? tripId = null, Guid? legId = null, DateTime? start = null, DraftPlacement? placement = null) =>
         new(Guid.NewGuid(), Guid.NewGuid(), tripId, legId, "flight", "Flight ABC123", "SEA",
@@ -36,7 +36,7 @@ public class InboxReviewPageTests : TestContext
         var draft = Draft(Guid.NewGuid(), Guid.NewGuid(), new DateTime(2026, 8, 12, 9, 30, 0));
         Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([draft]));
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
 
         cut.WaitForAssertion(() =>
         {
@@ -52,7 +52,7 @@ public class InboxReviewPageTests : TestContext
     {
         Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([Draft()]));
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
 
         cut.WaitForAssertion(() =>
         {
@@ -68,7 +68,7 @@ public class InboxReviewPageTests : TestContext
         var client = new StubEmailIngestionApiClient([Draft(Guid.NewGuid(), Guid.NewGuid(), new DateTime(2026, 8, 12, 9, 30, 0))]);
         Services.AddSingleton<IEmailIngestionApiClient>(client);
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
         cut.WaitForAssertion(() => Assert.Contains("Flight ABC123", cut.Markup, StringComparison.Ordinal));
 
         cut.FindAll("button").Single(b => b.TextContent.Contains("Discard", StringComparison.Ordinal)).Click();
@@ -82,7 +82,7 @@ public class InboxReviewPageTests : TestContext
     {
         Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([]));
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
 
         cut.WaitForAssertion(() => Assert.Contains("No items are waiting for review", cut.Markup, StringComparison.Ordinal));
     }
@@ -97,7 +97,7 @@ public class InboxReviewPageTests : TestContext
             DraftPlacementStatus.Matched, candidate.TripId, candidate.TripLegId, [candidate]));
         Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([draft]));
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
 
         cut.WaitForAssertion(() =>
         {
@@ -118,7 +118,7 @@ public class InboxReviewPageTests : TestContext
         var client = new StubEmailIngestionApiClient([draft]);
         Services.AddSingleton<IEmailIngestionApiClient>(client);
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
         cut.WaitForAssertion(() => Assert.Contains("San Francisco", cut.Markup, StringComparison.Ordinal));
 
         Assert.Empty(client.Updated);
@@ -143,7 +143,7 @@ public class InboxReviewPageTests : TestContext
             DraftPlacementStatus.Ambiguous, null, null, [first, second]));
         Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([draft]));
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
 
         cut.WaitForAssertion(() =>
         {
@@ -164,7 +164,7 @@ public class InboxReviewPageTests : TestContext
         var client = new StubEmailIngestionApiClient([draft]);
         Services.AddSingleton<IEmailIngestionApiClient>(client);
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
         cut.WaitForAssertion(() => Assert.Contains("Napa", cut.Markup, StringComparison.Ordinal));
 
         cut.Find("select").Change(second.TripLegId.ToString());
@@ -187,7 +187,7 @@ public class InboxReviewPageTests : TestContext
         var draft = Draft(placement: new DraftPlacement(DraftPlacementStatus.InsufficientData, null, null, []));
         Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([draft]));
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
 
         cut.WaitForAssertion(() =>
         {
@@ -208,7 +208,7 @@ public class InboxReviewPageTests : TestContext
             new DraftPlacement(DraftPlacementStatus.OutsideTripDates, null, null, []));
         Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([inAGap, unplanned]));
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
 
         cut.WaitForAssertion(() =>
         {
@@ -233,7 +233,7 @@ public class InboxReviewPageTests : TestContext
             new DraftPlacement(DraftPlacementStatus.NoLegCovers, null, null, []));
         Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([draft]));
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
 
         cut.WaitForAssertion(() =>
         {
@@ -273,7 +273,7 @@ public class InboxReviewPageTests : TestContext
         Services.AddSingleton<ITripApiClient>(tripClient);
         Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
         cut.WaitForAssertion(() => Assert.Contains("Flight ABC123", cut.Markup, StringComparison.Ordinal));
         return (cut, ingestion, tripClient);
     }
@@ -441,7 +441,7 @@ public class InboxReviewPageTests : TestContext
         };
         Services.AddSingleton<IEmailIngestionApiClient>(ingestion);
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
         cut.WaitForAssertion(() => Assert.Contains("Flight ABC123", cut.Markup, StringComparison.Ordinal));
 
         cut.FindAll("button").Single(b => b.TextContent.Contains("Confirm", StringComparison.Ordinal)).Click();
@@ -532,7 +532,7 @@ public class InboxReviewPageTests : TestContext
         var unsupported = new InboxEmailDto(Guid.NewGuid(), "traveler@contoso.com", "Newsletter", DateTimeOffset.UtcNow, ParseStatus.Unsupported);
         Services.AddSingleton<IInboxHistoryApiClient>(new StubInboxHistoryApiClient([parsed, unsupported]));
 
-        var cut = RenderComponent<InboxHistory>();
+        var cut = Render<InboxHistory>();
 
         cut.WaitForAssertion(() =>
         {
@@ -551,7 +551,7 @@ public class InboxReviewPageTests : TestContext
         var client = new StubInboxHistoryApiClient([parsed, failed]);
         Services.AddSingleton<IInboxHistoryApiClient>(client);
 
-        var cut = RenderComponent<InboxHistory>();
+        var cut = Render<InboxHistory>();
         cut.WaitForAssertion(() => Assert.Contains("Hotel booking", cut.Markup, StringComparison.Ordinal));
 
         var reprocessButtons = cut.FindAll("button").Where(b => b.TextContent.Contains("Re-process", StringComparison.Ordinal)).ToList();
@@ -568,7 +568,7 @@ public class InboxReviewPageTests : TestContext
         var client = new StubInboxHistoryApiClient([parsed]);
         Services.AddSingleton<IInboxHistoryApiClient>(client);
 
-        var cut = RenderComponent<InboxHistory>();
+        var cut = Render<InboxHistory>();
         cut.WaitForAssertion(() => Assert.Equal(1, client.Fetches));
 
         cut.FindAll("button").Single(b => b.TextContent.Contains("Refresh", StringComparison.Ordinal)).Click();
@@ -582,7 +582,7 @@ public class InboxReviewPageTests : TestContext
         var client = new StubEmailIngestionApiClient([Draft(Guid.NewGuid(), Guid.NewGuid(), new DateTime(2026, 8, 12, 9, 30, 0))]);
         Services.AddSingleton<IEmailIngestionApiClient>(client);
 
-        var cut = RenderComponent<InboxDrafts>();
+        var cut = Render<InboxDrafts>();
         cut.WaitForAssertion(() => Assert.Equal(1, client.Fetches));
 
         cut.FindAll("button").Single(b => b.TextContent.Contains("Refresh", StringComparison.Ordinal)).Click();

@@ -1,14 +1,17 @@
 using AngleSharp.Dom;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 
 namespace TripPlanner.Web.Tests.Infrastructure;
 
 public static class MarkupAssertionHelpers
 {
-    public static IElement ShouldHaveElement(this IRenderedFragment fragment, string cssSelector)
+    public static IElement ShouldHaveElement<TComponent>(this IRenderedComponent<TComponent> fragment, string cssSelector)
+        where TComponent : IComponent
         => fragment.Find(cssSelector);
 
-    public static void ShouldContainText(this IRenderedFragment fragment, string expected)
+    public static void ShouldContainText<TComponent>(this IRenderedComponent<TComponent> fragment, string expected)
+        where TComponent : IComponent
         => Assert.Contains(expected, fragment.Markup, StringComparison.OrdinalIgnoreCase);
 
     public static void ShouldHaveClass(this IElement element, string className)

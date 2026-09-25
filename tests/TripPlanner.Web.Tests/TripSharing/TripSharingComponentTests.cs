@@ -12,7 +12,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.TripSharing;
 
-public class TripSharingComponentTests : TestContext
+public class TripSharingComponentTests : BunitContext
 {
     [Fact]
     public void TripsIndex_ShowsOwnedAndSharedBadges()
@@ -25,7 +25,7 @@ public class TripSharingComponentTests : TestContext
         };
         Services.AddSingleton<ITripApiClient>(client);
 
-        var cut = RenderComponent<TripsIndex>();
+        var cut = Render<TripsIndex>();
 
         cut.WaitForAssertion(() =>
         {
@@ -41,7 +41,7 @@ public class TripSharingComponentTests : TestContext
     {
         Services.AddSingleton<ITripApiClient>(new StubShareApiClient());
 
-        var cut = RenderComponent<TripsIndex>();
+        var cut = Render<TripsIndex>();
 
         cut.WaitForAssertion(() =>
         {
@@ -58,7 +58,7 @@ public class TripSharingComponentTests : TestContext
         var client = new StubShareApiClient { Members = new[] { member } };
         Services.AddSingleton<ITripApiClient>(client);
 
-        var cut = RenderComponent<ShareTripModal>(parameters => parameters
+        var cut = Render<ShareTripModal>(parameters => parameters
             .Add(p => p.TripId, Guid.NewGuid()));
 
         cut.WaitForAssertion(() =>

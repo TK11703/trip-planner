@@ -11,7 +11,7 @@ using Xunit;
 
 namespace TripPlanner.Web.Tests.Home;
 
-public class RecentTripsComponentTests : TestContext
+public class RecentTripsComponentTests : BunitContext
 {
     [Fact]
     public void AnonymousUser_DoesNotCallProtectedTripApi()
@@ -20,7 +20,7 @@ public class RecentTripsComponentTests : TestContext
         Services.AddSingleton<ITripApiClient>(client);
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: false));
 
-        var cut = RenderComponent<RecentTripsList>();
+        var cut = Render<RecentTripsList>();
 
         Assert.Equal(0, client.RecentCallCount);
         Assert.Contains("Sign in is required", cut.Markup);
@@ -33,7 +33,7 @@ public class RecentTripsComponentTests : TestContext
         Services.AddSingleton<ITripApiClient>(client);
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
-        var cut = RenderComponent<RecentTripsList>();
+        var cut = Render<RecentTripsList>();
 
         cut.WaitForAssertion(() => Assert.Contains("No trips yet", cut.Markup));
         Assert.Equal(1, client.RecentCallCount);
@@ -47,7 +47,7 @@ public class RecentTripsComponentTests : TestContext
         Services.AddSingleton<ITripApiClient>(client);
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
-        var cut = RenderComponent<RecentTripsList>();
+        var cut = Render<RecentTripsList>();
 
         cut.WaitForAssertion(() => Assert.Contains("Paris planning", cut.Markup));
         Assert.Equal(1, client.RecentCallCount);
@@ -62,7 +62,7 @@ public class RecentTripsComponentTests : TestContext
         Services.AddSingleton<ITripApiClient>(client);
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
 
-        var cut = RenderComponent<RecentTripsList>();
+        var cut = Render<RecentTripsList>();
 
         cut.WaitForAssertion(() =>
         {
@@ -77,7 +77,7 @@ public class RecentTripsComponentTests : TestContext
     {
         var trip = new TripSummary(Guid.NewGuid(), "Paris planning", new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 6), DateTimeOffset.UtcNow, 2);
 
-        var cut = RenderComponent<TripCard>(parameters => parameters.Add(p => p.Trip, trip));
+        var cut = Render<TripCard>(parameters => parameters.Add(p => p.Trip, trip));
 
         Assert.Equal("No description yet.", cut.Find(".trip-card-description").TextContent);
         Assert.Contains("2 itinerary items", cut.Markup);

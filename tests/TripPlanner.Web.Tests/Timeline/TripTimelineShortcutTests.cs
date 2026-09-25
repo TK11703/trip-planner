@@ -7,7 +7,7 @@ using Xunit;
 namespace TripPlanner.Web.Tests.Timeline;
 
 // User Story 3 (P3): Orient to today and trip boundaries.
-public class TripTimelineShortcutTests : TestContext
+public class TripTimelineShortcutTests : BunitContext
 {
     public TripTimelineShortcutTests()
     {
@@ -18,7 +18,7 @@ public class TripTimelineShortcutTests : TestContext
     {
         var response = TimelineNavTestData.Response(start, end);
         Services.AddSingleton<ITripApiClient>(new NavStubTripApiClient(response));
-        var cut = RenderComponent<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
+        var cut = Render<TripTimeline>(p => p.Add(x => x.TripId, response.TripId));
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.Instance.TripDates));
         return cut;
     }
