@@ -82,6 +82,14 @@ public sealed class TripChatSessionStore(IJSRuntime jsRuntime) : IAsyncDisposabl
         }
     }
 
+    public async Task ScrollToBottomAsync(ElementReference element)
+    {
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("scrollToBottom", element);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_module is not null)

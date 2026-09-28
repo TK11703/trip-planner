@@ -30,8 +30,7 @@
                     </div>
                 </header>
 
-                <ol @ref="_transcriptElement" class="trip-chat-transcript" role="log" aria-live="polite" aria-relevant="additions text"
-                    @onscroll="SaveScrollAsync">
+                <ol @ref="_transcriptElement" class="trip-chat-transcript" role="log" aria-live="polite" aria-relevant="additions text">
                     @foreach (var message in _messages)
                     {
                         <li class="@(message.Role == "user" ? "trip-chat-user-message" : "trip-chat-assistant-message")">
@@ -93,6 +92,8 @@
     private bool _loaded;
     private bool _focusInput;
     private bool _focusActivator;
+    private bool _restoreScroll;
+    private bool _scrollToBottom;
     private double _scrollTop;
     private CancellationTokenSource? _requestCancellation;
     private ElementReference _activator;
@@ -118,6 +119,7 @@
             _messages = snapshot.Messages.TakeLast(MaxStoredMessages).ToList();
             _isOpen = snapshot.IsOpen;
             _scrollTop = snapshot.ScrollTop;
+            _restoreScroll = true;
             _loaded = true;
             StateHasChanged();
         }
@@ -129,7 +131,17 @@
                 await SessionStore.SyncPaneAsync(_panel, _isOpen);
                 if (_isOpen)
                 {
-                    await SessionStore.RestoreScrollAsync(_transcriptElement, _scrollTop);
+                    // Scroll only on these transitions; re-applying it every render fights the user's own scrolling.
+                    if (_restoreScroll)
+                    {
+                        _restoreScroll = false;
+                        await SessionStore.RestoreScrollAsync(_transcriptElement, _scrollTop);
+                    }
+                    else if (_scrollToBottom)
+                    {
+                        _scrollToBottom = false;
+                        await SessionStore.ScrollToBottomAsync(_transcriptElement);
+                    }
                     if (_focusInput)
                     {
                         await SessionStore.FocusAsync(_inputElement);
@@ -150,7 +162,9 @@
 
     private async Task ToggleAsync()
     {
+        await CaptureScrollAsync();
         _isOpen = !_isOpen;
+        _restoreScroll = _isOpen;
         _focusInput = _isOpen;
         _focusActivator = !_isOpen;
         await SaveAsync();
@@ -158,6 +172,7 @@
 
     private async Task CloseAsync()
     {
+        await CaptureScrollAsync();
         _isOpen = false;
         _focusActivator = true;
         await SaveAsync();
@@ -178,6 +193,7 @@
 
         _messages.Add(new TripChatSessionMessage("user", message));
         TrimMessages();
+        _scrollToBottom = true;
         _draft = string.Empty;
         _retryMessage = null;
         _status = "Sending message…";
@@ -237,6 +253,7 @@
             _requestCancellation?.Dispose();
             _requestCancellation = null;
             TrimMessages();
+            _scrollToBottom = true;
             await SaveAsync();
         }
     }
@@ -272,8 +289,9 @@
         await SendAsync();
     }
 
-    private async Task SaveScrollAsync()
+    private async Task CaptureScrollAsync()
     {
+        if (!_isOpen) return;
         try
         {
             _scrollTop = await SessionStore.ReadScrollAsync(_transcriptElement);
@@ -281,11 +299,11 @@
         catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException)
         {
         }
-        await SaveAsync();
     }
 
     private async Task PersistBeforeNavigationAsync()
     {
+        await CaptureScrollAsync();
         _isOpen = true;
         await SaveAsync();
     }
@@ -335,6 +353,7 @@
                     _messages = snapshot.Messages.TakeLast(MaxStoredMessages).ToList();
                     _isOpen = snapshot.IsOpen;
                     _scrollTop = snapshot.ScrollTop;
+                    _restoreScroll = true;
                 }
                 _loaded = true;
                 StateHasChanged();

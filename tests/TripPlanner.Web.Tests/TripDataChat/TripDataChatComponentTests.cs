@@ -128,6 +128,36 @@ public sealed class TripDataChatComponentTests : BunitContext
         Assert.Contains("Started a new chat.", cut.Find(".trip-chat-live-status").TextContent);
     }
 
+    [Fact]
+    public async Task SavedScrollIsRestoredOnceAndSendingScrollsToNewestMessage()
+    {
+        const string epoch = "opaque-epoch-scroll";
+        Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        Services.AddSingleton(new TripChatSessionStore(JSInterop.JSRuntime));
+        Services.AddSingleton<AuthenticationStateProvider>(new ChatAuthenticationStateProvider(true, epoch));
+        Services.AddSingleton<ITripDataChatApiClient>(new StubChatApiClient());
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var module = JSInterop.SetupModule("./js/tripDataChat.js");
+        module.Setup<TripChatSessionSnapshot>("load", epoch).SetResult(new TripChatSessionSnapshot(
+            [new TripChatSessionMessage("user", "Earlier question"), new TripChatSessionMessage("assistant", "Earlier answer")],
+            IsOpen: true,
+            ScrollTop: 120));
+
+        var cut = Render<ChatComponent>();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("#trip-data-chat-panel")));
+
+        // Each input re-renders the component; none of them may reapply the saved scroll position.
+        cut.Find("#trip-chat-message").Input("W");
+        cut.Find("#trip-chat-message").Input("Wh");
+        cut.Find("#trip-chat-message").Input("Which trip?");
+        module.VerifyInvoke("restoreScroll", calledTimes: 1);
+
+        await cut.Find("button[type='submit']").ClickAsync();
+        cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll(".trip-chat-assistant-message").Count));
+        Assert.NotEmpty(module.Invocations["scrollToBottom"]);
+        module.VerifyInvoke("restoreScroll", calledTimes: 1);
+    }
+
     private sealed class StubChatApiClient : ITripDataChatApiClient
     {
         public int CallCount { get; private set; }

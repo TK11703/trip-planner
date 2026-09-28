@@ -108,6 +108,12 @@ export function restoreScroll(element, scrollTop) {
     }
 }
 
+export function scrollToBottom(element) {
+    if (element) {
+        element.scrollTop = element.scrollHeight;
+    }
+}
+
 export function readScroll(element) {
     return element?.scrollTop ?? 0;
 }
