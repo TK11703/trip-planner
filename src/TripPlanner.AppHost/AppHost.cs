@@ -4,7 +4,11 @@ var postgresUser = builder.AddParameter("postgres-user", secret: false);
 var postgresPassword = builder.AddParameter("postgres-password", secret: true);
 
 var postgres = builder.AddPostgres("postgres", postgresUser, postgresPassword)
-    .WithDataVolume()
+    // Matches the PostgreSQL 18 / Debian trixie (glibc collation) cluster in existing local data volumes.
+    .WithImage("pgvector/pgvector", "pg18-trixie");
+
+// WithDataVolume can't infer 18+ from the "pg18" tag, so mount at the 18+ data root explicitly.
+postgres.WithVolume(VolumeNameGenerator.Generate(postgres, "data"), "/var/lib/postgresql")
     .WithPgAdmin()
     .WithLifetime(ContainerLifetime.Persistent);
 

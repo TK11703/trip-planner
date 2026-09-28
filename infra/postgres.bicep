@@ -141,7 +141,7 @@ resource extensionAllowList 'Microsoft.DBforPostgreSQL/flexibleServers/configura
   parent: server
   name: 'azure.extensions'
   properties: {
-    value: 'pgcrypto'
+    value: 'pgcrypto,vector'
     source: 'user-override'
   }
   dependsOn: [

@@ -348,21 +348,30 @@ like a networking or secret problem rather than a missing role.
 
    ```powershell
    $me = az ad signed-in-user show --query id -o tsv
-   az postgres flexible-server ad-admin create -g rg-trip-planner -s <server-name> `
+   az postgres flexible-server microsoft-entra-admin create -g rg-trip-planner -s <server-name> `
      --object-id $me --display-name (az ad signed-in-user show --query userPrincipalName -o tsv) --type User
    ```
+
+   Older Azure CLI versions name this command group `ad-admin`; newer ones only accept
+   `microsoft-entra-admin`.
 
    Then connect. Note that PostgreSQL truncates role names to 63 characters
    (`NAMEDATALEN`), so a long guest UPN is stored — and must be supplied — in its
    truncated form. Read the stored value rather than assuming it:
 
    ```powershell
-   az postgres flexible-server ad-admin list -g rg-trip-planner -s <server-name> `
+   az postgres flexible-server microsoft-entra-admin list -g rg-trip-planner -s <server-name> `
      --query "[].principalName" -o tsv
 
    $env:PGPASSWORD = az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv
    psql "host=$server port=5432 dbname=tripplanner user=<principal-name-as-stored> sslmode=require"
    ```
+
+   For example, a Microsoft account invited as a guest has a 74-character UPN such as
+   `someone_outlook.com#EXT#@someoneoutlook.onmicrosoft.com`, stored cut off at 63
+   characters. Supplying the email address, the full UPN, or the account password fails
+   with `password authentication failed for user "<name>"` — the password must be the
+   access token above, which expires after about an hour.
 
    Connections come from your workstation, which the `AllowAllAzureServicesAndResourcesWithinAzureIps`
    rule does not cover. Add a temporary firewall rule for your public IP and delete it when
@@ -377,14 +386,17 @@ like a networking or secret problem rather than a missing role.
    SELECT pgaadauth_create_principal_with_oid('id-trip-planner-api', '<apiOid>', 'service', false, false);
    ```
 
-4. Reconnect to `tripplanner` and install `pgcrypto`. `000_init.sql` declares
-   `CREATE EXTENSION IF NOT EXISTS "pgcrypto"`, but the API role holds no `CREATE` privilege
-   on the database, so it cannot create the extension itself. Creating it here turns that
-   statement into a no-op. (`infra/postgres.bicep` sets the `azure.extensions` server
-   parameter, without which Flexible Server rejects the statement for *any* caller.)
+4. Reconnect to `tripplanner` and install the extensions. `000_init.sql` declares
+   `CREATE EXTENSION IF NOT EXISTS "pgcrypto"` and `017_trip_search_documents.sql` declares
+   `CREATE EXTENSION IF NOT EXISTS vector`, but the API role holds no `CREATE` privilege
+   on the database, so it cannot create either itself. Creating them here turns those
+   statements into no-ops. (`infra/postgres.bicep` sets the `azure.extensions` server
+   parameter to `pgcrypto,vector`, without which Flexible Server rejects the statement for
+   *any* caller.)
 
    ```sql
    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+   CREATE EXTENSION IF NOT EXISTS vector;
    ```
 
 5. Grant the role exactly what the migration runner and repositories need.
@@ -412,6 +424,33 @@ This survives server restarts and redeployments. Repeat it only if the server is
 restored to a new server, since a restored copy carries the roles of the source — but a
 *rebuilt* server carries none.
 
+#### Existing servers: enable pgvector before the trip chat release
+
+A server bootstrapped before trip chat has only `pgcrypto`. The release pipeline provisions
+infrastructure and rolls out the new API in one `azd provision`, so there is no window to
+create the extension between the two — do it **before** merging the release. Otherwise the
+new API fails migration `017_trip_search_documents.sql` and never becomes ready.
+
+1. Allow-list `vector`. The value matches `infra/postgres.bicep`, so the next provision is
+   a no-op for this parameter. It is dynamic; no restart is needed:
+
+   ```powershell
+   az postgres flexible-server parameter set -g rg-trip-planner -s <server-name> `
+     --name azure.extensions --value pgcrypto,vector
+   ```
+
+2. Connect to `tripplanner` as an Entra administrator (step 2 above) and create it:
+
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   SELECT extversion FROM pg_extension WHERE extname = 'vector';
+   ```
+
+3. Set the chat configuration described in [2.2](#22-trip-chat-configuration), then merge.
+
+Existing trips are embedded by the API's background pass, about 100 records every five
+minutes while a replica is running, so answers cover older trips gradually after release.
+
 ### 2.1 Release pipeline
 
 Releases run through [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml):
@@ -428,6 +467,24 @@ Releases run through [`.github/workflows/deploy.yml`](../../.github/workflows/de
 
 Concurrency is keyed on the git ref with `cancel-in-progress: false` for pushes, so two
 releases can never race the migration advisory lock.
+
+### 2.2 Trip chat configuration
+
+Trip chat calls chat and embedding model deployments on an existing Azure OpenAI or
+Foundry account; Bicep does not create the account or its deployments. The runner builds a
+fresh azd environment on every run, so set these as **repository variables** — a local
+`azd env set` never reaches CI:
+
+| Variable | Example | Notes |
+| --- | --- | --- |
+| `TRIP_CHAT_ENDPOINT` | `https://<account>.openai.azure.com/` | Account endpoint. |
+| `TRIP_CHAT_CHAT_DEPLOYMENT_NAME` | `gpt-4.1` | Chat model deployment name. |
+| `TRIP_CHAT_EMBEDDING_DEPLOYMENT_NAME` | `text-embedding-3-large` | Embedding deployment name. |
+| `TRIP_CHAT_EMBEDDING_DIMENSIONS` | `3072` | Must match the embedding model (`1536` for `text-embedding-3-small`). Changing it re-embeds every record. |
+| `TRIP_CHAT_RESOURCE_ID` | `/subscriptions/…/accounts/<account>` | Scopes the API identity's inference role; `infra/rbac.bicep` skips it when it equals `AZURE_OPENAI_RESOURCE_ID`. |
+
+With any of the first three unset, chat is disabled rather than broken: the endpoint
+returns a retryable `503`, indexing does nothing, and readiness is unaffected.
 
 ### Post-deployment verification
 
@@ -679,7 +736,7 @@ a storage key, a registry password, or a Key Vault access policy.
 | --- | --- | --- |
 | `id-<env>-acrpull` | image pulls for both container apps | AcrPull on the registry |
 | `id-<env>-web` | `ca-web-<env>` container app | Key Vault Secrets User, Key Vault Crypto User, Storage Blob Data Contributor |
-| `id-<env>-api` | `ca-api-<env>` container app | Key Vault Secrets User, Cognitive Services OpenAI User, plus a PostgreSQL role of the same name (§2.0) |
+| `id-<env>-api` | `ca-api-<env>` container app | Key Vault Secrets User, Cognitive Services OpenAI User (email parsing and trip chat accounts), plus a PostgreSQL role of the same name (§2.0) |
 
 ### Symptoms and corrections
 
@@ -693,6 +750,11 @@ a storage key, a registry password, or a Key Vault access policy.
 | `api` connects but migrations fail with `permission denied for schema public` | The API role exists but lacks `CREATE` on `public` | Re-apply the grants in §2.0 as the Entra administrator. |
 | `api` crashes on `000_init.sql` with `extension "pgcrypto" is not allow-listed` | The `azure.extensions` server parameter does not list `pgcrypto` | Re-run `azd provision` — `infra/postgres.bicep` sets it. The parameter is dynamic, so no restart is needed. |
 | `api` crashes on `000_init.sql` with `permission denied to create extension "pgcrypto"` | The extension is allow-listed but not yet created, and the API role has no `CREATE` on the database | Create it once as the Entra administrator (§2.0 step 4); `CREATE EXTENSION IF NOT EXISTS` then becomes a no-op. |
+| `api` crashes on `017_trip_search_documents.sql` with `extension "vector" is not allow-listed` | `azure.extensions` still lists only `pgcrypto` | Allow-list it as in §2.0 *Existing servers*, or re-run `azd provision`. |
+| `api` crashes on `017_trip_search_documents.sql` with `permission denied to create extension "vector"` | `vector` is allow-listed but was never created | Create it as the Entra administrator (§2.0 *Existing servers*, step 2). |
+| Entra admin login fails with `password authentication failed for user "<you>"` | Supplied the email or full UPN instead of the stored (truncated) role name, or a password instead of an access token | Read the stored name with `microsoft-entra-admin list` and use `az account get-access-token --resource-type oss-rdbms` as the password (§2.0 step 2). |
+| Trip chat always answers *temporarily unavailable* | `TRIP_CHAT_*` repository variables are unset, so chat is disabled | Set them (§2.2) and redeploy. |
+| Trip chat fails with a `401`/`403` from the model account | API identity lacks the inference role on the chat account | Confirm `TRIP_CHAT_RESOURCE_ID` is set and re-run `azd provision`. Locally, a `401` usually means `DefaultAzureCredential` picked a tool signed into another tenant; the AppHost pins `AzureCliCredential` for this reason. |
 | `web` is `Unhealthy` with `api-reachability` timing out after ~5s | `services__api__https__0` points at the bare app name instead of the API's ingress FQDN | The bare name is not covered by the ingress certificate, so the TLS handshake never completes. `infra/web.bicep` must pass `api.outputs.fqdn`. |
 | Database calls start failing ~1 hour after a long idle period | Entra access token expired and was not refreshed | The connection factory refreshes at 45 minutes. If this recurs, confirm `AZURE_CLIENT_ID` on `api` names the API identity so `DefaultAzureCredential` resolves the right one. |
 

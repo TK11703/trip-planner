@@ -25,7 +25,7 @@ namespace TripPlanner.Api.Tests.Infrastructure;
 /// </summary>
 public class PostgresApiFactory : TestApiFactory, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("pgvector/pgvector:pg16")
         .WithDatabase("tripplanner_api_tests")
         .WithUsername("test")
         .WithPassword("test")

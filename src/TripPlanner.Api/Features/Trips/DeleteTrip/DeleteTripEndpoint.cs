@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using TripPlanner.Api.Security;
+using TripPlanner.Api.Features.TripDataChat;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Contracts.Common;
 using TripPlanner.Contracts.Errors;
@@ -25,6 +26,7 @@ public static class DeleteTripEndpoint
         ITripCommandRepository commands,
         IAuditRepository audit,
         IClock clock,
+        ITripSearchIndexer indexer,
         CancellationToken cancellationToken)
     {
         var callerId = currentUser.UserId;
@@ -44,6 +46,7 @@ public static class DeleteTripEndpoint
         }
 
         await audit.RecordAsync(callerId, AuditOperations.TripDelete, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
+        await indexer.DeleteTripAsync(tripId, cancellationToken);
         return TypedResults.NoContent();
     }
 }

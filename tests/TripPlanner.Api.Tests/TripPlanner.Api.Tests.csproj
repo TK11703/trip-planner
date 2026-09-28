@@ -25,6 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="TripDataChat\TestData\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\TripPlanner.Api\TripPlanner.Api.csproj" />
     <ProjectReference Include="..\..\src\TripPlanner.Contracts\TripPlanner.Contracts.csproj" />
     <ProjectReference Include="..\..\src\TripPlanner.Database\TripPlanner.Database.csproj" />

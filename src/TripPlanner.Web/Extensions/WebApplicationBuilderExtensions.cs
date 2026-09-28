@@ -10,6 +10,7 @@ using TripPlanner.Web.Features.Maps;
 using TripPlanner.Web.Features.Notifications;
 using TripPlanner.Web.Features.EmailIngestion;
 using TripPlanner.Web.Features.InboxHistory;
+using TripPlanner.Web.Features.TripDataChat;
 using TripPlanner.Web.Health;
 
 namespace TripPlanner.Web.Extensions;
@@ -72,6 +73,13 @@ public static class WebApplicationBuilderExtensions
             client.BaseAddress = new Uri("https+http://api");
         })
         .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
+
+        builder.Services.AddHttpClient<ITripDataChatApiClient, TripDataChatApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https+http://api");
+        })
+        .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
+        builder.Services.AddScoped<TripChatSessionStore>();
 
         // Unauthenticated probe client: no token handler, because /alive is anonymous.
         builder.Services.AddHttpClient(ApiReachabilityHealthCheck.HttpClientName, client =>

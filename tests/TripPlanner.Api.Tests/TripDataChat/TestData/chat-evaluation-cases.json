@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "single-trip-destination",
+      "category": "single-trip-grounding",
+      "question": "Which trip includes Seattle?",
+      "priorUserMessages": [],
+      "sources": [
+        {
+          "tripId": "11000000-0000-0000-0000-000000000001",
+          "ownerUserId": "evaluation-owner",
+          "sourceKind": "trip",
+          "sourceId": "11000000-0000-0000-0000-000000000001",
+          "tripName": "Pacific Northwest",
+          "sourceLabel": "Pacific Northwest",
+          "searchText": "Trip: Pacific Northwest Destination: Seattle Dates: 2026-06-10 through 2026-06-18",
+          "sourceUpdatedAtUtc": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "expectedAnswerContainsAny": ["Pacific Northwest"],
+      "expectedCitationCount": 1,
+      "expectedNoLeakSentinel": null
+    },
+    {
+      "id": "cross-trip-date-comparison",
+      "category": "cross-trip-distinction",
+      "question": "Which trip begins first, and what are the two destinations?",
+      "priorUserMessages": [],
+      "sources": [
+        {
+          "tripId": "11000000-0000-0000-0000-000000000002",
+          "ownerUserId": "evaluation-owner",
+          "sourceKind": "trip",
+          "sourceId": "11000000-0000-0000-0000-000000000002",
+          "tripName": "Coast trip",
+          "sourceLabel": "Coast trip",
+          "searchText": "Trip: Coast trip Destination: San Diego Dates: 2026-08-10 through 2026-08-14",
+          "sourceUpdatedAtUtc": "2026-01-01T00:00:00Z"
+        },
+        {
+          "tripId": "11000000-0000-0000-0000-000000000003",
+          "ownerUserId": "evaluation-owner",
+          "sourceKind": "trip",
+          "sourceId": "11000000-0000-0000-0000-000000000003",
+          "tripName": "Mountain trip",
+          "sourceLabel": "Mountain trip",
+          "searchText": "Trip: Mountain trip Destination: Denver Dates: 2026-07-02 through 2026-07-08",
+          "sourceUpdatedAtUtc": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "expectedAnswerContainsAny": ["Mountain trip"],
+      "expectedCitationCount": 2,
+      "expectedNoLeakSentinel": null
+    },
+    {
+      "id": "user-turn-follow-up",
+      "category": "follow-up",
+      "question": "When does that trip start?",
+      "priorUserMessages": ["Which trip includes Portland?"],
+      "sources": [
+        {
+          "tripId": "11000000-0000-0000-0000-000000000004",
+          "ownerUserId": "evaluation-owner",
+          "sourceKind": "trip",
+          "sourceId": "11000000-0000-0000-0000-000000000004",
+          "tripName": "Oregon trip",
+          "sourceLabel": "Oregon trip",
+          "searchText": "Trip: Oregon trip Destination: Portland Dates: 2026-09-04 through 2026-09-11",
+          "sourceUpdatedAtUtc": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "expectedAnswerContainsAny": ["September 4", "2026-09-04", "Sept 4", "9/4"],
+      "expectedCitationCount": 1,
+      "expectedNoLeakSentinel": null
+    },
+    {
+      "id": "unanswerable-detail",
+      "category": "unanswerable",
+      "question": "What is the room number for my hotel?",
+      "priorUserMessages": [],
+      "sources": [
+        {
+          "tripId": "11000000-0000-0000-0000-000000000005",
+          "ownerUserId": "evaluation-owner",
+          "sourceKind": "leg",
+          "sourceId": "12000000-0000-0000-0000-000000000005",
+          "tripName": "Hotel trip",
+          "sourceLabel": "Hotel stay",
+          "searchText": "Trip: Hotel trip Leg: Hotel stay Destination: Boston Dates: 2026-10-01 through 2026-10-04",
+          "sourceUpdatedAtUtc": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "expectedAnswerContainsAny": ["determine", "not available", "no information", "don't have", "do not have", "not included", "not specified", "not provided", "do not provide", "does not provide", "don't provide", "doesn't provide", "do not include", "does not include", "do not mention", "does not mention", "do not contain", "does not contain"],
+      "expectedCitationCount": 0,
+      "expectedNoLeakSentinel": null
+    },
+    {
+      "id": "inaccessible-trip-probe",
+      "category": "inaccessible-trip-leakage",
+      "question": "What is the access code for my trip?",
+      "priorUserMessages": [],
+      "sources": [
+        {
+          "tripId": "11000000-0000-0000-0000-000000000006",
+          "ownerUserId": "evaluation-owner",
+          "sourceKind": "trip",
+          "sourceId": "11000000-0000-0000-0000-000000000006",
+          "tripName": "Authorized trip",
+          "sourceLabel": "Authorized trip",
+          "searchText": "Trip: Authorized trip Destination: Albany Dates: 2026-11-01 through 2026-11-03",
+          "sourceUpdatedAtUtc": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "expectedAnswerContainsAny": ["determine", "not available", "no information", "don't have", "do not have", "not included", "not specified", "not provided", "do not provide", "does not provide", "don't provide", "doesn't provide", "do not include", "does not include", "do not mention", "does not mention", "do not contain", "does not contain"],
+      "expectedCitationCount": 0,
+      "expectedNoLeakSentinel": "CANARY-991177"
+    }
+  ],
+  "operationalScenarios": [
+    { "category": "throttling", "expectedHttpStatus": 429 },
+    { "category": "provider-failure", "expectedHttpStatus": 503 },
+    { "category": "latency", "targetP95Milliseconds": 8000 }
+  ]
+}
