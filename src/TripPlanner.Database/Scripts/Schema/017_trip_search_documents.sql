@@ -1,4 +1,12 @@
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Azure checks azure_pg_admin for untrusted extensions even under IF NOT EXISTS, and the
+-- API role is not a member; production pre-creates vector (runbook 2.0), so skip it when present.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+        CREATE EXTENSION vector;
+    END IF;
+END
+$$;
 
 CREATE TABLE IF NOT EXISTS trip_search_documents (
     search_document_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
