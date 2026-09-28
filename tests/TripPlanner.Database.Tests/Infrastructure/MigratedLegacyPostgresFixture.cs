@@ -22,7 +22,7 @@ public sealed class MigratedLegacyPostgresFixture : IAsyncLifetime
         "015_stay_leg_destination_removed.sql",
     ];
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("pgvector/pgvector:pg16")
         .WithDatabase("tripplanner_migration_tests")
         .WithUsername("test")
         .WithPassword("test")

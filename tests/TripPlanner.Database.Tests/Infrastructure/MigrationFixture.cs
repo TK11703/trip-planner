@@ -12,7 +12,7 @@ namespace TripPlanner.Database.Tests.Infrastructure;
 /// </summary>
 public sealed class MigrationFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("pgvector/pgvector:pg16")
         .WithDatabase("migrations_root")
         .WithUsername("test")
         .WithPassword("test")

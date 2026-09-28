@@ -1,0 +1,276 @@
+.trip-chat-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+}
+
+.trip-chat-retry {
+    margin: 0 1.25rem .5rem auto;
+}
+.trip-chat-shell {
+    --trip-chat-surface: var(--tp-surface-raised, #fff);
+    --trip-chat-surface-alt: var(--tp-surface, #eef4f7);
+    --trip-chat-text: var(--tp-text, #16232b);
+    --trip-chat-muted: var(--tp-muted, #566771);
+    --trip-chat-border: var(--tp-border, rgba(20, 60, 72, .15));
+    --trip-chat-control-border: var(--tp-muted, #566771);
+    --trip-chat-accent: var(--tp-brand, #1f7a8c);
+    --trip-chat-accent-strong: var(--tp-brand-strong, #12525f);
+    --trip-chat-on-accent: #fff;
+    --trip-chat-hover: color-mix(in srgb, var(--trip-chat-accent) 12%, var(--trip-chat-surface));
+    --trip-chat-pressed: color-mix(in srgb, var(--trip-chat-accent) 22%, var(--trip-chat-surface));
+    --trip-chat-user-bubble: var(--tp-brand-soft, #d5eef1);
+    --trip-chat-user-bubble-border: color-mix(in srgb, var(--trip-chat-accent) 35%, transparent);
+    --trip-chat-link: var(--tp-brand-strong, #12525f);
+    --trip-chat-focus: var(--tp-focus, #1f7a8c);
+    --trip-chat-shadow: rgb(17 43 39 / 15%);
+}
+
+/* The dark accent is a bright mint, so text on it must be dark. */
+[data-bs-theme="dark"] .trip-chat-shell {
+    --trip-chat-on-accent: var(--tp-page, #0a1017);
+    --trip-chat-shadow: rgb(0 0 0 / 55%);
+}
+
+.trip-chat-activator {
+    position: fixed;
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    z-index: 1040;
+    display: inline-flex;
+    align-items: center;
+    gap: .55rem;
+    min-height: 3rem;
+    padding: .7rem 1rem;
+    border: 1px solid var(--trip-chat-accent);
+    border-radius: .5rem;
+    background: var(--trip-chat-accent);
+    color: var(--trip-chat-on-accent);
+    font-weight: 650;
+    box-shadow: 0 .25rem 1rem var(--trip-chat-shadow);
+}
+
+.trip-chat-activator:hover,
+.trip-chat-send:hover:not(:disabled) {
+    border-color: var(--trip-chat-accent-strong);
+    background: var(--trip-chat-accent-strong);
+}
+
+.trip-chat-activator:focus-visible,
+.trip-chat-panel button:focus-visible,
+.trip-chat-panel a:focus-visible,
+.trip-chat-panel textarea:focus-visible {
+    outline: 3px solid var(--trip-chat-focus);
+    outline-offset: 2px;
+}
+
+.trip-chat-panel {
+    position: fixed;
+    z-index: 1045;
+    inset: 0 0 0 auto;
+    display: flex;
+    width: min(30rem, 100vw);
+    height: 100vh;
+    height: 100dvh;
+    flex-direction: column;
+    border-left: 1px solid var(--trip-chat-border);
+    background: var(--trip-chat-surface);
+    color: var(--trip-chat-text);
+    box-shadow: -.5rem 0 1.5rem var(--trip-chat-shadow);
+}
+
+.trip-chat-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.25rem 1rem;
+    border-bottom: 1px solid var(--trip-chat-border);
+    background: var(--trip-chat-surface-alt);
+}
+
+.trip-chat-header h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.trip-chat-header p {
+    margin: .25rem 0 0;
+    color: var(--trip-chat-muted);
+    font-size: .875rem;
+}
+
+.trip-chat-header-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: .5rem;
+}
+
+.trip-chat-header-button {
+    --bs-btn-color: var(--trip-chat-text);
+    --bs-btn-bg: var(--trip-chat-surface);
+    --bs-btn-border-color: var(--trip-chat-control-border);
+    --bs-btn-hover-color: var(--trip-chat-text);
+    --bs-btn-hover-bg: var(--trip-chat-hover);
+    --bs-btn-hover-border-color: var(--trip-chat-accent);
+    --bs-btn-active-color: var(--trip-chat-text);
+    --bs-btn-active-bg: var(--trip-chat-pressed);
+    --bs-btn-active-border-color: var(--trip-chat-accent);
+    --bs-btn-disabled-color: var(--trip-chat-text);
+    --bs-btn-disabled-bg: var(--trip-chat-surface);
+    --bs-btn-disabled-border-color: var(--trip-chat-control-border);
+    --bs-btn-font-weight: 600;
+}
+
+.trip-chat-hint {
+    margin: 0;
+    color: var(--trip-chat-muted);
+    font-size: .8rem;
+}
+
+.trip-chat-secondary:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.trip-chat-secondary:hover:not(:disabled) {
+    border-color: var(--trip-chat-accent);
+    background: var(--trip-chat-hover);
+}
+
+.trip-chat-secondary,
+.trip-chat-send {
+    min-height: 2.5rem;
+    padding: .45rem .8rem;
+    border: 1px solid var(--trip-chat-control-border);
+    border-radius: .4rem;
+    background: var(--trip-chat-surface);
+    color: var(--trip-chat-text);
+    font-weight: 600;
+}
+
+.trip-chat-transcript {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: .85rem;
+    overflow-y: auto;
+    margin: 0;
+    padding: 1rem 1.25rem;
+    list-style: none;
+    overscroll-behavior: contain;
+}
+
+.trip-chat-transcript li {
+    max-width: 92%;
+    padding: .75rem .85rem;
+    border: 1px solid var(--trip-chat-border);
+    border-radius: .55rem;
+    background: var(--trip-chat-surface-alt);
+    overflow-wrap: anywhere;
+}
+
+.trip-chat-transcript li p {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.trip-chat-user-message {
+    align-self: flex-end;
+    border-color: var(--trip-chat-user-bubble-border) !important;
+    background: var(--trip-chat-user-bubble) !important;
+}
+
+.trip-chat-assistant-message {
+    align-self: flex-start;
+}
+
+.trip-chat-citations {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin: .7rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.trip-chat-citations a {
+    color: var(--trip-chat-link);
+    font-size: .875rem;
+    font-weight: 650;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+}
+
+.trip-chat-live-status {
+    min-height: 1.5rem;
+    padding: .1rem 1.25rem;
+    color: var(--trip-chat-muted);
+    font-size: .85rem;
+}
+
+.trip-chat-composer {
+    display: grid;
+    gap: .5rem;
+    padding: .8rem 1.25rem max(1rem, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--trip-chat-border);
+    background: var(--trip-chat-surface);
+}
+
+.trip-chat-composer label {
+    font-size: .9rem;
+    font-weight: 650;
+}
+
+.trip-chat-composer textarea {
+    width: 100%;
+    min-height: 5rem;
+    resize: vertical;
+    border: 1px solid var(--trip-chat-control-border);
+    border-radius: .4rem;
+    padding: .65rem .75rem;
+    color: var(--trip-chat-text);
+    background: var(--trip-chat-surface);
+}
+
+.trip-chat-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+}
+
+.trip-chat-send {
+    border-color: var(--trip-chat-accent);
+    background: var(--trip-chat-accent);
+    color: var(--trip-chat-on-accent);
+}
+
+.trip-chat-send:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+}
+
+@media (max-width: 640.98px) {
+    .trip-chat-panel {
+        width: 100vw;
+        border-left: 0;
+    }
+
+    .trip-chat-activator {
+        right: max(.75rem, env(safe-area-inset-right));
+        bottom: max(.75rem, env(safe-area-inset-bottom));
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .trip-chat-panel {
+        animation: trip-chat-enter 160ms ease-out;
+    }
+
+    @keyframes trip-chat-enter {
+        from { transform: translateX(1rem); opacity: .75; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+}

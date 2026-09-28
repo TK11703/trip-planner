@@ -7,6 +7,7 @@ using TripPlanner.Api.Features.UserProfiles;
 using TripPlanner.Api.Features.Notifications;
 using TripPlanner.Api.Features.Places;
 using TripPlanner.Api.Features.EmailIngestion;
+using TripPlanner.Api.Features.TripDataChat;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Database.Audit;
 using TripPlanner.Database.Initialization;
@@ -38,6 +39,7 @@ public static partial class WebApplicationExtensions
             }
         });
         app.UseAuthorization();
+        app.UseRateLimiter();
 
         app.MapTripEndpoints();
         app.MapTripItemEndpoints();
@@ -48,6 +50,7 @@ public static partial class WebApplicationExtensions
         app.MapNotificationEndpoints();
         app.MapPlaceEndpoints();
         app.MapEmailIngestionEndpoints(app.Environment);
+        app.MapTripDataChat();
 
         return app;
     }

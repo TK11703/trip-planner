@@ -15,6 +15,9 @@ param dataProtectionContainerName string
 @description('Resource id of the Azure OpenAI account. Empty = skip the inference role assignment.')
 param azureOpenAiResourceId string = ''
 
+@description('Resource id of the existing Foundry/Azure AI account used by trip chat. Empty skips the assignment.')
+param tripChatResourceId string = ''
+
 @description('Resource id of the Azure Maps account. Empty = skip the search role assignment.')
 param azureMapsResourceId string = ''
 
@@ -134,6 +137,15 @@ module apiOpenAi 'rbac-openai.bicep' = if (!empty(azureOpenAiResourceId)) {
   scope: resourceGroup(split(azureOpenAiResourceId, '/')[2], split(azureOpenAiResourceId, '/')[4])
   params: {
     accountName: last(split(azureOpenAiResourceId, '/'))
+    principalId: apiPrincipalId
+    roleDefinitionId: cognitiveServicesOpenAiUserRoleId
+  }
+}
+
+module apiTripChatFoundry 'rbac-openai.bicep' = if (!empty(tripChatResourceId) && toLower(tripChatResourceId) != toLower(azureOpenAiResourceId)) {
+  scope: resourceGroup(split(tripChatResourceId, '/')[2], split(tripChatResourceId, '/')[4])
+  params: {
+    accountName: last(split(tripChatResourceId, '/'))
     principalId: apiPrincipalId
     roleDefinitionId: cognitiveServicesOpenAiUserRoleId
   }

@@ -66,6 +66,39 @@ param azureOpenAiDeploymentName string = ''
 @description('Resource id of the Azure OpenAI account, used to scope the inference role assignment.')
 param azureOpenAiResourceId string = ''
 
+@description('Existing Foundry/Azure AI account resource id used to scope the chat inference role. Empty disables chat inference.')
+param tripChatResourceId string = ''
+
+@description('Existing Foundry project endpoint for trip chat. Empty disables trip chat.')
+param tripChatEndpoint string = ''
+
+@description('Existing chat model deployment name.')
+param tripChatChatDeploymentName string = ''
+
+@description('Existing embedding model deployment name.')
+param tripChatEmbeddingDeploymentName string = ''
+
+@minValue(1)
+param tripChatEmbeddingDimensions int = 1536
+
+@minValue(1)
+param tripChatMaxMessageLength int = 2000
+
+@minValue(0)
+param tripChatMaxPriorUserTurns int = 6
+
+@minValue(1)
+param tripChatRetrievalTopK int = 12
+
+@minValue(1)
+param tripChatRateLimitPerMinute int = 10
+
+@minValue(1)
+param tripChatIndexBatchSize int = 100
+
+@minValue(1)
+param tripChatTargetP95Milliseconds int = 8000
+
 @description('Set to "true" to start the relay polling. The workflow always deploys; it stays disabled until its Office 365 connection is consented and the EmailIngestion.Relay role is granted.')
 param emailRelayEnabled string = 'false'
 
@@ -157,6 +190,7 @@ module rbac 'rbac.bicep' = {
     storageAccountName: storage.outputs.name
     dataProtectionContainerName: storage.outputs.dataProtectionContainerName
     azureOpenAiResourceId: azureOpenAiResourceId
+    tripChatResourceId: tripChatResourceId
     azureMapsResourceId: azureMapsResourceId
     acrPullPrincipalId: identity.outputs.acrPull.principalId
     webPrincipalId: identity.outputs.web.principalId
@@ -201,6 +235,16 @@ module api 'api.bicep' = {
     entraApiAudience: entraApiAudience
     azureOpenAiEndpoint: azureOpenAiEndpoint
     azureOpenAiDeploymentName: effectiveOpenAiDeployment
+    tripChatEndpoint: tripChatEndpoint
+    tripChatChatDeploymentName: tripChatChatDeploymentName
+    tripChatEmbeddingDeploymentName: tripChatEmbeddingDeploymentName
+    tripChatEmbeddingDimensions: tripChatEmbeddingDimensions
+    tripChatMaxMessageLength: tripChatMaxMessageLength
+    tripChatMaxPriorUserTurns: tripChatMaxPriorUserTurns
+    tripChatRetrievalTopK: tripChatRetrievalTopK
+    tripChatRateLimitPerMinute: tripChatRateLimitPerMinute
+    tripChatIndexBatchSize: tripChatIndexBatchSize
+    tripChatTargetP95Milliseconds: tripChatTargetP95Milliseconds
     releaseId: releaseId
   }
   dependsOn: [

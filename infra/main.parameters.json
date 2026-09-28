@@ -53,6 +53,39 @@
     "azureOpenAiResourceId": {
       "value": "${AZURE_OPENAI_RESOURCE_ID}"
     },
+    "tripChatResourceId": {
+      "value": "${TRIP_CHAT_RESOURCE_ID}"
+    },
+    "tripChatEndpoint": {
+      "value": "${TRIP_CHAT_ENDPOINT}"
+    },
+    "tripChatChatDeploymentName": {
+      "value": "${TRIP_CHAT_CHAT_DEPLOYMENT_NAME}"
+    },
+    "tripChatEmbeddingDeploymentName": {
+      "value": "${TRIP_CHAT_EMBEDDING_DEPLOYMENT_NAME}"
+    },
+    "tripChatEmbeddingDimensions": {
+      "value": "${TRIP_CHAT_EMBEDDING_DIMENSIONS=1536}"
+    },
+    "tripChatMaxMessageLength": {
+      "value": "${TRIP_CHAT_MAX_MESSAGE_LENGTH=2000}"
+    },
+    "tripChatMaxPriorUserTurns": {
+      "value": "${TRIP_CHAT_MAX_PRIOR_USER_TURNS=6}"
+    },
+    "tripChatRetrievalTopK": {
+      "value": "${TRIP_CHAT_RETRIEVAL_TOP_K=12}"
+    },
+    "tripChatRateLimitPerMinute": {
+      "value": "${TRIP_CHAT_RATE_LIMIT_PER_MINUTE=10}"
+    },
+    "tripChatIndexBatchSize": {
+      "value": "${TRIP_CHAT_INDEX_BATCH_SIZE=100}"
+    },
+    "tripChatTargetP95Milliseconds": {
+      "value": "${TRIP_CHAT_TARGET_P95_MILLISECONDS=8000}"
+    },
     "azureMapsClientId": {
       "value": "${AZURE_MAPS_CLIENT_ID}"
     },

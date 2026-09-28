@@ -38,6 +38,19 @@ param entraApiAudience string
 param azureOpenAiEndpoint string
 param azureOpenAiDeploymentName string
 
+@description('Existing Foundry project endpoint used for trip chat. Empty disables chat.')
+param tripChatEndpoint string = ''
+
+param tripChatChatDeploymentName string = ''
+param tripChatEmbeddingDeploymentName string = ''
+param tripChatEmbeddingDimensions int = 1536
+param tripChatMaxMessageLength int = 2000
+param tripChatMaxPriorUserTurns int = 6
+param tripChatRetrievalTopK int = 12
+param tripChatRateLimitPerMinute int = 10
+param tripChatIndexBatchSize int = 100
+param tripChatTargetP95Milliseconds int = 8000
+
 @description('Release identifier recorded against applied migrations and telemetry.')
 param releaseId string = ''
 
@@ -104,6 +117,46 @@ var baseEnv = [
   {
     name: 'AzureOpenAI__DeploymentName'
     value: azureOpenAiDeploymentName
+  }
+  {
+    name: 'TripChat__Endpoint'
+    value: tripChatEndpoint
+  }
+  {
+    name: 'TripChat__ChatDeploymentName'
+    value: tripChatChatDeploymentName
+  }
+  {
+    name: 'TripChat__EmbeddingDeploymentName'
+    value: tripChatEmbeddingDeploymentName
+  }
+  {
+    name: 'TripChat__EmbeddingDimensions'
+    value: string(tripChatEmbeddingDimensions)
+  }
+  {
+    name: 'TripChat__MaxMessageLength'
+    value: string(tripChatMaxMessageLength)
+  }
+  {
+    name: 'TripChat__MaxPriorUserTurns'
+    value: string(tripChatMaxPriorUserTurns)
+  }
+  {
+    name: 'TripChat__RetrievalTopK'
+    value: string(tripChatRetrievalTopK)
+  }
+  {
+    name: 'TripChat__RateLimitPerMinute'
+    value: string(tripChatRateLimitPerMinute)
+  }
+  {
+    name: 'TripChat__IndexBatchSize'
+    value: string(tripChatIndexBatchSize)
+  }
+  {
+    name: 'TripChat__TargetP95Milliseconds'
+    value: string(tripChatTargetP95Milliseconds)
   }
   {
     name: 'OTEL_EXPORTER_OTLP_ENDPOINT'

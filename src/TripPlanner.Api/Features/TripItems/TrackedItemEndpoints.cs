@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using TripPlanner.Api.Features.Notifications;
+using TripPlanner.Api.Features.TripDataChat;
 using TripPlanner.Api.Security;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Contracts.Common;
@@ -28,7 +29,7 @@ public static class TrackedItemEndpoints
         Guid tripId, CreateTrackedItemRequest request,
         ICurrentUser currentUser, ITripAccessResolver accessResolver, TrackedItemValidator validator,
         ITripReadRepository tripReads, ITripItemRepository items,
-        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, CancellationToken ct)
+        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, ITripSearchIndexer indexer, CancellationToken ct)
     {
         var callerId = currentUser.UserId;
         var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
@@ -69,6 +70,7 @@ public static class TrackedItemEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TrackedItemCreate, "tracked-item", id.Value.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await indexer.IndexTripAsync(tripId, ct);
         await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemCreated, id.Value, ct);
         return TypedResults.Created($"/api/trips/{tripId}/items/{id}");
     }
@@ -77,7 +79,7 @@ public static class TrackedItemEndpoints
         Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request,
         ICurrentUser currentUser, ITripAccessResolver accessResolver, TrackedItemValidator validator,
         ITripReadRepository tripReads, ITripItemRepository items,
-        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, CancellationToken ct)
+        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, ITripSearchIndexer indexer, CancellationToken ct)
     {
         var callerId = currentUser.UserId;
         var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
@@ -117,6 +119,7 @@ public static class TrackedItemEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TrackedItemUpdate, "tracked-item", trackedItemId.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await indexer.IndexTripAsync(tripId, ct);
         await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemUpdated, trackedItemId, ct);
         return TypedResults.NoContent();
     }
@@ -124,7 +127,7 @@ public static class TrackedItemEndpoints
     private static async Task<Results<NoContent, NotFound<ApiError>>> DeleteAsync(
         Guid tripId, Guid trackedItemId,
         ICurrentUser currentUser, ITripAccessResolver accessResolver, ITripItemRepository items,
-        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, CancellationToken ct)
+        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, ITripSearchIndexer indexer, CancellationToken ct)
     {
         var callerId = currentUser.UserId;
         var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
@@ -140,6 +143,7 @@ public static class TrackedItemEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TrackedItemDelete, "tracked-item", trackedItemId.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await indexer.DeleteSourceAsync(tripId, "tracked_item", trackedItemId, ct);
         await itineraryNotifications.NotifyChangeAsync(tripId, access.OwnerUserId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripItemDeleted, trackedItemId, ct);
         return TypedResults.NoContent();
     }

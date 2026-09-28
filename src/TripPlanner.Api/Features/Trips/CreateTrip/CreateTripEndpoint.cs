@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using TripPlanner.Api.Security;
+using TripPlanner.Api.Features.TripDataChat;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Contracts.Common;
 using TripPlanner.Contracts.Errors;
@@ -26,6 +27,7 @@ public static class CreateTripEndpoint
         ITripCommandRepository commands,
         IAuditRepository audit,
         IClock clock,
+        ITripSearchIndexer indexer,
         CancellationToken cancellationToken)
     {
         var ownerId = currentUser.UserId;
@@ -36,6 +38,7 @@ public static class CreateTripEndpoint
             return TypedResults.BadRequest(validation.Error!);
         }
         var tripId = await commands.InsertAsync(ownerId, request, clock.UtcNow, cancellationToken);
+        await indexer.IndexTripAsync(tripId, cancellationToken);
         await audit.RecordAsync(ownerId, AuditOperations.TripCreate, "trip", tripId.ToString(), AuditResults.Success, clock.UtcNow, cancellationToken);
         var response = new CreateTripResponse(tripId, request.Name, request.Description, request.StartDate, request.EndDate);
         return TypedResults.Created($"/api/trips/{tripId}", response);

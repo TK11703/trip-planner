@@ -30,6 +30,8 @@ using TripPlanner.Api.Features.Places;
 using TripPlanner.Database.UserProfiles;
 using TripPlanner.Database.Notifications;
 using TripPlanner.Database.EmailIngestion;
+using TripPlanner.Database.TripDataChat;
+using TripPlanner.Api.Features.TripDataChat;
 
 namespace TripPlanner.Api.Extensions;
 
@@ -40,12 +42,15 @@ public static class WebApplicationBuilderExtensions
     public static WebApplicationBuilder AddTripPlannerApi(this WebApplicationBuilder builder)
     {
         builder.AddServiceDefaults();
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics => metrics.AddMeter(TripDataChatTelemetry.MeterName));
         builder.AddTripPlannerAuthentication();
 
         builder.Services.AddOpenApi();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<ICurrentUser, CurrentUser>();
         builder.Services.AddSingleton<IClock, SystemClock>();
+        builder.Services.AddTripDataChatRateLimit(builder.Configuration);
 
         builder.Services.AddSingleton<ISqlFileProvider>(_ => new SqlFileProvider());
         // Singleton: the factory owns an NpgsqlDataSource, and a per-scope instance would
@@ -56,6 +61,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<ITripItemRepository, TripItemRepository>();
         builder.Services.AddScoped<ITimelineRepository, TimelineRepository>();
         builder.Services.AddScoped<ITripSharingRepository, TripSharingRepository>();
+        builder.Services.AddScoped<ITripSearchDocumentRepository, TripSearchDocumentRepository>();
         builder.Services.AddScoped<ITripAccessResolver, TripAccessResolver>();
         builder.Services.AddScoped<IAuditRepository, AuditRepository>();
         builder.Services.AddScoped<IThemePreferenceRepository, ThemePreferenceRepository>();
@@ -116,6 +122,8 @@ public static class WebApplicationBuilderExtensions
             .AddCheck<DatabaseHealthCheck>(DatabaseHealthCheck.Name, tags: ["ready"])
             .AddCheck<MigrationHealthCheck>(MigrationHealthCheck.Name, tags: ["ready"])
             .AddCheck<AzureOpenAIConfigurationHealthCheck>(AzureOpenAIConfigurationHealthCheck.Name, tags: ["ready"]);
+        builder.Services.AddHealthChecks()
+            .AddCheck<TripChatConfigurationHealthCheck>(TripChatConfigurationHealthCheck.Name, tags: ["ready"]);
 
         // Email ingestion: repositories, deduplication, sender resolution, attachment text
         // extraction, and the recognition parser (Azure OpenAI via managed identity).
@@ -136,6 +144,12 @@ public static class WebApplicationBuilderExtensions
         // cannot even be constructed, and construction happens during resolution (FR-047).
         builder.Services.AddScoped<Func<IItemRecognizer>>(sp => sp.GetRequiredService<IItemRecognizer>);
         builder.Services.AddScoped<DraftReRecognitionService>();
+
+        builder.Services.AddSingleton<ITripDataChatAgent, TripDataChatAgent>();
+        builder.Services.AddScoped<TripSearchRetrievalService>();
+        builder.Services.AddScoped<TripDataChatHandler>();
+        builder.Services.AddScoped<ITripSearchIndexer, TripSearchIndexer>();
+        builder.Services.AddHostedService<TripSearchReconciliationService>();
 
         return builder;
     }

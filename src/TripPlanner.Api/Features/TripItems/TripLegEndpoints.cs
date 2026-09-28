@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using TripPlanner.Api.Features.Notifications;
+using TripPlanner.Api.Features.TripDataChat;
 using TripPlanner.Api.Security;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Contracts.Common;
@@ -59,7 +60,7 @@ public static class TripLegEndpoints
         Guid tripId, CreateTripLegRequest request,
         ICurrentUser currentUser, ITripAccessResolver accessResolver, TripLegValidator validator,
         ITripReadRepository tripReads, ITripItemRepository items,
-        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, CancellationToken ct)
+        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, ITripSearchIndexer indexer, CancellationToken ct)
     {
         var callerId = currentUser.UserId;
         var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
@@ -88,6 +89,7 @@ public static class TripLegEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripLegCreate, "trip-leg", id.Value.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await indexer.IndexTripAsync(tripId, ct);
         await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegCreated, id.Value, ct);
         return TypedResults.Created($"/api/trips/{tripId}/legs/{id}");
     }
@@ -96,7 +98,7 @@ public static class TripLegEndpoints
         Guid tripId, Guid tripLegId, UpdateTripLegRequest request,
         ICurrentUser currentUser, ITripAccessResolver accessResolver, TripLegValidator validator,
         ITripReadRepository tripReads, ITripItemRepository items,
-        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, CancellationToken ct)
+        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, ITripSearchIndexer indexer, CancellationToken ct)
     {
         var callerId = currentUser.UserId;
         var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
@@ -146,6 +148,7 @@ public static class TripLegEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripLegUpdate, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await indexer.IndexTripAsync(tripId, ct);
         await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegUpdated, tripLegId, ct);
         return TypedResults.NoContent();
     }
@@ -153,7 +156,7 @@ public static class TripLegEndpoints
     private static async Task<Results<NoContent, BadRequest<ApiError>, NotFound<ApiError>>> DeleteAsync(
         Guid tripId, Guid tripLegId,
         ICurrentUser currentUser, ITripAccessResolver accessResolver, ITripItemRepository items,
-        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, CancellationToken ct)
+        IAuditRepository audit, IItineraryNotificationService itineraryNotifications, IClock clock, ITripSearchIndexer indexer, CancellationToken ct)
     {
         var callerId = currentUser.UserId;
         var access = await accessResolver.ResolveAsync(callerId, tripId, ct);
@@ -178,6 +181,7 @@ public static class TripLegEndpoints
             return TypedResults.NotFound(ApiError.NotFoundOrDenied());
         }
         await audit.RecordAsync(callerId, AuditOperations.TripLegDelete, "trip-leg", tripLegId.ToString(), AuditResults.Success, clock.UtcNow, ct);
+        await indexer.DeleteSourceAsync(tripId, "leg", tripLegId, ct);
         await itineraryNotifications.NotifyChangeAsync(tripId, ownerId, callerId, currentUser.DisplayName, ItineraryChangeKind.TripLegDeleted, tripLegId, ct);
         return TypedResults.NoContent();
     }

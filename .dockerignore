@@ -1,0 +1,13 @@
+.git/
+.azure/
+.vscode/
+.idea/
+**/bin/
+**/obj/
+**/TestResults/
+**/node_modules/
+**/coverage/
+**/*.log
+.env*
+*.user
+*.suo

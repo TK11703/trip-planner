@@ -79,3 +79,27 @@ public sealed class AzureOpenAIConfigurationHealthCheck(IConfiguration configura
         return Task.FromResult(HealthCheckResult.Healthy());
     }
 }
+
+public sealed class TripChatConfigurationHealthCheck(IConfiguration configuration) : IHealthCheck
+{
+    public const string Name = "trip-chat-configuration";
+
+    public Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var endpoint = configuration["TripChat:Endpoint"];
+        var chatDeployment = configuration["TripChat:ChatDeploymentName"];
+        var embeddingDeployment = configuration["TripChat:EmbeddingDeploymentName"];
+        if (string.IsNullOrWhiteSpace(endpoint)
+            || string.IsNullOrWhiteSpace(chatDeployment)
+            || string.IsNullOrWhiteSpace(embeddingDeployment))
+        {
+            return Task.FromResult(HealthCheckResult.Degraded("Trip chat is not configured."));
+        }
+
+        return Task.FromResult(Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
+            ? HealthCheckResult.Healthy()
+            : HealthCheckResult.Degraded("Trip chat endpoint configuration is invalid."));
+    }
+}

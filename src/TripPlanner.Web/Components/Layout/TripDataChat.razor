@@ -1,0 +1,355 @@
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ITripDataChatApiClient ChatApi
+@inject TripChatSessionStore SessionStore
+@inject IConfiguration Configuration
+
+<div class="trip-chat-shell">
+    @if (!string.IsNullOrWhiteSpace(_epoch))
+    {
+        <button @ref="_activator" class="trip-chat-activator" type="button" aria-label="@(_isOpen ? "Close trip chat" : "Open trip chat")"
+            aria-controls="trip-data-chat-panel" aria-expanded="@(_isOpen ? "true" : "false")" @onclick="ToggleAsync">
+            <span aria-hidden="true">✦</span>
+            <span>Trip chat</span>
+        </button>
+
+        @if (_isOpen)
+        {
+            <aside @ref="_panel" id="trip-data-chat-panel" class="trip-chat-panel" role="dialog" aria-label="Trip data chat"
+                   @onkeydown="HandlePanelKeyDownAsync">
+                <header class="trip-chat-header">
+                    <div>
+                        <h2>Trip chat</h2>
+                        <p>Ask about your trips</p>
+                    </div>
+                    <div class="trip-chat-header-actions">
+                        <button type="button" class="btn btn-sm trip-chat-header-button trip-chat-new" @onclick="NewChatAsync"
+                                disabled="@(_sending || (_messages.Count == 0 && string.IsNullOrEmpty(_draft)))">New chat</button>
+                        <button type="button" class="btn btn-sm trip-chat-header-button trip-chat-close" aria-label="Close trip chat" @onclick="CloseAsync">Close</button>
+                    </div>
+                </header>
+
+                <ol @ref="_transcriptElement" class="trip-chat-transcript" role="log" aria-live="polite" aria-relevant="additions text"
+                    @onscroll="SaveScrollAsync">
+                    @foreach (var message in _messages)
+                    {
+                        <li class="@(message.Role == "user" ? "trip-chat-user-message" : "trip-chat-assistant-message")">
+                            <p>@message.Text</p>
+                            @if (message.Citations is { Count: > 0 })
+                            {
+                                <ul class="trip-chat-citations" aria-label="Sources">
+                                    @foreach (var citation in message.Citations)
+                                    {
+                                        <li>
+                                            <a href="@($"/trips/{citation.TripId}")" @onclick="PersistBeforeNavigationAsync">
+                                                @citation.TripName
+                                                @if (citation.SourceKind != TripDataChatSourceKind.Trip)
+                                                {
+                                                    <span> · @citation.SourceLabel</span>
+                                                }
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </li>
+                    }
+                </ol>
+
+                <div class="trip-chat-live-status" role="status" aria-live="polite">@_status</div>
+                @if (_retryMessage is not null && !_sending)
+                {
+                    <button type="button" class="trip-chat-secondary trip-chat-retry" @onclick="RetryAsync">Retry</button>
+                }
+                <form class="trip-chat-composer" @onsubmit="SendAsync" @onsubmit:preventDefault>
+                    <label for="trip-chat-message">Message</label>
+                    <textarea @ref="_inputElement" id="trip-chat-message" @bind="_draft" @bind:event="oninput"
+                              maxlength="@MaxMessageLength" rows="3" disabled="@_sending" aria-describedby="trip-chat-hint"></textarea>
+                    <p id="trip-chat-hint" class="trip-chat-hint">Press Enter to send, Shift+Enter for a new line.</p>
+                    <div class="trip-chat-actions">
+                        @if (_sending)
+                        {
+                            <button type="button" class="trip-chat-secondary" @onclick="StopAsync">Stop</button>
+                        }
+                        <button type="submit" class="trip-chat-send" disabled="@(_sending || string.IsNullOrWhiteSpace(_draft))">Send</button>
+                    </div>
+                </form>
+            </aside>
+        }
+    }
+</div>
+
+@code {
+    private const string EpochClaim = TripChatSessionEpoch.ClaimType;
+    private const int MaxStoredMessages = 20;
+    private string? _epoch;
+    private string _draft = string.Empty;
+    private string _status = string.Empty;
+    private string? _retryMessage;
+    private List<TripChatSessionMessage> _messages = [];
+    private bool _isOpen;
+    private bool _sending;
+    private bool _loaded;
+    private bool _focusInput;
+    private bool _focusActivator;
+    private double _scrollTop;
+    private CancellationTokenSource? _requestCancellation;
+    private ElementReference _activator;
+    private ElementReference _panel;
+    private ElementReference _inputElement;
+    private ElementReference _transcriptElement;
+
+    private int MaxMessageLength => int.TryParse(Configuration["TripChat:MaxMessageLength"], out var value) && value > 0 ? value : 2000;
+    private int MaxPriorUserTurns => int.TryParse(Configuration["TripChat:MaxPriorUserTurns"], out var value) && value >= 0 ? value : 6;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var principal = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        _epoch = principal.FindFirst(EpochClaim)?.Value;
+        AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !string.IsNullOrWhiteSpace(_epoch))
+        {
+            var snapshot = await SessionStore.LoadAsync(_epoch);
+            _messages = snapshot.Messages.TakeLast(MaxStoredMessages).ToList();
+            _isOpen = snapshot.IsOpen;
+            _scrollTop = snapshot.ScrollTop;
+            _loaded = true;
+            StateHasChanged();
+        }
+
+        if (_loaded)
+        {
+            try
+            {
+                await SessionStore.SyncPaneAsync(_panel, _isOpen);
+                if (_isOpen)
+                {
+                    await SessionStore.RestoreScrollAsync(_transcriptElement, _scrollTop);
+                    if (_focusInput)
+                    {
+                        await SessionStore.FocusAsync(_inputElement);
+                        _focusInput = false;
+                    }
+                }
+                else if (_focusActivator)
+                {
+                    await SessionStore.FocusAsync(_activator);
+                    _focusActivator = false;
+                }
+            }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        _isOpen = !_isOpen;
+        _focusInput = _isOpen;
+        _focusActivator = !_isOpen;
+        await SaveAsync();
+    }
+
+    private async Task CloseAsync()
+    {
+        _isOpen = false;
+        _focusActivator = true;
+        await SaveAsync();
+    }
+
+    private async Task HandlePanelKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            await CloseAsync();
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        var message = _draft.Trim();
+        if (_sending || message.Length == 0 || message.Length > MaxMessageLength) return;
+
+        _messages.Add(new TripChatSessionMessage("user", message));
+        TrimMessages();
+        _draft = string.Empty;
+        _retryMessage = null;
+        _status = "Sending message…";
+        _sending = true;
+        _requestCancellation = new CancellationTokenSource();
+        await SaveAsync();
+
+        var priorUserMessages = _messages
+            .Take(Math.Max(0, _messages.Count - 1))
+            .Where(turn => turn.Role == "user")
+            .TakeLast(MaxPriorUserTurns)
+            .Select(turn => turn.Text)
+            .ToArray();
+
+        try
+        {
+            var response = await ChatApi.AskAsync(new TripDataChatRequest(message, priorUserMessages), _requestCancellation.Token);
+            _messages.Add(new TripChatSessionMessage("assistant", response.Answer, response.Citations));
+            _retryMessage = null;
+            _status = response.Status switch
+            {
+                TripDataChatStatus.NoAccessibleTripData => "No accessible trip data.",
+                TripDataChatStatus.InsufficientData => "Not enough trip information to answer.",
+                _ => "Answer ready."
+            };
+        }
+        catch (TripDataChatApiException exception)
+        {
+            _retryMessage = exception.Kind is TripDataChatFailureKind.Throttled or TripDataChatFailureKind.Retryable
+                ? message
+                : null;
+            _status = exception.Kind switch
+            {
+                TripDataChatFailureKind.Throttled => "Too many requests. Please wait and retry.",
+                TripDataChatFailureKind.Unauthorized => "Your sign-in has expired. Sign in again to continue.",
+                TripDataChatFailureKind.InvalidRequest => "That message could not be sent.",
+                _ => "Trip chat is temporarily unavailable. Please retry."
+            };
+            if (exception.Kind == TripDataChatFailureKind.Unauthorized)
+            {
+                await ClearSessionAsync();
+                _epoch = null;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _status = "Response stopped.";
+        }
+        catch
+        {
+            _status = "Trip chat is temporarily unavailable. Please retry.";
+            _retryMessage = message;
+        }
+        finally
+        {
+            _sending = false;
+            _requestCancellation?.Dispose();
+            _requestCancellation = null;
+            TrimMessages();
+            await SaveAsync();
+        }
+    }
+
+    private async Task NewChatAsync()
+    {
+        if (_sending) return;
+
+        _messages.Clear();
+        _draft = string.Empty;
+        _retryMessage = null;
+        _scrollTop = 0;
+        _status = "Started a new chat.";
+        _focusInput = true;
+        await SaveAsync();
+    }
+
+    private Task StopAsync()
+    {
+        _requestCancellation?.Cancel();
+        return Task.CompletedTask;
+    }
+
+    private async Task RetryAsync()
+    {
+        if (_retryMessage is null) return;
+        if (_messages.LastOrDefault() is { Role: "user" } last && last.Text == _retryMessage)
+        {
+            _messages.RemoveAt(_messages.Count - 1);
+        }
+        _draft = _retryMessage;
+        _retryMessage = null;
+        await SendAsync();
+    }
+
+    private async Task SaveScrollAsync()
+    {
+        try
+        {
+            _scrollTop = await SessionStore.ReadScrollAsync(_transcriptElement);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException)
+        {
+        }
+        await SaveAsync();
+    }
+
+    private async Task PersistBeforeNavigationAsync()
+    {
+        _isOpen = true;
+        await SaveAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_epoch)) return;
+        await SessionStore.SaveAsync(_epoch, new TripChatSessionSnapshot(_messages.ToArray(), _isOpen, _scrollTop));
+    }
+
+    private void TrimMessages()
+    {
+        if (_messages.Count > MaxStoredMessages)
+        {
+            _messages.RemoveRange(0, _messages.Count - MaxStoredMessages);
+        }
+    }
+
+    private async Task ClearSessionAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_epoch))
+        {
+            await SessionStore.ClearAsync(_epoch);
+        }
+        _messages.Clear();
+        _isOpen = false;
+        _retryMessage = null;
+        _scrollTop = 0;
+    }
+
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                var newEpoch = (await authenticationStateTask).User.FindFirst(EpochClaim)?.Value;
+                if (string.Equals(newEpoch, _epoch, StringComparison.Ordinal)) return;
+
+                await ClearSessionAsync();
+                _epoch = newEpoch;
+                _draft = string.Empty;
+                _status = string.Empty;
+                if (!string.IsNullOrWhiteSpace(newEpoch))
+                {
+                    var snapshot = await SessionStore.LoadAsync(newEpoch);
+                    _messages = snapshot.Messages.TakeLast(MaxStoredMessages).ToList();
+                    _isOpen = snapshot.IsOpen;
+                    _scrollTop = snapshot.ScrollTop;
+                }
+                _loaded = true;
+                StateHasChanged();
+            }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException)
+            {
+            }
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _requestCancellation?.Cancel();
+        await SessionStore.SyncPaneAsync(_panel, false);
+    }
+
+    public void Dispose() => AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
+}
