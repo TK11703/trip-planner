@@ -67,3 +67,22 @@ Use a versioned test dataset containing answerable single-trip questions, cross-
 - End-to-end, retrieval, and model p50/p95 latency plus failure recovery.
 
 Keep evaluation inputs/results access-controlled and separate from default production telemetry. Preserve the feature-spec success targets of >=90% answer accuracy, >=90% contextual follow-ups, 100% cited trip coverage for trip facts, 100% limitation behavior on unanswerable questions, and zero inaccessible-trip leakage.
+
+## Validation results (2026-09-28)
+
+Guided run in a real browser against the local AppHost, signed in as the owner of one trip (`2026 Hawaii`, 8 itinerary items). No second account was available, so sharing scenarios rely on the automated tests noted below.
+
+| # | Scenario | Result |
+|---|---|---|
+| — | Migration and pgvector | Pass. Local: `017` applied on PostgreSQL 18.6 with `vector` 0.8.6; existing records embedded at 3072 dimensions. Production: `azure.extensions` = `pgcrypto,vector` and `vector` 0.8.2 created in `tripplanner`. |
+| 1 | Activator and drawer | Pass. Fixed lower-right, `aria-expanded`/`aria-controls` correct; drawer full viewport height, 480 px desktop; focus moves to the input on open and returns to the activator on Escape. At 390 px it is full width, `aria-modal`, page inert while open. Fixed a 15 px left clip caused by `100vw` including the scrollbar. |
+| 2 | Grounded answers | Pass for owned trips: start date, duration, all 8 legs/items, and reservations answered from records with per-item citations; follow-up ("that trip") resolved from prior user turns. Viewer/collaborator/cross-trip access: covered by `TripDataChatEndpointTests`, `TripDataChatRetrievalTests`, and `TripSearchDocumentsRepositoryTests`; not exercised manually. |
+| 3 | Unanswerable | Pass. Room-number question returned a limitation with no citations. Ambiguous, unrelated, and no-accessible-trips cases covered by the live evaluation and `TripDataChatSecurityTests`. |
+| 4 | Citation navigation | Pass. Citation opened `/trips/{id}`; drawer reopened with all 8 messages and 13 citations; state also survived a full reload. Links are built from IDs only. |
+| 5 | Share revocation | Not verified manually (no second account). Covered by `TripDataChatSecurityTests` and `TripDataChatRetrievalTests` (fresh access check per turn, no revoked citations). |
+| 6 | Sign-out / new sign-in | Pass. Sign-out cleared the `sessionStorage` transcript and removed the activator; a new sign-in started with an empty chat. Tab close relies on browser `sessionStorage` semantics. |
+| 7 | Read-only and failures | Pass. Anonymous `POST /api/chat/messages` returned `401`. No-mutation, `429`, and retryable `503` behavior covered by API tests. New chat and Enter/Shift+Enter behave as specified. |
+| 8 | Content-free telemetry | Covered by `TripDataChatOperationalTests`; not inspected manually. |
+| — | Dark theme | Pass. Panel, text, and activator use the dark `--tp-*` palette. |
+
+Managed-identity access in Azure is configured (shared `acc-aoai` account, `TRIP_CHAT_*` repository variables) and is exercised by the first release.
