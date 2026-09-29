@@ -1,0 +1,134 @@
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using TripPlanner.Contracts.FavoriteDestinations
+
+<EditForm id="favorite-form" Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName" class="d-flex flex-column overflow-hidden">
+    <DataAnnotationsValidator />
+    <div class="modal-body">
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label" for="favorite-name">Name</label>
+                <InputText id="favorite-name" class="form-control" maxlength="200" @bind-Value="_model.Name" />
+                <ValidationMessage For="@(() => _model.Name)" />
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="favorite-address">Address</label>
+                <InputText id="favorite-address" class="form-control" maxlength="1000" @bind-Value="_model.Address" />
+                <ValidationMessage For="@(() => _model.Address)" />
+                <p class="form-text mb-0" data-testid="favorite-calculated-location">
+                    City, country, and coordinates are looked up from the address when you save.
+                    @if (Favorite is not null)
+                    {
+                        <br />
+                        <span>Current: @CalculatedLocation</span>
+                    }
+                </p>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="favorite-notes">Notes</label>
+                <InputTextArea id="favorite-notes" class="form-control" rows="4" maxlength="4000" @bind-Value="_model.Notes" />
+                <ValidationMessage For="@(() => _model.Notes)" />
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="alert alert-danger mt-3 mb-0" role="alert">@ErrorMessage</div>
+        }
+
+        @ChildContent
+    </div>
+
+    <div class="modal-footer justify-content-between">
+        <div>
+            @if (Favorite is not null && OnDelete.HasDelegate)
+            {
+                <button id="favorite-delete" type="button" class="btn btn-outline-danger" disabled="@IsSaving" @onclick="OnDelete">Delete</button>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            @if (OnCancel.HasDelegate)
+            {
+                <button id="favorite-cancel" type="button" class="btn btn-outline-secondary" disabled="@IsSaving" @onclick="OnCancel">Cancel</button>
+            }
+            <button type="submit" class="btn btn-primary" disabled="@IsSaving">@(IsSaving ? "Saving..." : "Save favorite")</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    private sealed class FormModel
+    {
+        [Required(ErrorMessage = "Name is required.")]
+        [StringLength(200)]
+        public string? Name { get; set; }
+
+        [Required(ErrorMessage = "Address is required.")]
+        [StringLength(1000)]
+        public string? Address { get; set; }
+
+        [StringLength(4000)]
+        public string? Notes { get; set; }
+    }
+
+    private FormModel _model = new();
+    private Guid? _loadedFavoriteId;
+
+    [Parameter] public FavoriteDestinationDto? Favorite { get; set; }
+    [Parameter] public EventCallback<CreateFavoriteDestinationRequest> OnCreate { get; set; }
+    [Parameter] public EventCallback<UpdateFavoriteDestinationRequest> OnUpdate { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string FormName => Favorite is null ? "favorite-destination-create" : $"favorite-destination-edit-{Favorite.FavoriteDestinationId}";
+
+    private string CalculatedLocation
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(Favorite?.City)) parts.Add(Favorite.City);
+            if (!string.IsNullOrWhiteSpace(Favorite?.Country)) parts.Add(Favorite.Country);
+            if (Favorite?.Latitude is double latitude && Favorite.Longitude is double longitude)
+            {
+                parts.Add(string.Create(CultureInfo.InvariantCulture, $"{latitude:0.#####}, {longitude:0.#####}"));
+            }
+            return parts.Count == 0 ? "not resolved" : string.Join(" · ", parts);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        var id = Favorite?.FavoriteDestinationId;
+        if (_loadedFavoriteId == id)
+        {
+            return;
+        }
+
+        _loadedFavoriteId = id;
+        _model = Favorite is null
+            ? new FormModel()
+            : new FormModel
+            {
+                Name = Favorite.Name,
+                Address = Favorite.Address,
+                Notes = Favorite.Notes
+            };
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (Favorite is null)
+        {
+            await OnCreate.InvokeAsync(new CreateFavoriteDestinationRequest(
+                _model.Name, _model.Address, _model.Notes));
+            return;
+        }
+
+        await OnUpdate.InvokeAsync(new UpdateFavoriteDestinationRequest(
+            _model.Name, _model.Address, _model.Notes));
+    }
+}

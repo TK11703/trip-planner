@@ -11,6 +11,7 @@ using TripPlanner.Web.Features.Notifications;
 using TripPlanner.Web.Features.EmailIngestion;
 using TripPlanner.Web.Features.InboxHistory;
 using TripPlanner.Web.Features.TripDataChat;
+using TripPlanner.Web.Features.FavoriteDestinations;
 using TripPlanner.Web.Health;
 
 namespace TripPlanner.Web.Extensions;
@@ -57,6 +58,12 @@ public static class WebApplicationBuilderExtensions
         .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
 
         builder.Services.AddHttpClient<INotificationApiClient, NotificationApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https+http://api");
+        })
+        .AddHttpMessageHandler<AuthenticatedApiTokenHandler>();
+
+        builder.Services.AddHttpClient<IFavoriteDestinationApiClient, FavoriteDestinationApiClient>(client =>
         {
             client.BaseAddress = new Uri("https+http://api");
         })

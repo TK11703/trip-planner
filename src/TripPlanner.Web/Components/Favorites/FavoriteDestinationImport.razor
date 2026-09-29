@@ -1,0 +1,129 @@
+@inherits ApiComponentBase
+@using Microsoft.AspNetCore.Components.Forms
+@using TripPlanner.Contracts.FavoriteDestinations
+@using TripPlanner.Web.Features.FavoriteDestinations
+@inject IFavoriteDestinationApiClient FavoriteApi
+
+<section class="card card-body favorite-import mb-3" aria-label="Import favorite destinations">
+    <h2 class="card-title h5">Import favorites</h2>
+    <div>
+        <label class="form-label" for="favorite-import-file">JSON or CSV file</label>
+        <InputFile id="favorite-import-file" class="form-control" accept=".json,.csv,application/json,text/csv" OnChange="OnFileSelected" disabled="@_isImporting" />
+        <p class="form-text mb-0">CSV headers: <code>name,address,notes</code>. JSON: an array of objects with <code>name</code>, <code>address</code>, and optional <code>notes</code>.</p>
+    </div>
+    @if (_selectedFile is not null)
+    {
+        <p class="small text-secondary mt-2 mb-0">@_selectedFile.Name (@FormatSize(_selectedFile.Size))</p>
+    }
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger mt-3 mb-0" role="alert">@_error</div>
+    }
+    @if (_response is not null && _response.Errors.Count > 0)
+    {
+        <div class="alert alert-danger mt-3 mb-0" role="alert" data-testid="favorite-import-errors">
+            <p class="mb-1">Nothing was imported. Correct these errors and try again.</p>
+            <ul class="mb-0">
+                @foreach (var issue in _response.Errors)
+                {
+                    <li>@(issue.RowNumber is { } row ? $"Row {row}: " : null)@issue.Message</li>
+                }
+            </ul>
+        </div>
+    }
+    @if (_response is { RequiresDuplicateConfirmation: true })
+    {
+        <div class="alert alert-warning mt-3 mb-0" role="alert" data-testid="favorite-import-duplicate-warning">
+            <p class="mb-2">Possible duplicates were found. Import them as separate favorites?</p>
+            <ul class="mb-2">
+                @foreach (var duplicate in _response.PossibleDuplicates)
+                {
+                    <li>Row @duplicate.RowNumber: @duplicate.Name, @duplicate.Address</li>
+                }
+            </ul>
+            <div class="d-flex gap-2">
+                <button id="favorite-import-confirm-duplicates" type="button" class="btn btn-sm btn-warning" disabled="@_isImporting" @onclick="() => ImportAsync(confirmDuplicates: true)">Import duplicates</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_isImporting" @onclick="CancelDuplicateConfirmation">Cancel</button>
+            </div>
+        </div>
+    }
+    @if (_successMessage is not null)
+    {
+        <div class="alert alert-success mt-3 mb-0" role="status">@_successMessage</div>
+    }
+    <div class="d-flex gap-2 mt-3">
+        <button id="favorite-import-submit" type="button" class="btn btn-primary" disabled="@(_selectedFile is null || _isImporting)" @onclick="() => ImportAsync()">
+            @(_isImporting ? "Importing..." : "Import file")
+        </button>
+        @if (OnCancel.HasDelegate)
+        {
+            <button id="favorite-import-cancel" type="button" class="btn btn-outline-secondary" disabled="@_isImporting" @onclick="OnCancel">@(_successMessage is null ? "Cancel" : "Close")</button>
+        }
+    </div>
+</section>
+
+@code {
+    public const long MaximumUploadBytes = 2 * 1024 * 1024;
+
+    private IBrowserFile? _selectedFile;
+    private FavoriteDestinationImportResponse? _response;
+    private string? _error;
+    private string? _successMessage;
+    private bool _isImporting;
+
+    [Parameter] public EventCallback OnImported { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    public void OnFileSelected(InputFileChangeEventArgs args)
+    {
+        _selectedFile = args.File;
+        _response = null;
+        _error = null;
+        _successMessage = null;
+    }
+
+    private void CancelDuplicateConfirmation()
+    {
+        _response = null;
+    }
+
+    private async Task ImportAsync(bool confirmDuplicates = false)
+    {
+        if (_selectedFile is null)
+        {
+            return;
+        }
+        if (_selectedFile.Size > MaximumUploadBytes)
+        {
+            _error = "The selected file is too large. Choose a file smaller than 2 MiB.";
+            return;
+        }
+
+        _isImporting = true;
+        _error = null;
+        _successMessage = null;
+        try
+        {
+            await using var stream = _selectedFile.OpenReadStream(MaximumUploadBytes);
+            _response = await FavoriteApi.ImportAsync(_selectedFile.Name, stream, confirmDuplicates);
+            if (_response.Errors.Count > 0 || _response.RequiresDuplicateConfirmation)
+            {
+                return;
+            }
+
+            _successMessage = $"{_response.Imported.Count} destination{(_response.Imported.Count == 1 ? string.Empty : "s")} imported";
+            await OnImported.InvokeAsync();
+        }
+        catch (Exception exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
+
+    private static string FormatSize(long bytes)
+        => bytes < 1024 ? $"{bytes} B" : $"{bytes / 1024d:0.#} KB";
+}

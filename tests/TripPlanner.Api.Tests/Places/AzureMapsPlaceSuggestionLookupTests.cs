@@ -4,6 +4,7 @@ using Azure.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using TripPlanner.Api.Features.Places;
+using TripPlanner.Contracts.Places;
 using Xunit;
 
 namespace TripPlanner.Api.Tests.Places;
@@ -72,6 +73,52 @@ public class AzureMapsPlaceSuggestionLookupTests
             r => Assert.Equal("Louvre Museum, 75001 Paris", r.Description),
             r => Assert.Equal("Louvre-Rivoli, Paris", r.Description));
     }
+
+        [Fact]
+        public async Task ResolveAddress_ReturnsStructuredCityAndCountryComponents()
+        {
+                const string body = """
+                {
+                    "results": [
+                        { "position": { "lat": 38.65123, "lon": -77.25321 }, "address": { "freeformAddress": "4129 Merchant Plaza, Woodbridge, VA 22192", "municipality": "Occoquan", "localName": "Woodbridge", "country": "United States", "countryCode": "US" } }
+                    ]
+                }
+                """;
+                var lookup = Create(HttpStatusCode.OK, body);
+
+                var result = await lookup.ResolveAddressAsync("4129 Merchant Plaza, Woodbridge, VA 22192", CancellationToken.None);
+
+                Assert.Equal(new PlaceAddressComponents("Woodbridge", "United States", 38.65123, -77.25321), result);
+        }
+
+        [Fact]
+        public async Task ResolveAddress_WithoutLocalName_FallsBackToMunicipality()
+        {
+                const string body = """
+                {
+                    "results": [
+                        { "address": { "freeformAddress": "10 Downing Street, London SW1A 2AA", "municipality": "London", "country": "United Kingdom" } }
+                    ]
+                }
+                """;
+                var lookup = Create(HttpStatusCode.OK, body);
+
+                var result = await lookup.ResolveAddressAsync("10 Downing Street", CancellationToken.None);
+
+                Assert.Equal(new PlaceAddressComponents("London", "United Kingdom", null, null), result);
+        }
+
+        [Fact]
+        public async Task ResolveAddress_UnconfiguredOrUnresolved_ReturnsNull()
+        {
+                var unconfigured = Create(HttpStatusCode.OK, "{}", clientId: null);
+                var unresolved = Create(HttpStatusCode.OK, "{ \"results\": [] }");
+                var failed = Create(HttpStatusCode.ServiceUnavailable, "{}");
+
+                Assert.Null(await unconfigured.ResolveAddressAsync("Paris", CancellationToken.None));
+                Assert.Null(await unresolved.ResolveAddressAsync("Unknown place", CancellationToken.None));
+                Assert.Null(await failed.ResolveAddressAsync("Paris", CancellationToken.None));
+        }
 
     [Fact]
     public async Task SendsEntraBearerTokenAndClientId()

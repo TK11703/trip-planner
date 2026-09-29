@@ -1,0 +1,515 @@
+@page "/favorites"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits ApiComponentBase
+@using TripPlanner.Contracts.FavoriteDestinations
+@using TripPlanner.Web.Components.Favorites
+@using TripPlanner.Web.Features.FavoriteDestinations
+@inject IFavoriteDestinationApiClient FavoriteApi
+
+<PageTitle>Favorites</PageTitle>
+
+<section class="favorites-page">
+    <div class="mb-3">
+        <h1 class="mb-1">Favorites</h1>
+        <p class="text-secondary mb-0">Places you want to remember for a future trip.</p>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p class="text-secondary" role="status">Loading favorites...</p>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="alert alert-warning" role="alert">@_loadError</div>
+    }
+    else
+    {
+        <div class="card favorites-card">
+            <div class="card-header">
+                <div class="row g-2 align-items-center">
+                    <div class="col-12 col-md-6">
+                        <label class="visually-hidden" for="favorite-search">Search favorites</label>
+                        <input id="favorite-search" class="form-control" type="search" placeholder="Search favorites" value="@_search" @oninput="SearchChangedAsync" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="d-flex flex-wrap gap-2 justify-content-md-end" role="toolbar" aria-label="Favorite actions">
+                            <button id="favorite-add" type="button" class="btn btn-sm btn-primary" title="Add a new favorite" @onclick="ShowCreateForm">
+                                <ActionIcon Name="add" CssClass="me-1 align-text-bottom" />New
+                            </button>
+                            <button id="favorite-import-toggle" type="button" class="btn btn-sm btn-outline-secondary" title="Import favorites from a JSON or CSV file" aria-expanded="@(_showImport ? "true" : "false")" @onclick="ToggleImport">
+                                <ActionIcon Name="import" CssClass="me-1 align-text-bottom" />Import
+                            </button>
+                            <button id="favorite-delete-selected" type="button" class="btn btn-sm btn-outline-danger" title="Delete the selected favorites" disabled="@(SelectedFavorites.Count == 0)" @onclick="RequestBulkDelete">
+                                <ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete@(SelectedFavorites.Count > 0 ? $" ({SelectedFavorites.Count})" : null)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                @if (_showImport || _saveMessage is not null)
+                {
+                    <div class="favorites-card-section">
+                        @if (_showImport)
+                        {
+                            <FavoriteDestinationImport OnImported="ReloadFavoritesAsync" OnCancel="CloseImport" />
+                        }
+                        @if (_saveMessage is not null)
+                        {
+                            <div class="alert alert-success" role="status">@_saveMessage</div>
+                        }
+                    </div>
+                }
+
+                @if (_favorites.Count == 0 && string.IsNullOrWhiteSpace(_search))
+                {
+                    <div class="favorites-card-section py-4 text-center">
+                        <h2 class="h5">No favorite destinations yet</h2>
+                        <p class="text-secondary">Save a place you have researched and keep its details here.</p>
+                        <button id="favorite-add-empty" class="btn btn-primary" type="button" @onclick="ShowCreateForm">Add your first favorite</button>
+                    </div>
+                }
+                else if (_favorites.Count == 0 && !string.IsNullOrWhiteSpace(_search))
+                {
+                    <p class="favorites-card-section text-secondary text-center py-4 mb-0" role="status">No favorites match your search.</p>
+                }
+                else if (_favorites.Count > 0)
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover align-middle favorites-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="favorites-select-col">
+                                        <input id="favorite-select-all" class="form-check-input" type="checkbox" aria-label="Select all favorites" checked="@AllVisibleSelected" @onchange="ToggleSelectAll" />
+                                    </th>
+                                    <th scope="col">Name</th>
+                                    <th scope="col">Address</th>
+                                    <th scope="col">City</th>
+                                    <th scope="col">Country</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var favorite in _favorites)
+                                {
+                                    <tr @key="favorite.FavoriteDestinationId" class="@(_selectedIds.Contains(favorite.FavoriteDestinationId) ? "table-active" : null)">
+                                        <td class="favorites-select-col">
+                                            <input class="form-check-input" type="checkbox" aria-label="Select @favorite.Name" data-testid="favorite-select-@favorite.FavoriteDestinationId" checked="@_selectedIds.Contains(favorite.FavoriteDestinationId)" @onchange="args => ToggleSelection(favorite.FavoriteDestinationId, args)" />
+                                        </td>
+                                        <th scope="row">
+                                            <button type="button" class="btn btn-link p-0 text-start fw-semibold" data-testid="favorite-edit-@favorite.FavoriteDestinationId" @onclick="() => EditFavorite(favorite)">@favorite.Name</button>
+                                        </th>
+                                        <td>@favorite.Address</td>
+                                        <td>@favorite.City</td>
+                                        <td>@favorite.Country</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_showForm || _editingFavorite is not null)
+    {
+        <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="favoriteModalTitle">
+            <div class="modal-dialog modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="favoriteModalTitle">@(_editingFavorite is null ? "Add favorite" : "Edit favorite")</h2>
+                        <button type="button" class="btn-close" aria-label="Close" disabled="@(_isSaving || _isDeleting)" @onclick="CancelForm"></button>
+                    </div>
+                    <FavoriteDestinationForm Favorite="_editingFavorite" OnCreate="CreateAsync" OnUpdate="UpdateAsync" OnCancel="CancelForm" OnDelete="RequestDelete" IsSaving="@(_isSaving || _isDeleting)" ErrorMessage="@_formError">
+                        @if (_duplicateWarning is not null)
+                        {
+                            <div class="alert alert-warning mt-3 mb-0" role="alert" data-testid="favorite-duplicate-warning">
+                                <p class="mb-2">This may be a possible duplicate. Save it as a separate favorite?</p>
+                                <ul class="mb-2">
+                                    @foreach (var match in _duplicateWarning.Matches)
+                                    {
+                                        <li>@match.Name, @match.Address</li>
+                                    }
+                                </ul>
+                                <div class="d-flex gap-2">
+                                    <button id="favorite-confirm-duplicate" type="button" class="btn btn-sm btn-warning" disabled="@_isSaving" @onclick="ConfirmDuplicateAsync">Save separately</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_isSaving" @onclick="CancelDuplicate">Cancel</button>
+                                </div>
+                            </div>
+                        }
+                        @if (_deleteCandidate is not null)
+                        {
+                            <div id="favorite-delete-confirm" class="alert alert-warning mt-3 mb-0" role="alert">
+                                <p class="mb-2">Remove <strong>@_deleteCandidate.Name</strong> from your favorites? Existing trip items will not change.</p>
+                                @if (_deleteError is not null)
+                                {
+                                    <p class="text-danger mb-2">@_deleteError</p>
+                                }
+                                <div class="d-flex gap-2">
+                                    <button id="favorite-delete-confirm-action" type="button" class="btn btn-sm btn-danger" disabled="@_isDeleting" @onclick="DeleteFavoriteAsync">@(_isDeleting ? "Removing..." : "Remove favorite")</button>
+                                    <button id="favorite-delete-cancel" type="button" class="btn btn-sm btn-outline-secondary" disabled="@_isDeleting" @onclick="CancelDelete">Keep favorite</button>
+                                </div>
+                            </div>
+                        }
+                    </FavoriteDestinationForm>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop show"></div>
+    }
+
+    @if (_showBulkDeleteConfirm)
+    {
+        <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="favoriteBulkDeleteTitle">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="favoriteBulkDeleteTitle">Delete favorites</h2>
+                        <button type="button" class="btn-close" aria-label="Close" disabled="@_isBulkDeleting" @onclick="CancelBulkDelete"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (_bulkDeleteError is not null)
+                        {
+                            <div class="alert alert-danger small" role="alert">@_bulkDeleteError</div>
+                        }
+                        <p class="mb-0">Remove <strong>@SelectedFavorites.Count</strong> selected favorite@(SelectedFavorites.Count == 1 ? null : "s")? Existing trip items will not change.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="favorite-bulk-delete-cancel" type="button" class="btn btn-outline-secondary" disabled="@_isBulkDeleting" @onclick="CancelBulkDelete">Cancel</button>
+                        <button id="favorite-bulk-delete-confirm" type="button" class="btn btn-danger" disabled="@_isBulkDeleting" @onclick="DeleteSelectedAsync">@(_isBulkDeleting ? "Deleting..." : "Delete favorites")</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop show"></div>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<FavoriteDestinationDto> _favorites = Array.Empty<FavoriteDestinationDto>();
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private bool _isDeleting;
+    private bool _showForm;
+    private bool _showImport;
+    private bool _showBulkDeleteConfirm;
+    private bool _isBulkDeleting;
+    private string? _bulkDeleteError;
+    private readonly HashSet<Guid> _selectedIds = [];
+    private FavoriteDestinationDto? _editingFavorite;
+    private FavoriteDestinationDto? _deleteCandidate;
+    private string _search = string.Empty;
+    private string? _loadError;
+    private string? _formError;
+    private string? _deleteError;
+    private string? _saveMessage;
+    private FavoriteDestinationDuplicateWarning? _duplicateWarning;
+    private CreateFavoriteDestinationRequest? _pendingDuplicateRequest;
+    private UpdateFavoriteDestinationRequest? _pendingDuplicateUpdate;
+    private Guid? _pendingDuplicateFavoriteId;
+    private int _searchRequestVersion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CallApiAsync(
+            async () => _favorites = await FavoriteApi.GetAsync(),
+            message => _loadError = message);
+        _isLoading = false;
+    }
+
+    private void ToggleImport()
+    {
+        _showImport = !_showImport;
+        _saveMessage = null;
+    }
+
+    // Only rows currently listed count, so a search filter never deletes hidden selections.
+    private IReadOnlyList<FavoriteDestinationDto> SelectedFavorites
+        => _favorites.Where(favorite => _selectedIds.Contains(favorite.FavoriteDestinationId)).ToArray();
+
+    private bool AllVisibleSelected
+        => _favorites.Count > 0 && _favorites.All(favorite => _selectedIds.Contains(favorite.FavoriteDestinationId));
+
+    private void ToggleSelection(Guid favoriteDestinationId, ChangeEventArgs args)
+    {
+        if (args.Value is true)
+        {
+            _selectedIds.Add(favoriteDestinationId);
+        }
+        else
+        {
+            _selectedIds.Remove(favoriteDestinationId);
+        }
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs args)
+    {
+        foreach (var favorite in _favorites)
+        {
+            if (args.Value is true)
+            {
+                _selectedIds.Add(favorite.FavoriteDestinationId);
+            }
+            else
+            {
+                _selectedIds.Remove(favorite.FavoriteDestinationId);
+            }
+        }
+    }
+
+    private void RequestBulkDelete()
+    {
+        if (SelectedFavorites.Count == 0)
+        {
+            return;
+        }
+
+        _bulkDeleteError = null;
+        _saveMessage = null;
+        _showBulkDeleteConfirm = true;
+    }
+
+    private void CancelBulkDelete()
+    {
+        _showBulkDeleteConfirm = false;
+        _bulkDeleteError = null;
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        var ids = SelectedFavorites.Select(favorite => favorite.FavoriteDestinationId).ToArray();
+        if (ids.Length == 0)
+        {
+            return;
+        }
+
+        _isBulkDeleting = true;
+        _bulkDeleteError = null;
+        await CallApiAsync(
+            async () =>
+            {
+                var deleted = await FavoriteApi.DeleteManyAsync(ids);
+                if (deleted is null)
+                {
+                    _bulkDeleteError = "The selected favorites could not be removed. Refresh and try again.";
+                    return;
+                }
+
+                _selectedIds.ExceptWith(ids);
+                _showBulkDeleteConfirm = false;
+                _favorites = await FavoriteApi.GetAsync(_search);
+                _saveMessage = $"{deleted} favorite{(deleted == 1 ? string.Empty : "s")} removed";
+            },
+            message => _bulkDeleteError = message);
+        _isBulkDeleting = false;
+    }
+
+    private void CloseImport()
+    {
+        _showImport = false;
+    }
+
+    private void ShowCreateForm()
+    {
+        _editingFavorite = null;
+        _formError = null;
+        _saveMessage = null;
+        _duplicateWarning = null;
+        _pendingDuplicateRequest = null;
+        CancelDelete();
+        _showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        _showForm = false;
+        _editingFavorite = null;
+        _formError = null;
+        _duplicateWarning = null;
+        _pendingDuplicateRequest = null;
+        _pendingDuplicateUpdate = null;
+        _pendingDuplicateFavoriteId = null;
+        CancelDelete();
+    }
+
+    private void EditFavorite(FavoriteDestinationDto favorite)
+    {
+        _showForm = false;
+        _editingFavorite = favorite;
+        _formError = null;
+        _saveMessage = null;
+        ClearDuplicateWarning();
+        CancelDelete();
+    }
+
+    private async Task SearchChangedAsync(ChangeEventArgs eventArgs)
+    {
+        _search = eventArgs.Value?.ToString() ?? string.Empty;
+        var requestVersion = ++_searchRequestVersion;
+        await CallApiAsync(
+            async () =>
+            {
+                var results = await FavoriteApi.GetAsync(_search);
+                if (requestVersion == _searchRequestVersion)
+                {
+                    _favorites = results;
+                }
+            },
+            message => _loadError = message);
+    }
+
+    private async Task ReloadFavoritesAsync()
+    {
+        await CallApiAsync(
+            async () => _favorites = await FavoriteApi.GetAsync(_search),
+            message => _loadError = message);
+    }
+
+    private async Task CreateAsync(CreateFavoriteDestinationRequest request)
+        => await SaveAsync(request);
+
+    private async Task ConfirmDuplicateAsync()
+    {
+        if (_pendingDuplicateRequest is not null)
+        {
+            await SaveAsync(_pendingDuplicateRequest with { ConfirmPossibleDuplicate = true });
+        }
+        else if (_pendingDuplicateUpdate is not null && _pendingDuplicateFavoriteId is { } favoriteId)
+        {
+            await UpdateAsync(favoriteId, _pendingDuplicateUpdate with { ConfirmPossibleDuplicate = true });
+        }
+    }
+
+    private async Task SaveAsync(CreateFavoriteDestinationRequest request)
+    {
+        _isSaving = true;
+        _formError = null;
+        _saveMessage = null;
+
+        await CallApiAsync(
+            async () =>
+            {
+                var result = await FavoriteApi.CreateAsync(request);
+                if (result.DuplicateWarning is not null)
+                {
+                    _pendingDuplicateRequest = request;
+                    _pendingDuplicateUpdate = null;
+                    _pendingDuplicateFavoriteId = null;
+                    _duplicateWarning = result.DuplicateWarning;
+                    return;
+                }
+                if (!result.Succeeded)
+                {
+                    _formError = result.ErrorMessage ?? "The favorite destination could not be saved.";
+                    return;
+                }
+
+                _favorites = await FavoriteApi.GetAsync(_search);
+                ClearDuplicateWarning();
+                _showForm = false;
+                _saveMessage = "Favorite destination saved";
+            },
+            message => _formError = message);
+
+        _isSaving = false;
+    }
+
+    private async Task UpdateAsync(UpdateFavoriteDestinationRequest request)
+    {
+        if (_editingFavorite is null)
+        {
+            return;
+        }
+
+        await UpdateAsync(_editingFavorite.FavoriteDestinationId, request);
+    }
+
+    private async Task UpdateAsync(Guid favoriteDestinationId, UpdateFavoriteDestinationRequest request)
+    {
+        _isSaving = true;
+        _formError = null;
+        _saveMessage = null;
+
+        await CallApiAsync(
+            async () =>
+            {
+                var result = await FavoriteApi.UpdateAsync(favoriteDestinationId, request);
+                if (result.DuplicateWarning is not null)
+                {
+                    _pendingDuplicateRequest = null;
+                    _pendingDuplicateUpdate = request;
+                    _pendingDuplicateFavoriteId = favoriteDestinationId;
+                    _duplicateWarning = result.DuplicateWarning;
+                    return;
+                }
+                if (!result.Succeeded)
+                {
+                    _formError = result.ErrorMessage ?? "The favorite destination could not be updated.";
+                    return;
+                }
+
+                _favorites = await FavoriteApi.GetAsync(_search);
+                _editingFavorite = null;
+                ClearDuplicateWarning();
+                _saveMessage = "Favorite destination updated";
+            },
+            message => _formError = message);
+
+        _isSaving = false;
+    }
+
+    private void RequestDelete()
+    {
+        _deleteCandidate = _editingFavorite;
+        _deleteError = null;
+        ClearDuplicateWarning();
+    }
+
+    private void CancelDelete()
+    {
+        _deleteCandidate = null;
+        _deleteError = null;
+    }
+
+    private async Task DeleteFavoriteAsync()
+    {
+        if (_deleteCandidate is null)
+        {
+            return;
+        }
+
+        var favoriteId = _deleteCandidate.FavoriteDestinationId;
+        _isDeleting = true;
+        _deleteError = null;
+        await CallApiAsync(
+            async () =>
+            {
+                if (!await FavoriteApi.DeleteAsync(favoriteId))
+                {
+                    _deleteError = "The favorite could not be removed. Refresh and try again.";
+                    return;
+                }
+
+                _deleteCandidate = null;
+                _editingFavorite = null;
+                _favorites = await FavoriteApi.GetAsync(_search);
+                _saveMessage = "Favorite destination removed";
+            },
+            message => _deleteError = message);
+        _isDeleting = false;
+    }
+
+    private void CancelDuplicate()
+    {
+        ClearDuplicateWarning();
+    }
+
+    private void ClearDuplicateWarning()
+    {
+        _duplicateWarning = null;
+        _pendingDuplicateRequest = null;
+        _pendingDuplicateUpdate = null;
+        _pendingDuplicateFavoriteId = null;
+    }
+}

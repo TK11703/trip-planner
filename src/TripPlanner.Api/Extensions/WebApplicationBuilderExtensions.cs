@@ -31,7 +31,9 @@ using TripPlanner.Database.UserProfiles;
 using TripPlanner.Database.Notifications;
 using TripPlanner.Database.EmailIngestion;
 using TripPlanner.Database.TripDataChat;
+using TripPlanner.Database.FavoriteDestinations;
 using TripPlanner.Api.Features.TripDataChat;
+using TripPlanner.Api.Features.FavoriteDestinations;
 
 namespace TripPlanner.Api.Extensions;
 
@@ -59,6 +61,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<ITripReadRepository, TripReadRepository>();
         builder.Services.AddScoped<ITripCommandRepository, TripCommandRepository>();
         builder.Services.AddScoped<ITripItemRepository, TripItemRepository>();
+        builder.Services.AddScoped<IFavoriteDestinationRepository, FavoriteDestinationRepository>();
         builder.Services.AddScoped<ITimelineRepository, TimelineRepository>();
         builder.Services.AddScoped<ITripSharingRepository, TripSharingRepository>();
         builder.Services.AddScoped<ITripSearchDocumentRepository, TripSearchDocumentRepository>();
@@ -78,6 +81,9 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton<TripSharingValidator>();
         builder.Services.AddSingleton<ThemePreferenceValidator>();
         builder.Services.AddSingleton<UserProfileValidator>();
+        builder.Services.AddSingleton<FavoriteDestinationValidator>();
+        builder.Services.AddSingleton<FavoriteDestinationImportParser>();
+        builder.Services.AddScoped<FavoriteDestinationImportService>();
         builder.Services.AddSingleton<NotificationValidator>();
         builder.Services.AddSingleton<NotificationPreferenceValidator>();
         builder.Services.AddSingleton<ITimezoneIdValidator, TimezoneIdValidator>();

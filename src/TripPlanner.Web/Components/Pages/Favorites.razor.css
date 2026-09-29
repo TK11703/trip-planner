@@ -1,0 +1,54 @@
+.favorites-card {
+    background: var(--tp-surface-raised);
+    border: 1px solid var(--tp-border);
+    border-radius: 1.25rem;
+    box-shadow: 0 1rem 2.5rem rgba(20, 37, 28, .08);
+}
+
+/* Sticky header needs the card to leave overflow visible, so the header rounds its own top corners. */
+.favorites-card > .card-header {
+    position: sticky;
+    top: 3.5rem;
+    z-index: 1010;
+    padding: 0.75rem clamp(1rem, 3vw, 1.5rem);
+    background: var(--tp-surface-raised);
+    border-bottom: 1px solid var(--tp-border);
+    border-radius: 1.25rem 1.25rem 0 0;
+}
+
+.favorites-card > .card-body {
+    padding: 0;
+    border-radius: 0 0 1.25rem 1.25rem;
+    overflow: hidden;
+}
+
+/* Vertical spacing comes from the children's own bottom margins. */
+.favorites-card-section {
+    padding: clamp(1rem, 3vw, 1.5rem) clamp(1rem, 3vw, 1.5rem) 0;
+}
+
+.favorites-table {
+    --bs-table-bg: transparent;
+}
+
+.favorites-table > :not(caption) > tr > :first-child {
+    padding-left: clamp(1rem, 3vw, 1.5rem);
+}
+
+.favorites-table > :not(caption) > tr > :last-child {
+    padding-right: clamp(1rem, 3vw, 1.5rem);
+}
+
+.favorites-table > tbody > tr:last-child > * {
+    border-bottom-width: 0;
+}
+
+.favorites-card .form-control {
+    border-color: var(--tp-border);
+    background-color: var(--tp-surface);
+    color: var(--tp-text);
+}
+
+.favorites-select-col {
+    width: 2.5rem;
+}

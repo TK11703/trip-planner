@@ -1,0 +1,115 @@
+@using TripPlanner.Contracts.FavoriteDestinations
+
+<div class="position-relative">
+    <input id="@Id" type="text" class="form-control" autocomplete="off"
+           role="combobox" aria-autocomplete="list" aria-controls="@ListId" aria-expanded="@(_open ? "true" : "false")"
+           placeholder="@Placeholder" value="@_text"
+           @oninput="OnInput" @onfocus="OnFocus" @onfocusout="Close" @onkeydown="OnKeyDown" />
+    @if (_open)
+    {
+        <ul id="@ListId" class="list-group tp-option-list shadow-sm" role="listbox" aria-label="Favorite destinations">
+            @if (_matches.Count == 0)
+            {
+                <li class="list-group-item small text-secondary">No favorite matches that search.</li>
+            }
+            @foreach (var favorite in _matches)
+            {
+                var selected = favorite.FavoriteDestinationId == _selectedId;
+                <li>
+                    <button type="button" class="list-group-item list-group-item-action text-start @(selected ? "active" : null)"
+                            role="option" aria-selected="@selected" data-testid="favorite-option-@favorite.FavoriteDestinationId"
+                            @onmousedown:preventDefault="true"
+                            @onclick="() => SelectAsync(favorite)">
+                        <span class="d-block fw-semibold">@favorite.Name</span>
+                        <span class="d-block small @(selected ? "opacity-75" : "text-secondary")">@Describe(favorite)</span>
+                    </button>
+                </li>
+            }
+            @if (_truncated)
+            {
+                <li class="list-group-item small text-secondary">Keep typing to narrow these results.</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private const int MaxMatches = 50;
+
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Search favorites by name, address, city, or country…";
+    [Parameter] public IReadOnlyList<FavoriteDestinationDto> Favorites { get; set; } = Array.Empty<FavoriteDestinationDto>();
+    [Parameter] public EventCallback<FavoriteDestinationDto> OnSelected { get; set; }
+
+    private List<FavoriteDestinationDto> _matches = new();
+    private Guid? _selectedId;
+    private string _text = string.Empty;
+    private bool _open;
+    private bool _truncated;
+
+    private string ListId => $"{Id}-options";
+
+    // Focus clears the box so a search starts on an empty field; Close puts the selection back.
+    private void OnFocus()
+    {
+        _text = string.Empty;
+        _open = true;
+        Filter(string.Empty);
+    }
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        _text = e.Value?.ToString() ?? string.Empty;
+        _open = true;
+        Filter(_text);
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Close();
+        }
+    }
+
+    private void Close()
+    {
+        _open = false;
+        _text = Favorites.FirstOrDefault(f => f.FavoriteDestinationId == _selectedId)?.Name ?? string.Empty;
+    }
+
+    private async Task SelectAsync(FavoriteDestinationDto favorite)
+    {
+        _selectedId = favorite.FavoriteDestinationId;
+        _text = favorite.Name;
+        _open = false;
+        await OnSelected.InvokeAsync(favorite);
+    }
+
+    private void Filter(string query)
+    {
+        var trimmed = query.Trim();
+        IEnumerable<FavoriteDestinationDto> matches = trimmed.Length == 0
+            ? Favorites
+            : Favorites
+                .Where(f => IsMatch(f, trimmed))
+                // Name hits first; the API's country/city/name order is kept within each group.
+                .OrderBy(f => f.Name.Contains(trimmed, StringComparison.OrdinalIgnoreCase) ? 0 : 1);
+        _matches = matches.Take(MaxMatches + 1).ToList();
+        _truncated = _matches.Count > MaxMatches;
+        if (_truncated)
+        {
+            _matches.RemoveAt(MaxMatches);
+        }
+    }
+
+    private static bool IsMatch(FavoriteDestinationDto favorite, string query)
+        => new[] { favorite.Name, favorite.Address, favorite.City, favorite.Country }
+            .Any(value => value?.Contains(query, StringComparison.OrdinalIgnoreCase) == true);
+
+    private static string Describe(FavoriteDestinationDto favorite)
+    {
+        var place = string.Join(", ", new[] { favorite.City, favorite.Country }.Where(v => !string.IsNullOrWhiteSpace(v)));
+        return place.Length == 0 ? favorite.Address : $"{favorite.Address} · {place}";
+    }
+}

@@ -16,6 +16,7 @@ public interface IPlaceSuggestionLookup
 {
     bool IsConfigured { get; }
     Task<IReadOnlyList<PlaceSuggestion>> SearchAsync(string query, CancellationToken ct);
+    Task<PlaceAddressComponents?> ResolveAddressAsync(string query, CancellationToken ct);
 }
 
 /// <summary>A resolved geographic point (WGS84).</summary>
@@ -150,6 +151,81 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
         }
     }
 
+    public async Task<PlaceAddressComponents?> ResolveAddressAsync(string query, CancellationToken ct)
+    {
+        if (!IsConfigured || string.IsNullOrWhiteSpace(query))
+        {
+            return null;
+        }
+
+        try
+        {
+            var http = _httpFactory.CreateClient(HttpClientName);
+            var term = Uri.EscapeDataString(query.Trim());
+            var requestUri = $"search/fuzzy/json?api-version=1.0&limit=1&query={term}";
+            if (!string.IsNullOrWhiteSpace(_countrySet))
+            {
+                requestUri += $"&countrySet={Uri.EscapeDataString(_countrySet)}";
+            }
+
+            using var request = await CreateRequestAsync(requestUri, ct);
+            using var response = await http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                LogAddressResolutionFailed((int)response.StatusCode);
+                return null;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            if (!document.RootElement.TryGetProperty("results", out var results)
+                || results.ValueKind != JsonValueKind.Array
+                || results.GetArrayLength() == 0
+                || !results[0].TryGetProperty("address", out var address))
+            {
+                return null;
+            }
+
+            double? latitude = null;
+            double? longitude = null;
+            if (results[0].TryGetProperty("position", out var position)
+                && position.TryGetProperty("lat", out var lat)
+                && position.TryGetProperty("lon", out var lon)
+                && lat.ValueKind == JsonValueKind.Number
+                && lon.ValueKind == JsonValueKind.Number)
+            {
+                latitude = lat.GetDouble();
+                longitude = lon.GetDouble();
+            }
+
+            // localName is the postal city; municipality can be a census place (e.g. Occoquan for Woodbridge, VA).
+            var components = new PlaceAddressComponents(
+                ReadAddressComponent(address, "localName") ?? ReadAddressComponent(address, "municipality"),
+                ReadAddressComponent(address, "country"),
+                latitude,
+                longitude);
+            return string.IsNullOrWhiteSpace(components.City)
+                && string.IsNullOrWhiteSpace(components.Country)
+                && latitude is null
+                ? null
+                : components;
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LogAddressResolutionError(ex.GetType().Name);
+            return null;
+        }
+    }
+
+    private static string? ReadAddressComponent(JsonElement address, string propertyName)
+        => address.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
     public async Task<GeoPoint?> GeocodeAsync(string query, CancellationToken ct)
     {
         if (!IsConfigured || string.IsNullOrWhiteSpace(query))
@@ -278,6 +354,12 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps place suggestion lookup failed.")]
     private partial void LogSearchError(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps address resolution returned {StatusCode}.")]
+    private partial void LogAddressResolutionFailed(int statusCode);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps address resolution failed. Error type: {ErrorType}.")]
+    private partial void LogAddressResolutionError(string errorType);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Azure Maps geocode returned {StatusCode}. A 401/403 usually means the identity lacks the Azure Maps Data Reader role, or AzureMaps:ClientId is wrong.")]
     private partial void LogGeocodeFailed(int statusCode);

@@ -18,6 +18,11 @@
             @* x-lg *@
             <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z" />
             break;
+        case "import":
+            @* upload *@
+            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+            <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
+            break;
         default:
             @* floppy — the save/submit default for unknown names *@
             <path d="M11 2H9v3h2V2Z" />
@@ -27,7 +32,7 @@
 </svg>
 
 @code {
-    /// <summary>The action name (case-insensitive): add, delete, cancel, or save.</summary>
+    /// <summary>The action name (case-insensitive): add, delete, cancel, import, or save.</summary>
     [Parameter] public string? Name { get; set; }
 
     /// <summary>Optional extra CSS classes for spacing/alignment in context.</summary>

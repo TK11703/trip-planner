@@ -8,6 +8,7 @@ using TripPlanner.Api.Features.Notifications;
 using TripPlanner.Api.Features.Places;
 using TripPlanner.Api.Features.EmailIngestion;
 using TripPlanner.Api.Features.TripDataChat;
+using TripPlanner.Api.Features.FavoriteDestinations;
 using TripPlanner.Contracts.Audit;
 using TripPlanner.Database.Audit;
 using TripPlanner.Database.Initialization;
@@ -51,6 +52,7 @@ public static partial class WebApplicationExtensions
         app.MapPlaceEndpoints();
         app.MapEmailIngestionEndpoints(app.Environment);
         app.MapTripDataChat();
+        app.MapFavoriteDestinationEndpoints();
 
         return app;
     }

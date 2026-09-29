@@ -1,6 +1,8 @@
 @inherits ApiComponentBase
 @using System.ComponentModel.DataAnnotations
 @using TripPlanner.Contracts.Profile
+@using TripPlanner.Contracts.FavoriteDestinations
+@using TripPlanner.Web.Features.FavoriteDestinations
 @inject ITripApiClient TripApi
 @inject TripPlanner.Web.Features.Maps.IMapPreferenceProvider MapPreference
 @implements IDisposable
@@ -25,6 +27,17 @@
         </InputSelect>
         <ValidationMessage For="@(() => _model.TripLegId)" />
     </div>
+    @if (Item is null && _favoriteLoading)
+    {
+        <p class="small text-secondary mb-2" role="status">Loading favorites...</p>
+    }
+    else if (Item is null && _favoriteDestinations.Count > 0)
+    {
+        <div class="mb-2">
+            <label class="form-label" for="item-favorite">Use a favorite destination</label>
+            <TripPlanner.Web.Components.Favorites.FavoriteDestinationPicker Id="item-favorite" Favorites="_favoriteDestinations" OnSelected="SelectFavorite" />
+        </div>
+    }
     <div class="row g-2 mb-2">
         <div class="col-5">
             <label class="form-label">Type</label>
@@ -291,6 +304,8 @@
     private Guid? _loadedItemId;
     private bool _appliedInitial;
     private bool _tzInitialized;
+    private bool _favoriteLoading = true;
+    private IReadOnlyList<FavoriteDestinationDto> _favoriteDestinations = Array.Empty<FavoriteDestinationDto>();
     private bool _confirmStartCopy;
     private bool _confirmEndCopy;
     // The leg whose travel window the entered dates were last pulled into, so a new item is only
@@ -525,6 +540,29 @@
     protected override async Task OnInitializedAsync()
     {
         _mapProvider = await MapPreference.GetProviderAsync();
+        var favoriteApi = Services.GetService<IFavoriteDestinationApiClient>();
+        if (Item is null && favoriteApi is not null)
+        {
+            try
+            {
+            _favoriteDestinations = await favoriteApi.GetAsync();
+            }
+            catch
+            {
+                _favoriteDestinations = Array.Empty<FavoriteDestinationDto>();
+            }
+        }
+        _favoriteLoading = false;
+    }
+
+    private void SelectFavorite(FavoriteDestinationDto favorite)
+    {
+        _model.Title = favorite.Name;
+        _model.Location = favorite.Address;
+        if (!string.IsNullOrWhiteSpace(favorite.Notes))
+        {
+            _model.Notes = favorite.Notes;
+        }
     }
 
     protected override void OnParametersSet()

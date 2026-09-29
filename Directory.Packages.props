@@ -44,6 +44,10 @@
     <PackageVersion Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
 
+  <ItemGroup Label="CSV parsing">
+    <PackageVersion Include="CsvHelper" Version="33.1.0" />
+  </ItemGroup>
+
   <ItemGroup Label="OpenTelemetry">
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.19.0" />
