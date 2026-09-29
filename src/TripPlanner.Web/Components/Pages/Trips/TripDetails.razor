@@ -65,6 +65,19 @@ else
     <div class="row g-3">
         <div class="col-12">
             @{ var itinerary = TripPrintFormatting.BuildItineraryTable(_trip); }
+            @if (itinerary.UnassignedItems.Count > 0)
+            {
+                <div class="alert alert-warning d-flex align-items-start gap-3 mb-3" role="alert">
+                    <ActionIcon Name="warning" CssClass="flex-shrink-0 fs-4" />
+                    <div>
+                        <h2 class="alert-heading h5 mb-1">Immediate Action Needed!</h2>
+                        @(itinerary.UnassignedItems.Count == 1
+                            ? "1 item is not related to a trip leg."
+                            : $"{itinerary.UnassignedItems.Count} items are not related to a trip leg.")
+                        Select one below to assign it to a leg.
+                    </div>
+                </div>
+            }
             <div class="card shadow-sm mb-3 tp-static">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div class="fw-semibold">@(_planningView == TripPlanningView.Timeline ? "Trip timeline" : "Itinerary table")</div>
@@ -136,7 +149,7 @@ else
                         }
                     </div>
                 </div>
-                <div class="card-body @(_planningView == TripPlanningView.Table && itinerary.HasContent ? "tp-itinerary-flush" : null)">
+                <div class="card-body @(itinerary.HasContent ? "tp-itinerary-flush" : null)">
                     @if (_planningView == TripPlanningView.Timeline)
                     {
                         <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" OnAddLegRequested="OpenCreateLegModal" OnLoaded="HandleTimelineLoaded" OnActiveDateChanged="HandleActiveDateChanged" />

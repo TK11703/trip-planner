@@ -9,7 +9,7 @@
 
 @if (_timeline is null)
 {
-    <div class="text-secondary small py-4">Loading trip timeline…</div>
+    <div class="text-secondary small p-3">Loading trip timeline…</div>
 }
 else if (_timeline.Legs.Count == 0 && _timeline.UnassignedItems.Count == 0)
 {
@@ -26,12 +26,6 @@ else if (_timeline.Legs.Count == 0 && _timeline.UnassignedItems.Count == 0)
 }
 else
 {
-    @if (_timeline.UnassignedItems.Count > 0)
-    {
-        <div class="alert alert-warning py-2 small mb-2">
-            @UnassignedItemsLabel(_timeline.UnassignedItems.Count) Select one below to assign it to a leg.
-        </div>
-    }
     <div class="ttl" style="--ttl-slot-w:@(SlotWidthPx)px; --ttl-label-w:@(LabelWidthPx)px;">
         <div class="ttl-scroll" @ref="_scrollEl">
             <div class="ttl-grid" style="grid-template-columns: var(--ttl-label-w) @(TrackWidthPx)px;">
@@ -503,10 +497,6 @@ else
         1 => "1 item",
         _ => $"{count} items"
     };
-
-    private static string UnassignedItemsLabel(int count) => count == 1
-        ? "1 item is not related to a trip leg."
-        : $"{count} items are not related to a trip leg.";
 
     private static string ItemTooltip(TimelineItem item, DateTime localStart, DateTime? localEnd, bool outside)
     {

@@ -100,10 +100,32 @@ public class TripDetailsTableViewTests : BunitContext
 
         ViewButton(cut, "Timeline").Click();
         AssertAddActionsPrecedeMap(cut);
-        Assert.Empty(cut.FindAll(".tp-itinerary-flush"));
+        Assert.Single(cut.FindAll(".card-body.tp-itinerary-flush"));
 
         cut.Find(".card-header [aria-label='Add item']").Click();
         Assert.Single(cut.FindComponents<TrackedItemForm>());
+    }
+
+    [Fact]
+    public void UnassignedItemsWarningSitsAboveTheCardInBothViews()
+    {
+        var cut = RenderDetails();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("table.tp-itinerary-table")));
+
+        AssertWarningPrecedesCard(cut);
+
+        ViewButton(cut, "Timeline").Click();
+        AssertWarningPrecedesCard(cut);
+        Assert.Empty(cut.Find(".card-body").QuerySelectorAll(".alert-warning"));
+    }
+
+    private static void AssertWarningPrecedesCard(IRenderedComponent<TripDetails> cut)
+    {
+        var warning = cut.Find(".alert-warning");
+        Assert.Equal("alert", warning.GetAttribute("role"));
+        Assert.Equal("Immediate Action Needed!", warning.QuerySelector(".alert-heading")!.TextContent.Trim());
+        Assert.Contains("2 items are not related to a trip leg.", warning.TextContent, StringComparison.Ordinal);
+        Assert.Contains("card", warning.NextElementSibling!.ClassList);
     }
 
     private static void AssertAddActionsPrecedeMap(IRenderedComponent<TripDetails> cut)

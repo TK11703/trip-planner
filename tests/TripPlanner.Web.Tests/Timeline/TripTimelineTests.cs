@@ -98,7 +98,7 @@ public class TripTimelineTests : BunitContext
         {
             Assert.Contains("Unassigned", cut.Markup, StringComparison.Ordinal);
             Assert.Contains("Hotel Kabuki", cut.Markup, StringComparison.Ordinal);
-            Assert.Contains("assign it to a leg", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Needs a trip leg", cut.Markup, StringComparison.Ordinal);
         });
     }
 

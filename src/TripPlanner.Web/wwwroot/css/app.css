@@ -993,7 +993,7 @@ body {
     outline-offset: 2px;
 }
 
-/* Populated table spans the card body edge to edge; its outer cells line up with the card header. */
+/* A populated itinerary (table or timeline) spans the card body edge to edge; its outer cells line up with the card header. */
 .tp-itinerary-flush {
     padding: 0;
     overflow: hidden;
@@ -1013,6 +1013,22 @@ body {
 }
 
 .tp-itinerary-flush .tp-itinerary-table tbody tr:last-child > * {
+    border-bottom-width: 0;
+}
+
+.tp-itinerary-flush .ttl-scroll {
+    border: 0;
+    border-radius: 0;
+}
+
+.tp-itinerary-flush .ttl-corner,
+.tp-itinerary-flush .ttl-leg-label,
+.tp-itinerary-flush .ttl-leg-footer {
+    padding-left: 1rem;
+}
+
+.tp-itinerary-flush .ttl-leg-footer,
+.tp-itinerary-flush .ttl-footer-spacer {
     border-bottom-width: 0;
 }
 
