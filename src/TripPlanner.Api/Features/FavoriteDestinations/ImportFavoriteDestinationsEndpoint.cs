@@ -22,7 +22,6 @@ public static class ImportFavoriteDestinationsEndpoint
 
     private static async Task<IResult> HandleAsync(
         [FromForm(Name = "file")] IFormFile? file,
-        [FromForm] bool? confirmPossibleDuplicates,
         ICurrentUser currentUser,
         FavoriteDestinationImportService importService,
         IClock clock,
@@ -31,10 +30,8 @@ public static class ImportFavoriteDestinationsEndpoint
         if (file is null || file.Length == 0)
         {
             return Results.BadRequest(new FavoriteDestinationImportResponse(
-                Array.Empty<FavoriteDestinationDto>(),
-                [new FavoriteDestinationImportIssue(null, "Choose a non-empty JSON or CSV file.")],
-                Array.Empty<FavoriteDestinationImportDuplicate>(),
-                false));
+                null,
+                [new FavoriteDestinationImportIssue(null, "Choose a non-empty JSON or CSV file.")]));
         }
         if (file.Length > MaximumUploadBytes)
         {
@@ -42,14 +39,15 @@ public static class ImportFavoriteDestinationsEndpoint
         }
 
         await using var stream = file.OpenReadStream();
-        var result = await importService.ImportAsync(
+        var result = await importService.QueueAsync(
             currentUser.UserId,
             Path.GetFileName(file.FileName),
             stream,
-            confirmPossibleDuplicates == true,
             clock.UtcNow,
             cancellationToken);
 
-        return Results.Json(result.Response, statusCode: (int)result.StatusCode);
+        return result.Response.Import is { } import
+            ? Results.Accepted($"/api/favorite-destinations/imports/{import.ImportId}", result.Response)
+            : Results.Json(result.Response, statusCode: (int)result.StatusCode);
     }
 }

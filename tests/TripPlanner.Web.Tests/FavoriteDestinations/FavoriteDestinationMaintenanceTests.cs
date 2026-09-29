@@ -116,12 +116,49 @@ public sealed class FavoriteDestinationMaintenanceTests : BunitContext
         Assert.Contains(api.Favorites, favorite => favorite.FavoriteDestinationId == hidden.FavoriteDestinationId);
     }
 
-    private IRenderedComponent<FavoritesPage> RenderPage(MaintenanceFavoriteDestinationApiClient api)
+    [Fact]
+    public void DeleteMessage_ShowsSuccessIconAndCanBeDismissed()
+    {
+        var favorite = Favorite("First place", "First address", null, null, null);
+        var api = new MaintenanceFavoriteDestinationApiClient([favorite]);
+        var cut = RenderPage(api);
+        cut.WaitForAssertion(() => Assert.Contains("First place", cut.Markup));
+
+        cut.Find($"[data-testid='favorite-select-{favorite.FavoriteDestinationId}']").Change(true);
+        cut.Find("#favorite-delete-selected").Click();
+        cut.Find("#favorite-bulk-delete-confirm").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("1 favorite removed", cut.Find("[data-testid='favorite-save-message']").TextContent));
+        var alert = cut.Find("[data-testid='favorite-save-message']");
+        Assert.Contains("alert-success", alert.ClassList);
+        Assert.NotNull(alert.QuerySelector("svg"));
+        cut.Find("#favorite-save-message-close").Click();
+        Assert.Empty(cut.FindAll("[data-testid='favorite-save-message']"));
+    }
+
+    [Fact]
+    public void DeleteMessage_DisappearsAfterItsDuration()
+    {
+        var favorite = Favorite("First place", "First address", null, null, null);
+        var api = new MaintenanceFavoriteDestinationApiClient([favorite]);
+        var cut = RenderPage(api, TimeSpan.FromMilliseconds(50));
+        cut.WaitForAssertion(() => Assert.Contains("First place", cut.Markup));
+
+        cut.Find($"[data-testid='favorite-select-{favorite.FavoriteDestinationId}']").Change(true);
+        cut.Find("#favorite-delete-selected").Click();
+        cut.Find("#favorite-bulk-delete-confirm").Click();
+
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("[data-testid='favorite-save-message']")), TimeSpan.FromSeconds(5));
+        Assert.Empty(api.Favorites);
+    }
+
+    private IRenderedComponent<FavoritesPage> RenderPage(MaintenanceFavoriteDestinationApiClient api, TimeSpan? saveMessageDuration = null)
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton<IFavoriteDestinationApiClient>(api);
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
-        return Render<FavoritesPage>();
+        return Render<FavoritesPage>(parameters => parameters
+            .Add(page => page.SaveMessageDuration, saveMessageDuration ?? TimeSpan.FromSeconds(5)));
     }
 
     private static FavoriteDestinationDto Favorite(
@@ -190,6 +227,18 @@ internal sealed class MaintenanceFavoriteDestinationApiClient : IFavoriteDestina
         return Task.FromResult<int?>(Favorites.RemoveAll(favorite => ids.Contains(favorite.FavoriteDestinationId)));
     }
 
-    public Task<FavoriteDestinationImportResponse> ImportAsync(string fileName, Stream content, bool confirmPossibleDuplicates = false, CancellationToken ct = default)
+    public Task<FavoriteDestinationImportResponse> ImportAsync(string fileName, Stream content, CancellationToken ct = default)
+        => throw new NotSupportedException();
+
+    public Task<IReadOnlyList<FavoriteDestinationImportJobDto>> GetOpenImportsAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<FavoriteDestinationImportJobDto>>(Array.Empty<FavoriteDestinationImportJobDto>());
+
+    public Task<FavoriteDestinationImportJobDto?> GetImportAsync(Guid importId, CancellationToken ct = default)
+        => throw new NotSupportedException();
+
+    public Task<FavoriteDestinationImportCompletion> CompleteImportAsync(Guid importId, CompleteFavoriteDestinationImportRequest request, CancellationToken ct = default)
+        => throw new NotSupportedException();
+
+    public Task<bool> DiscardImportAsync(Guid importId, CancellationToken ct = default)
         => throw new NotSupportedException();
 }

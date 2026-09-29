@@ -137,26 +137,13 @@ public sealed class FavoriteDestinationRepository : IFavoriteDestinationReposito
             return Array.Empty<FavoriteDestinationDto>();
         }
 
-        var ids = favorites.Select(_ => Guid.NewGuid()).ToArray();
         await using var connection = await _factory.CreateOpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         try
         {
             var rows = await connection.QueryAsync<FavoriteDestinationDto>(new CommandDefinition(
-                _sql.Get("Queries/FavoriteDestinations/insert-favorite-destinations.sql"),
-                new
-                {
-                    FavoriteDestinationIds = ids,
-                    OwnerUserId = ownerUserId,
-                    Names = favorites.Select(item => item.Request.Name?.Trim()).ToArray(),
-                    Addresses = favorites.Select(item => item.Request.Address?.Trim()).ToArray(),
-                    Cities = favorites.Select(item => Normalize(item.Location?.City)).ToArray(),
-                    Countries = favorites.Select(item => Normalize(item.Location?.Country)).ToArray(),
-                    Latitudes = favorites.Select(item => item.Location?.Latitude).ToArray(),
-                    Longitudes = favorites.Select(item => item.Location?.Longitude).ToArray(),
-                    NotesValues = favorites.Select(item => Normalize(item.Request.Notes)).ToArray(),
-                    NowUtc = nowUtc
-                },
+                _sql.Get(InsertManySqlPath),
+                InsertManyParameters(ownerUserId, favorites, nowUtc),
                 transaction,
                 cancellationToken: cancellationToken));
             await transaction.CommitAsync(cancellationToken);
@@ -168,6 +155,26 @@ public sealed class FavoriteDestinationRepository : IFavoriteDestinationReposito
             throw;
         }
     }
+
+    internal const string InsertManySqlPath = "Queries/FavoriteDestinations/insert-favorite-destinations.sql";
+
+    internal static object InsertManyParameters(
+        string ownerUserId,
+        IReadOnlyList<(CreateFavoriteDestinationRequest Request, PlaceAddressComponents? Location)> favorites,
+        DateTimeOffset nowUtc)
+        => new
+        {
+            FavoriteDestinationIds = favorites.Select(_ => Guid.NewGuid()).ToArray(),
+            OwnerUserId = ownerUserId,
+            Names = favorites.Select(item => item.Request.Name?.Trim()).ToArray(),
+            Addresses = favorites.Select(item => item.Request.Address?.Trim()).ToArray(),
+            Cities = favorites.Select(item => Normalize(item.Location?.City)).ToArray(),
+            Countries = favorites.Select(item => Normalize(item.Location?.Country)).ToArray(),
+            Latitudes = favorites.Select(item => item.Location?.Latitude).ToArray(),
+            Longitudes = favorites.Select(item => item.Location?.Longitude).ToArray(),
+            NotesValues = favorites.Select(item => Normalize(item.Request.Notes)).ToArray(),
+            NowUtc = nowUtc
+        };
 
     public async Task<bool> DeleteAsync(
         string ownerUserId,

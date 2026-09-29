@@ -24,7 +24,8 @@ public sealed record FavoriteDestinationImportParseResult(
 
 public sealed class FavoriteDestinationImportParser
 {
-    private static readonly string[] CsvHeaders = ["name", "address", "notes"];
+    private static readonly string[] NativeCsvHeaders = ["name", "address", "notes"];
+    private static readonly string[] GoogleCsvHeaders = ["Title", "Note", "URL", "Tags", "Comment"];
     private const int MaximumRows = 1000;
 
     public async Task<FavoriteDestinationImportParseResult> ParseAsync(
@@ -129,25 +130,28 @@ public sealed class FavoriteDestinationImportParser
                 return Invalid("The CSV file is empty.");
             }
             csv.ReadHeader();
-            if (csv.HeaderRecord is null || !csv.HeaderRecord.SequenceEqual(CsvHeaders, StringComparer.Ordinal))
+            var csvFormat = GetCsvFormat(csv.HeaderRecord);
+            if (csvFormat is null)
             {
-                return Invalid("The CSV headers must be exactly: name,address,notes.");
+                return Invalid("The CSV headers must be exactly either: name,address,notes or Title,Note,URL,Tags,Comment.");
             }
 
             while (await csv.ReadAsync())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var rowNumber = csv.Parser.Row;
+                var record = ReadCsvRecord(csv, csvFormat.Value);
+                if (csvFormat == CsvFormat.Google && IsEmptyGoogleRow(csv))
+                {
+                    continue;
+                }
                 if (rows.Count >= MaximumRows)
                 {
                     errors.Add(new FavoriteDestinationImportParseError(null, $"A file can contain at most {MaximumRows} records."));
                     break;
                 }
 
-                rows.Add(new FavoriteDestinationImportRow(rowNumber, new FavoriteDestinationImportRecord(
-                    csv.GetField("name"),
-                    csv.GetField("address"),
-                    csv.GetField("notes"))));
+                rows.Add(new FavoriteDestinationImportRow(rowNumber, record));
             }
         }
         catch (CsvHelperException)
@@ -162,6 +166,49 @@ public sealed class FavoriteDestinationImportParser
         return new FavoriteDestinationImportParseResult(rows, errors);
     }
 
+    private static CsvFormat? GetCsvFormat(string[]? headers)
+    {
+        if (headers?.SequenceEqual(NativeCsvHeaders, StringComparer.Ordinal) == true)
+        {
+            return CsvFormat.Native;
+        }
+        if (headers?.SequenceEqual(GoogleCsvHeaders, StringComparer.Ordinal) == true)
+        {
+            return CsvFormat.Google;
+        }
+
+        return null;
+    }
+
+    private static FavoriteDestinationImportRecord ReadCsvRecord(CsvReader csv, CsvFormat format)
+        => format switch
+        {
+            CsvFormat.Native => new FavoriteDestinationImportRecord(
+                csv.GetField("name"),
+                csv.GetField("address"),
+                csv.GetField("notes")),
+            CsvFormat.Google => new FavoriteDestinationImportRecord(
+                csv.GetField("Title"),
+                csv.GetField("URL"),
+                CombineNotes(csv.GetField("Note"), csv.GetField("Comment"))),
+            _ => throw new ArgumentOutOfRangeException(nameof(format))
+        };
+
+    private static string? CombineNotes(params string?[] values)
+    {
+        var notes = values.Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
+        return notes.Length == 0 ? null : string.Join(Environment.NewLine, notes);
+    }
+
+    private static bool IsEmptyGoogleRow(CsvReader csv)
+        => GoogleCsvHeaders.All(header => string.IsNullOrWhiteSpace(csv.GetField(header)));
+
     private static FavoriteDestinationImportParseResult Invalid(string message)
         => new(Array.Empty<FavoriteDestinationImportRow>(), [new FavoriteDestinationImportParseError(null, message)]);
+
+    private enum CsvFormat
+    {
+        Native,
+        Google
+    }
 }

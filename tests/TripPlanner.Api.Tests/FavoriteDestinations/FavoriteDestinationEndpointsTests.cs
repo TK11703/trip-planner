@@ -163,6 +163,37 @@ public sealed class FavoriteDestinationEndpointsTests
     }
 
     [Fact]
+    public async Task Import_GoogleCsv_ReplacesUrlWithResolvedAddress()
+    {
+        await using var factory = new FavoritesApiFactory();
+        using var client = factory.CreateClient();
+        client.AddUser("owner-a");
+        factory.Lookup.ResolutionsByAddress["Galeries Lafayette Haussmann"] = new PlaceAddressComponents(
+            "Paris",
+            "France",
+            48.8738,
+            2.332,
+            "40 Boulevard Haussmann, 75009 Paris, France");
+        const string csv = """
+        Title,Note,URL,Tags,Comment
+        Galeries Lafayette Haussmann,,https://www.google.com/maps/place/Galeries+Lafayette+Haussmann/data=!4m2!3m1!1s0x47e66e3703a1108b:0xe6773845cdab1593,,
+        """;
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(csv), "file", "favorites.csv");
+
+        var response = await client.PostAsync("/api/favorite-destinations/import", form);
+        var queued = await response.Content.ReadFromJsonAsync<FavoriteDestinationImportResponse>();
+        var completed = await FavoriteDestinationImportEndpointTests.WaitForImportAsync(client, queued!.Import!.ImportId);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(FavoriteDestinationImportStatus.Completed, completed.Status);
+        var imported = Assert.Single(factory.Repository.All).Favorite;
+        Assert.Equal("40 Boulevard Haussmann, 75009 Paris, France", imported.Address);
+        Assert.Equal("Paris", imported.City);
+        Assert.Equal("France", imported.Country);
+    }
+
+    [Fact]
     public void Requests_DoNotAcceptCallerSuppliedLocation()
     {
         foreach (var type in new[] { typeof(CreateFavoriteDestinationRequest), typeof(UpdateFavoriteDestinationRequest) })
@@ -182,7 +213,10 @@ public sealed class FavoriteDestinationEndpointsTests
 
     internal sealed class FavoritesApiFactory : TestApiFactory
     {
+        public FavoritesApiFactory() => Imports = new InMemoryFavoriteDestinationImportRepository(Repository);
+
         public InMemoryFavoriteDestinationRepository Repository { get; } = new();
+        public InMemoryFavoriteDestinationImportRepository Imports { get; }
         public FakePlaceLookup Lookup { get; } = new();
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -192,6 +226,8 @@ public sealed class FavoriteDestinationEndpointsTests
             {
                 services.RemoveAll<IFavoriteDestinationRepository>();
                 services.AddSingleton<IFavoriteDestinationRepository>(Repository);
+                services.RemoveAll<IFavoriteDestinationImportRepository>();
+                services.AddSingleton<IFavoriteDestinationImportRepository>(Imports);
                 services.RemoveAll<IPlaceSuggestionLookup>();
                 services.AddSingleton<IPlaceSuggestionLookup>(Lookup);
             });
@@ -203,6 +239,7 @@ public sealed class FavoriteDestinationEndpointsTests
         public bool IsConfigured => true;
         public PlaceAddressComponents? Resolution { get; set; }
         public Dictionary<string, PlaceAddressComponents> ResolutionsByAddress { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, PlaceMatch[]> MatchesByQuery { get; } = new(StringComparer.OrdinalIgnoreCase);
         public bool ThrowOnResolve { get; set; }
         public int ResolveCallCount { get; private set; }
 
@@ -216,6 +253,170 @@ public sealed class FavoriteDestinationEndpointsTests
                 ? throw new HttpRequestException("Maps unavailable")
                 : Task.FromResult(ResolutionsByAddress.GetValueOrDefault(query) ?? Resolution);
         }
+
+        public async Task<IReadOnlyList<PlaceMatch>> FindPlacesAsync(string query, CancellationToken ct)
+        {
+            if (MatchesByQuery.TryGetValue(query, out var matches))
+            {
+                return matches;
+            }
+
+            var resolved = await ResolveAddressAsync(query, ct);
+            return resolved is null ? Array.Empty<PlaceMatch>() : [new PlaceMatch(null, resolved)];
+        }
+    }
+
+    internal sealed class InMemoryFavoriteDestinationImportRepository(InMemoryFavoriteDestinationRepository favorites) : IFavoriteDestinationImportRepository
+    {
+        private readonly Lock _gate = new();
+        private readonly Dictionary<Guid, (FavoriteDestinationImportJob Job, List<FavoriteDestinationImportRowState> Rows, DateTimeOffset? LeaseExpiresAtUtc)> _imports = [];
+
+        public Task<FavoriteDestinationImportJob> CreateAsync(string ownerUserId, string fileName, IReadOnlyList<FavoriteDestinationImportRowInput> rows, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
+        {
+            var job = new FavoriteDestinationImportJob(Guid.NewGuid(), ownerUserId, fileName, FavoriteDestinationImportStatus.Queued, rows.Count, 0, 0, null, 0, nowUtc, nowUtc);
+            var states = rows.Select(row => new FavoriteDestinationImportRowState(
+                row.RowNumber, row.Name, row.SubmittedAddress, row.Notes, FavoriteDestinationImportRowStatus.Pending, false, null, null, [], false)).ToList();
+            lock (_gate)
+            {
+                _imports[job.ImportId] = (job, states, null);
+            }
+            return Task.FromResult(job);
+        }
+
+        public Task<FavoriteDestinationImportJob?> GetAsync(string ownerUserId, Guid importId, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                return Task.FromResult(_imports.TryGetValue(importId, out var entry) && entry.Job.OwnerUserId == ownerUserId
+                    ? WithProgress(entry.Job, entry.Rows)
+                    : null);
+            }
+        }
+
+        public Task<IReadOnlyList<FavoriteDestinationImportJob>> GetOpenAsync(string ownerUserId, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                IReadOnlyList<FavoriteDestinationImportJob> open = _imports.Values
+                    .Where(entry => entry.Job.OwnerUserId == ownerUserId && entry.Job.Status != FavoriteDestinationImportStatus.Completed)
+                    .OrderByDescending(entry => entry.Job.CreatedAtUtc)
+                    .Select(entry => WithProgress(entry.Job, entry.Rows))
+                    .ToArray();
+                return Task.FromResult(open);
+            }
+        }
+
+        public Task<IReadOnlyList<FavoriteDestinationImportRowState>> GetRowsAsync(string ownerUserId, Guid importId, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                IReadOnlyList<FavoriteDestinationImportRowState> rows = _imports.TryGetValue(importId, out var entry) && entry.Job.OwnerUserId == ownerUserId
+                    ? entry.Rows.ToArray()
+                    : [];
+                return Task.FromResult(rows);
+            }
+        }
+
+        public Task<FavoriteDestinationImportJob?> ClaimNextAsync(DateTimeOffset nowUtc, DateTimeOffset leaseExpiresAtUtc, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                var next = _imports.Values
+                    .Where(entry => entry.Job.Status == FavoriteDestinationImportStatus.Queued
+                        || (entry.Job.Status == FavoriteDestinationImportStatus.Processing && entry.LeaseExpiresAtUtc < nowUtc))
+                    .OrderBy(entry => entry.Job.CreatedAtUtc)
+                    .Select(entry => (FavoriteDestinationImportJob?)entry.Job)
+                    .FirstOrDefault();
+                if (next is null)
+                {
+                    return Task.FromResult<FavoriteDestinationImportJob?>(null);
+                }
+
+                var claimed = next with { Status = FavoriteDestinationImportStatus.Processing, AttemptCount = next.AttemptCount + 1, UpdatedAtUtc = nowUtc };
+                _imports[claimed.ImportId] = (claimed, _imports[claimed.ImportId].Rows, leaseExpiresAtUtc);
+                return Task.FromResult<FavoriteDestinationImportJob?>(claimed);
+            }
+        }
+
+        public Task<bool> SaveRowResolutionAsync(Guid importId, FavoriteDestinationImportRowResolution resolution, DateTimeOffset nowUtc, DateTimeOffset leaseExpiresAtUtc, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                if (!_imports.TryGetValue(importId, out var entry) || entry.Job.Status != FavoriteDestinationImportStatus.Processing)
+                {
+                    return Task.FromResult(false);
+                }
+
+                var index = entry.Rows.FindIndex(row => row.RowNumber == resolution.RowNumber);
+                entry.Rows[index] = entry.Rows[index] with
+                {
+                    Status = resolution.Status,
+                    UsesResolvedAddress = resolution.UsesResolvedAddress,
+                    Address = resolution.Address,
+                    Location = resolution.Location,
+                    Candidates = resolution.Candidates
+                };
+                _imports[importId] = (entry.Job with { UpdatedAtUtc = nowUtc }, entry.Rows, leaseExpiresAtUtc);
+                return Task.FromResult(true);
+            }
+        }
+
+        public Task<bool> MarkNeedsReviewAsync(Guid importId, IReadOnlyCollection<int> duplicateRowNumbers, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                if (!_imports.TryGetValue(importId, out var entry) || entry.Job.Status != FavoriteDestinationImportStatus.Processing)
+                {
+                    return Task.FromResult(false);
+                }
+
+                var rows = entry.Rows.Select(row => row with { IsPossibleDuplicate = duplicateRowNumbers.Contains(row.RowNumber) }).ToList();
+                _imports[importId] = (entry.Job with { Status = FavoriteDestinationImportStatus.NeedsReview, UpdatedAtUtc = nowUtc }, rows, null);
+                return Task.FromResult(true);
+            }
+        }
+
+        public Task MarkFailedAsync(Guid importId, string errorMessage, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                if (_imports.TryGetValue(importId, out var entry))
+                {
+                    _imports[importId] = (entry.Job with { Status = FavoriteDestinationImportStatus.Failed, ErrorMessage = errorMessage, UpdatedAtUtc = nowUtc }, entry.Rows, null);
+                }
+            }
+            return Task.CompletedTask;
+        }
+
+        public async Task<IReadOnlyList<FavoriteDestinationDto>?> CompleteAsync(string ownerUserId, Guid importId, FavoriteDestinationImportStatus expectedStatus, IReadOnlyList<(CreateFavoriteDestinationRequest Request, PlaceAddressComponents? Location)> favoritesToCreate, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                if (!_imports.TryGetValue(importId, out var entry) || entry.Job.OwnerUserId != ownerUserId || entry.Job.Status != expectedStatus)
+                {
+                    return null;
+                }
+
+                _imports[importId] = (entry.Job with { Status = FavoriteDestinationImportStatus.Completed, ImportedCount = favoritesToCreate.Count, UpdatedAtUtc = nowUtc }, [], null);
+            }
+            return await favorites.CreateManyAsync(ownerUserId, favoritesToCreate, nowUtc, cancellationToken);
+        }
+
+        public Task<bool> DeleteAsync(string ownerUserId, Guid importId, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                return Task.FromResult(_imports.TryGetValue(importId, out var entry) && entry.Job.OwnerUserId == ownerUserId && _imports.Remove(importId));
+            }
+        }
+
+        private static FavoriteDestinationImportJob WithProgress(FavoriteDestinationImportJob job, IReadOnlyList<FavoriteDestinationImportRowState> rows)
+            => job with
+            {
+                ProcessedRows = job.Status == FavoriteDestinationImportStatus.Completed
+                    ? job.TotalRows
+                    : rows.Count(row => row.Status != FavoriteDestinationImportRowStatus.Pending)
+            };
     }
 
     internal sealed class InMemoryFavoriteDestinationRepository : IFavoriteDestinationRepository

@@ -14,8 +14,17 @@ public interface IFavoriteDestinationApiClient
     Task<FavoriteDestinationMutationResult> UpdateAsync(Guid id, UpdateFavoriteDestinationRequest request, CancellationToken ct = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
     Task<int?> DeleteManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
-    Task<FavoriteDestinationImportResponse> ImportAsync(string fileName, Stream content, bool confirmPossibleDuplicates = false, CancellationToken ct = default);
+    Task<FavoriteDestinationImportResponse> ImportAsync(string fileName, Stream content, CancellationToken ct = default);
+    Task<IReadOnlyList<FavoriteDestinationImportJobDto>> GetOpenImportsAsync(CancellationToken ct = default);
+    Task<FavoriteDestinationImportJobDto?> GetImportAsync(Guid importId, CancellationToken ct = default);
+    Task<FavoriteDestinationImportCompletion> CompleteImportAsync(Guid importId, CompleteFavoriteDestinationImportRequest request, CancellationToken ct = default);
+    Task<bool> DiscardImportAsync(Guid importId, CancellationToken ct = default);
 }
+
+// Import carries the latest import state; ErrorMessage is set when the request itself was rejected.
+public sealed record FavoriteDestinationImportCompletion(
+    FavoriteDestinationImportJobDto? Import,
+    string? ErrorMessage);
 
 public sealed record FavoriteDestinationMutationResult(
     FavoriteDestinationDto? Favorite,
@@ -72,23 +81,64 @@ public sealed class FavoriteDestinationApiClient : IFavoriteDestinationApiClient
         return result?.DeletedCount;
     }
 
-    public async Task<FavoriteDestinationImportResponse> ImportAsync(string fileName, Stream content, bool confirmPossibleDuplicates = false, CancellationToken ct = default)
+    public async Task<FavoriteDestinationImportResponse> ImportAsync(string fileName, Stream content, CancellationToken ct = default)
     {
         using var form = new MultipartFormDataContent();
         using var fileContent = new StreamContent(content);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         form.Add(fileContent, "file", Path.GetFileName(fileName));
-        form.Add(new StringContent(confirmPossibleDuplicates.ToString(System.Globalization.CultureInfo.InvariantCulture)), "confirmPossibleDuplicates");
 
         var response = await _http.PostAsync("/api/favorite-destinations/import", form, ct);
+        if (response.StatusCode == HttpStatusCode.RequestEntityTooLarge)
+        {
+            return new FavoriteDestinationImportResponse(null, [new FavoriteDestinationImportIssue(null, "The selected file is too large.")]);
+        }
+
         return await response.Content.ReadFromJsonAsync<FavoriteDestinationImportResponse>(cancellationToken: ct)
-            ?? new FavoriteDestinationImportResponse(
-                Array.Empty<FavoriteDestinationDto>(),
-                [new FavoriteDestinationImportIssue(null, response.StatusCode == HttpStatusCode.RequestEntityTooLarge
-                    ? "The selected file is too large."
-                    : "The import response was empty.")],
-                Array.Empty<FavoriteDestinationImportDuplicate>(),
-                false);
+            ?? new FavoriteDestinationImportResponse(null, [new FavoriteDestinationImportIssue(null, "The import response was empty.")]);
+    }
+
+    public async Task<IReadOnlyList<FavoriteDestinationImportJobDto>> GetOpenImportsAsync(CancellationToken ct = default)
+    {
+        var response = await _http.GetAsync("/api/favorite-destinations/imports", ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<FavoriteDestinationImportJobDto[]>(cancellationToken: ct)
+            ?? Array.Empty<FavoriteDestinationImportJobDto>();
+    }
+
+    public async Task<FavoriteDestinationImportJobDto?> GetImportAsync(Guid importId, CancellationToken ct = default)
+    {
+        var response = await _http.GetAsync($"/api/favorite-destinations/imports/{importId}", ct);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<FavoriteDestinationImportJobDto>(cancellationToken: ct);
+    }
+
+    public async Task<FavoriteDestinationImportCompletion> CompleteImportAsync(Guid importId, CompleteFavoriteDestinationImportRequest request, CancellationToken ct = default)
+    {
+        var response = await _http.PostAsJsonAsync($"/api/favorite-destinations/imports/{importId}/complete", request, ct);
+        if (response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Conflict)
+        {
+            return new FavoriteDestinationImportCompletion(
+                await response.Content.ReadFromJsonAsync<FavoriteDestinationImportJobDto>(cancellationToken: ct),
+                null);
+        }
+
+        var error = await response.Content.ReadFromJsonAsync<ApiError>(cancellationToken: ct);
+        var message = error?.Details is { Count: > 0 } details
+            ? string.Join(" ", details.Values)
+            : error?.Message;
+        return new FavoriteDestinationImportCompletion(null, message ?? "The import could not be completed.");
+    }
+
+    public async Task<bool> DiscardImportAsync(Guid importId, CancellationToken ct = default)
+    {
+        var response = await _http.DeleteAsync($"/api/favorite-destinations/imports/{importId}", ct);
+        return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
     }
 
     private static async Task<FavoriteDestinationMutationResult> ReadMutationResultAsync(HttpResponseMessage response, CancellationToken ct)

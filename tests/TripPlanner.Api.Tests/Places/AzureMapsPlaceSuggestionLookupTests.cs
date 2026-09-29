@@ -11,12 +11,11 @@ namespace TripPlanner.Api.Tests.Places;
 
 public class AzureMapsPlaceSuggestionLookupTests
 {
-    private static IConfiguration Config(string? clientId, string? countrySet = null)
+    private static IConfiguration Config(string? clientId)
         => new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["AzureMaps:ClientId"] = clientId,
-                ["AzureMaps:CountrySet"] = countrySet
+                ["AzureMaps:ClientId"] = clientId
             })
             .Build();
 
@@ -88,7 +87,7 @@ public class AzureMapsPlaceSuggestionLookupTests
 
                 var result = await lookup.ResolveAddressAsync("4129 Merchant Plaza, Woodbridge, VA 22192", CancellationToken.None);
 
-                Assert.Equal(new PlaceAddressComponents("Woodbridge", "United States", 38.65123, -77.25321), result);
+                Assert.Equal(new PlaceAddressComponents("Woodbridge", "United States", 38.65123, -77.25321, "4129 Merchant Plaza, Woodbridge, VA 22192"), result);
         }
 
         [Fact]
@@ -105,7 +104,7 @@ public class AzureMapsPlaceSuggestionLookupTests
 
                 var result = await lookup.ResolveAddressAsync("10 Downing Street", CancellationToken.None);
 
-                Assert.Equal(new PlaceAddressComponents("London", "United Kingdom", null, null), result);
+                Assert.Equal(new PlaceAddressComponents("London", "United Kingdom", null, null, "10 Downing Street, London SW1A 2AA"), result);
         }
 
         [Fact]
@@ -119,6 +118,36 @@ public class AzureMapsPlaceSuggestionLookupTests
                 Assert.Null(await unresolved.ResolveAddressAsync("Unknown place", CancellationToken.None));
                 Assert.Null(await failed.ResolveAddressAsync("Paris", CancellationToken.None));
         }
+
+    [Fact]
+    public async Task FindPlaces_ReturnsEveryResultWithPoiNameAndLocation()
+    {
+        const string body = """
+        {
+          "results": [
+            { "type": "POI", "poi": { "name": "Blue Bottle Coffee" }, "position": { "lat": 37.8, "lon": -122.27 }, "address": { "freeformAddress": "300 Webster St, Oakland, CA 94607", "municipality": "Oakland", "country": "United States" } },
+            { "type": "POI", "poi": { "name": "Blue Bottle Coffee" }, "position": { "lat": 37.78, "lon": -122.41 }, "address": { "freeformAddress": "66 Mint St, San Francisco, CA 94103", "municipality": "San Francisco", "country": "United States" } },
+            { "type": "Street", "position": { "lat": 37.7, "lon": -122.4 }, "address": { "freeformAddress": "Bottle St", "country": "United States" } }
+          ]
+        }
+        """;
+        var handler = new FakeHandler(HttpStatusCode.OK, body);
+        var lookup = new AzureMapsPlaceSuggestionLookup(new StubHttpClientFactory(handler), Config("test-client-id"), new StubTokenCredential(), NullLogger<AzureMapsPlaceSuggestionLookup>.Instance);
+
+        var matches = await lookup.FindPlacesAsync("Blue Bottle Coffee", CancellationToken.None);
+
+        Assert.Contains("limit=10", handler.LastRequest!.RequestUri!.Query);
+        Assert.DoesNotContain("countrySet", handler.LastRequest.RequestUri.Query, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["Blue Bottle Coffee", "Blue Bottle Coffee", null], matches.Select(match => match.Name));
+        Assert.Equal(new PlaceAddressComponents("San Francisco", "United States", 37.78, -122.41, "66 Mint St, San Francisco, CA 94103"), matches[1].Location);
+    }
+
+    [Fact]
+    public async Task FindPlaces_FailureOrUnconfigured_ReturnsEmpty()
+    {
+        Assert.Empty(await Create(HttpStatusCode.ServiceUnavailable, "{}").FindPlacesAsync("Paris", CancellationToken.None));
+        Assert.Empty(await Create(HttpStatusCode.OK, "{}", clientId: null).FindPlacesAsync("Paris", CancellationToken.None));
+    }
 
     [Fact]
     public async Task SendsEntraBearerTokenAndClientId()

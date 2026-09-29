@@ -17,7 +17,13 @@ public interface IPlaceSuggestionLookup
     bool IsConfigured { get; }
     Task<IReadOnlyList<PlaceSuggestion>> SearchAsync(string query, CancellationToken ct);
     Task<PlaceAddressComponents?> ResolveAddressAsync(string query, CancellationToken ct);
+
+    /// <summary>Returns the ranked places matching the query, best first; empty when unavailable.</summary>
+    Task<IReadOnlyList<PlaceMatch>> FindPlacesAsync(string query, CancellationToken ct);
 }
+
+/// <summary>A single place search result. <see cref="Name"/> is the point-of-interest name, when the result is one.</summary>
+public sealed record PlaceMatch(string? Name, PlaceAddressComponents Location);
 
 /// <summary>A resolved geographic point (WGS84).</summary>
 public readonly record struct GeoPoint(double Latitude, double Longitude);
@@ -49,6 +55,7 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
     public const string HttpClientName = "azuremaps";
 
     private const int MaxResults = 6;
+    private const int MaxPlaceMatches = 10;
 
     private static readonly string[] MapsScopes = ["https://atlas.microsoft.com/.default"];
 
@@ -56,7 +63,6 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
     private readonly TokenCredential _credential;
     private readonly ILogger<AzureMapsPlaceSuggestionLookup> _logger;
     private readonly string? _clientId;
-    private readonly string? _countrySet;
 
     public AzureMapsPlaceSuggestionLookup(
         IHttpClientFactory httpFactory,
@@ -69,8 +75,6 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
         _logger = logger;
         // The account's unique id, which tells Azure Maps which account the Entra token applies to.
         _clientId = configuration["AzureMaps:ClientId"];
-        // Optional ISO country codes (e.g. "US,CA") to bias/limit results. Empty means worldwide.
-        _countrySet = configuration["AzureMaps:CountrySet"];
     }
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_clientId);
@@ -99,10 +103,6 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
 
             var term = Uri.EscapeDataString(query.Trim());
             var requestUri = $"search/fuzzy/json?api-version=1.0&typeahead=true&limit={MaxResults}&query={term}";
-            if (!string.IsNullOrWhiteSpace(_countrySet))
-            {
-                requestUri += $"&countrySet={Uri.EscapeDataString(_countrySet)}";
-            }
 
             using var request = await CreateRequestAsync(requestUri, ct);
 
@@ -163,10 +163,6 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
             var http = _httpFactory.CreateClient(HttpClientName);
             var term = Uri.EscapeDataString(query.Trim());
             var requestUri = $"search/fuzzy/json?api-version=1.0&limit=1&query={term}";
-            if (!string.IsNullOrWhiteSpace(_countrySet))
-            {
-                requestUri += $"&countrySet={Uri.EscapeDataString(_countrySet)}";
-            }
 
             using var request = await CreateRequestAsync(requestUri, ct);
             using var response = await http.SendAsync(request, ct);
@@ -180,35 +176,12 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
             if (!document.RootElement.TryGetProperty("results", out var results)
                 || results.ValueKind != JsonValueKind.Array
-                || results.GetArrayLength() == 0
-                || !results[0].TryGetProperty("address", out var address))
+                || results.GetArrayLength() == 0)
             {
                 return null;
             }
 
-            double? latitude = null;
-            double? longitude = null;
-            if (results[0].TryGetProperty("position", out var position)
-                && position.TryGetProperty("lat", out var lat)
-                && position.TryGetProperty("lon", out var lon)
-                && lat.ValueKind == JsonValueKind.Number
-                && lon.ValueKind == JsonValueKind.Number)
-            {
-                latitude = lat.GetDouble();
-                longitude = lon.GetDouble();
-            }
-
-            // localName is the postal city; municipality can be a census place (e.g. Occoquan for Woodbridge, VA).
-            var components = new PlaceAddressComponents(
-                ReadAddressComponent(address, "localName") ?? ReadAddressComponent(address, "municipality"),
-                ReadAddressComponent(address, "country"),
-                latitude,
-                longitude);
-            return string.IsNullOrWhiteSpace(components.City)
-                && string.IsNullOrWhiteSpace(components.Country)
-                && latitude is null
-                ? null
-                : components;
+            return ReadAddressComponents(results[0]);
         }
         catch (OperationCanceledException)
         {
@@ -219,6 +192,93 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
             LogAddressResolutionError(ex.GetType().Name);
             return null;
         }
+    }
+
+    public async Task<IReadOnlyList<PlaceMatch>> FindPlacesAsync(string query, CancellationToken ct)
+    {
+        if (!IsConfigured || string.IsNullOrWhiteSpace(query))
+        {
+            return Array.Empty<PlaceMatch>();
+        }
+
+        try
+        {
+            var http = _httpFactory.CreateClient(HttpClientName);
+            var term = Uri.EscapeDataString(query.Trim());
+            var requestUri = $"search/fuzzy/json?api-version=1.0&limit={MaxPlaceMatches}&query={term}";
+
+            using var request = await CreateRequestAsync(requestUri, ct);
+            using var response = await http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                LogAddressResolutionFailed((int)response.StatusCode);
+                return Array.Empty<PlaceMatch>();
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            if (!document.RootElement.TryGetProperty("results", out var results)
+                || results.ValueKind != JsonValueKind.Array)
+            {
+                return Array.Empty<PlaceMatch>();
+            }
+
+            var matches = new List<PlaceMatch>(results.GetArrayLength());
+            foreach (var result in results.EnumerateArray())
+            {
+                var components = ReadAddressComponents(result);
+                if (components is null)
+                {
+                    continue;
+                }
+
+                var name = result.TryGetProperty("poi", out var poi) ? ReadAddressComponent(poi, "name") : null;
+                matches.Add(new PlaceMatch(string.IsNullOrWhiteSpace(name) ? null : name.Trim(), components));
+            }
+            return matches;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            LogAddressResolutionError(ex.GetType().Name);
+            return Array.Empty<PlaceMatch>();
+        }
+    }
+
+    private static PlaceAddressComponents? ReadAddressComponents(JsonElement result)
+    {
+        if (!result.TryGetProperty("address", out var address))
+        {
+            return null;
+        }
+
+        double? latitude = null;
+        double? longitude = null;
+        if (result.TryGetProperty("position", out var position)
+            && position.TryGetProperty("lat", out var lat)
+            && position.TryGetProperty("lon", out var lon)
+            && lat.ValueKind == JsonValueKind.Number
+            && lon.ValueKind == JsonValueKind.Number)
+        {
+            latitude = lat.GetDouble();
+            longitude = lon.GetDouble();
+        }
+
+        // localName is the postal city; municipality can be a census place (e.g. Occoquan for Woodbridge, VA).
+        var components = new PlaceAddressComponents(
+            ReadAddressComponent(address, "localName") ?? ReadAddressComponent(address, "municipality"),
+            ReadAddressComponent(address, "country"),
+            latitude,
+            longitude,
+            ReadAddressComponent(address, "freeformAddress"));
+        return string.IsNullOrWhiteSpace(components.City)
+            && string.IsNullOrWhiteSpace(components.Country)
+            && latitude is null
+            ? null
+            : components;
     }
 
     private static string? ReadAddressComponent(JsonElement address, string propertyName)
@@ -239,10 +299,6 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
 
             var term = Uri.EscapeDataString(query.Trim());
             var requestUri = $"search/fuzzy/json?api-version=1.0&limit=1&query={term}";
-            if (!string.IsNullOrWhiteSpace(_countrySet))
-            {
-                requestUri += $"&countrySet={Uri.EscapeDataString(_countrySet)}";
-            }
 
             using var request = await CreateRequestAsync(requestUri, ct);
 

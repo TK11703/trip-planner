@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TripPlanner.Contracts.FavoriteDestinations;
 
 public sealed record FavoriteDestinationDto(
@@ -36,8 +38,52 @@ public sealed record FavoriteDestinationImportIssue(int? RowNumber, string Messa
 
 public sealed record FavoriteDestinationImportDuplicate(int RowNumber, string Name, string Address);
 
+// Import is non-null when the file was accepted and queued for background processing.
 public sealed record FavoriteDestinationImportResponse(
-    IReadOnlyList<FavoriteDestinationDto> Imported,
-    IReadOnlyList<FavoriteDestinationImportIssue> Errors,
+    FavoriteDestinationImportJobDto? Import,
+    IReadOnlyList<FavoriteDestinationImportIssue> Errors);
+
+[JsonConverter(typeof(JsonStringEnumConverter<FavoriteDestinationImportStatus>))]
+public enum FavoriteDestinationImportStatus
+{
+    Queued,
+    Processing,
+    NeedsReview,
+    Completed,
+    Failed
+}
+
+public sealed record FavoriteDestinationImportJobDto(
+    Guid ImportId,
+    string FileName,
+    FavoriteDestinationImportStatus Status,
+    int TotalRows,
+    int ProcessedRows,
+    int ImportedCount,
+    string? ErrorMessage,
+    IReadOnlyList<FavoriteDestinationImportAmbiguity> Ambiguities,
     IReadOnlyList<FavoriteDestinationImportDuplicate> PossibleDuplicates,
-    bool RequiresDuplicateConfirmation);
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+// A row whose place lookup returned several places with the same name; the owner picks one.
+public sealed record FavoriteDestinationImportAmbiguity(
+    int RowNumber,
+    string Name,
+    string SubmittedAddress,
+    IReadOnlyList<FavoriteDestinationPlaceCandidate> Candidates);
+
+public sealed record FavoriteDestinationPlaceCandidate(
+    string Name,
+    string? Address,
+    string? City,
+    string? Country,
+    double Latitude,
+    double Longitude);
+
+// CandidateIndex null means none of the candidates: keep the submitted address without a map location.
+public sealed record FavoriteDestinationImportSelection(int RowNumber, int? CandidateIndex);
+
+public sealed record CompleteFavoriteDestinationImportRequest(
+    IReadOnlyList<FavoriteDestinationImportSelection>? Selections,
+    bool ConfirmPossibleDuplicates = false);

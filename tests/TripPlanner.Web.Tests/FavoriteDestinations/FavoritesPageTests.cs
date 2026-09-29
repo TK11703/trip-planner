@@ -65,18 +65,63 @@ public sealed class FavoritesPageTests : BunitContext
     }
 
     [Fact]
-    public void ImportButton_ShowsImportCard_AndCancelHidesIt()
+    public void ImportTab_ShowsImporterInsteadOfList_AndCancelReturnsToList()
     {
         var cut = Render<FavoritesPage>();
         cut.WaitForAssertion(() => Assert.Contains("No favorite destinations yet", cut.Markup));
         Assert.Empty(cut.FindAll(".favorite-import"));
+        Assert.Equal("true", cut.Find("#favorite-tab-list").GetAttribute("aria-selected"));
 
-        cut.Find("#favorite-import-toggle").Click();
+        cut.Find("#favorite-tab-import").Click();
 
-        Assert.Contains("card", cut.Find(".favorite-import").ClassList);
+        Assert.Equal("true", cut.Find("#favorite-tab-import").GetAttribute("aria-selected"));
         Assert.NotNull(cut.Find("#favorite-import-submit"));
+        Assert.Empty(cut.FindAll("#favorite-search"));
         cut.Find("#favorite-import-cancel").Click();
         Assert.Empty(cut.FindAll(".favorite-import"));
+        Assert.NotNull(cut.Find("#favorite-search"));
+    }
+
+    [Fact]
+    public void UnfinishedImport_OpensImportTabWithReview()
+    {
+        var client = new RecordingFavoriteDestinationApiClient();
+        client.OpenImports.Add(new FavoriteDestinationImportJobDto(
+            Guid.NewGuid(), "saved.csv", FavoriteDestinationImportStatus.NeedsReview, 1, 1, 0, null,
+            [new FavoriteDestinationImportAmbiguity(1, "Starbucks", "https://maps.app.goo.gl/abc",
+            [
+                new FavoriteDestinationPlaceCandidate("Starbucks", "1912 Pike Pl, Seattle", "Seattle", "United States", 47.61, -122.34),
+                new FavoriteDestinationPlaceCandidate("Starbucks", "1124 Pike St, Seattle", "Seattle", "United States", 47.6, -122.33)
+            ])],
+            [], DateTimeOffset.UtcNow, DateTimeOffset.UtcNow));
+        Services.AddSingleton<IFavoriteDestinationApiClient>(client);
+
+        var cut = Render<FavoritesPage>();
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid='favorite-import-ambiguity-1']")));
+        Assert.Equal("true", cut.Find("#favorite-tab-import").GetAttribute("aria-selected"));
+        Assert.StartsWith("1", cut.Find("[data-testid='favorite-import-badge']").TextContent);
+    }
+
+    [Fact]
+    public void ProcessingImport_ShowsProgressOnTab_AndCompletionRefreshesList()
+    {
+        var imported = Favorite("Imported place", "Paris", "Paris", "France", null);
+        var client = new RecordingFavoriteDestinationApiClient([imported]);
+        var processing = new FavoriteDestinationImportJobDto(
+            Guid.NewGuid(), "saved.csv", FavoriteDestinationImportStatus.Processing, 2, 1, 0, null, [], [], DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        client.OpenImports.Add(processing);
+        Services.AddSingleton<IFavoriteDestinationApiClient>(client);
+        var cut = Render<FavoritesPage>(parameters => parameters.Add(page => page.ImportPollInterval, TimeSpan.FromMilliseconds(20)));
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid='favorite-import-processing']")));
+        cut.Find("#favorite-tab-list").Click();
+        Assert.NotNull(cut.Find("[data-testid='favorite-import-processing']"));
+        client.OpenImports[0] = processing with { Status = FavoriteDestinationImportStatus.Completed, ImportedCount = 2 };
+
+        cut.WaitForAssertion(() => Assert.Contains("2 destinations imported", cut.Markup));
+        Assert.Empty(cut.FindAll("[data-testid='favorite-import-processing']"));
+        Assert.Contains("Imported place", cut.Markup);
     }
 
     [Fact]
@@ -154,6 +199,20 @@ internal sealed class RecordingFavoriteDestinationApiClient : IFavoriteDestinati
     public Task<int?> DeleteManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
         => throw new NotSupportedException();
 
-    public Task<FavoriteDestinationImportResponse> ImportAsync(string fileName, Stream content, bool confirmPossibleDuplicates = false, CancellationToken ct = default)
+    public Task<FavoriteDestinationImportResponse> ImportAsync(string fileName, Stream content, CancellationToken ct = default)
+        => throw new NotSupportedException();
+
+    public List<FavoriteDestinationImportJobDto> OpenImports { get; } = [];
+
+    public Task<IReadOnlyList<FavoriteDestinationImportJobDto>> GetOpenImportsAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<FavoriteDestinationImportJobDto>>(OpenImports);
+
+    public Task<FavoriteDestinationImportJobDto?> GetImportAsync(Guid importId, CancellationToken ct = default)
+        => Task.FromResult(OpenImports.FirstOrDefault(import => import.ImportId == importId));
+
+    public Task<FavoriteDestinationImportCompletion> CompleteImportAsync(Guid importId, CompleteFavoriteDestinationImportRequest request, CancellationToken ct = default)
+        => throw new NotSupportedException();
+
+    public Task<bool> DiscardImportAsync(Guid importId, CancellationToken ct = default)
         => throw new NotSupportedException();
 }

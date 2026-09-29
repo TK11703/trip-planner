@@ -18,6 +18,7 @@ public static class FavoriteDestinationEndpointRouteBuilderExtensions
         group.MapDeleteFavoriteDestination();
         group.MapDeleteFavoriteDestinations();
         group.MapImportFavoriteDestinations();
+        group.MapFavoriteDestinationImportJobs();
         return endpoints;
     }
 }

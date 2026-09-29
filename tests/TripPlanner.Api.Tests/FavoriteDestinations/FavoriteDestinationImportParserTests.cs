@@ -54,6 +54,25 @@ public sealed class FavoriteDestinationImportParserTests
     }
 
     [Fact]
+    public async Task ParseCsv_MapsGoogleExportFields_AndSkipsEmptyPlaceholderRows()
+    {
+        const string csv = """
+        Title,Note,URL,Tags,Comment
+        ,,,,
+        Galeries Lafayette Haussmann,Visit rooftop,https://www.google.com/maps/place/Galeries+Lafayette+Haussmann/data=!4m2!3m1!1s0x47e66e3703a1108b:0xe6773845cdab1593,Paris,Great view
+        """;
+
+        var result = await new FavoriteDestinationImportParser().ParseAsync("saved-places.csv", Bytes(csv));
+
+        Assert.True(result.IsValid);
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(3, row.RowNumber);
+        Assert.Equal("Galeries Lafayette Haussmann", row.Record.Name);
+        Assert.Equal("https://www.google.com/maps/place/Galeries+Lafayette+Haussmann/data=!4m2!3m1!1s0x47e66e3703a1108b:0xe6773845cdab1593", row.Record.Address);
+        Assert.Equal($"Visit rooftop{Environment.NewLine}Great view", row.Record.Notes);
+    }
+
+    [Fact]
     public async Task ParseCsv_RejectsMissingOrUnexpectedHeaders()
     {
         var parser = new FavoriteDestinationImportParser();

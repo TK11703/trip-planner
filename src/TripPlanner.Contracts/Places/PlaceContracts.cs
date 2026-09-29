@@ -6,5 +6,10 @@ namespace TripPlanner.Contracts.Places;
 /// </summary>
 public sealed record PlaceSuggestion(string Description);
 
-/// <summary>City, country, and WGS84 coordinates returned by a structured address lookup.</summary>
-public sealed record PlaceAddressComponents(string? City, string? Country, double? Latitude, double? Longitude);
+/// <summary>A display address, city, country, and WGS84 coordinates returned by a structured address lookup.</summary>
+public sealed record PlaceAddressComponents(
+    string? City,
+    string? Country,
+    double? Latitude,
+    double? Longitude,
+    string? FreeformAddress = null);

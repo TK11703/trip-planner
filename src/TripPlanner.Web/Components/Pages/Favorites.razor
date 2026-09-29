@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inherits ApiComponentBase
+@implements IDisposable
 @using TripPlanner.Contracts.FavoriteDestinations
 @using TripPlanner.Web.Components.Favorites
 @using TripPlanner.Web.Features.FavoriteDestinations
@@ -25,7 +26,40 @@
     }
     else
     {
-        <div class="card favorites-card">
+        <ul class="nav nav-tabs favorites-tabs mb-3" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button id="favorite-tab-list" type="button" role="tab" class="nav-link @(_activeTab == FavoritesTab.List ? "active" : null)" aria-selected="@(_activeTab == FavoritesTab.List ? "true" : "false")" aria-controls="favorite-panel-list" @onclick="ShowListTab">
+                    Favorites
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button id="favorite-tab-import" type="button" role="tab" class="nav-link @(_activeTab == FavoritesTab.Import ? "active" : null)" aria-selected="@(_activeTab == FavoritesTab.Import ? "true" : "false")" aria-controls="favorite-panel-import" title="Import favorites from a JSON or CSV file" @onclick="ShowImportTab">
+                    <ActionIcon Name="import" CssClass="me-1 align-text-bottom" />Import
+                    @if (_openImport is { Status: FavoriteDestinationImportStatus.NeedsReview } && ReviewItemCount > 0)
+                    {
+                        <span class="badge rounded-pill text-bg-warning ms-1" data-testid="favorite-import-badge" title="@ReviewItemCount item@(ReviewItemCount == 1 ? null : "s") to review">@ReviewItemCount<span class="visually-hidden"> item@(ReviewItemCount == 1 ? null : "s") to review</span></span>
+                    }
+                    else if (_openImport is { Status: FavoriteDestinationImportStatus.Queued or FavoriteDestinationImportStatus.Processing })
+                    {
+                        <span class="spinner-border spinner-border-sm ms-1" data-testid="favorite-import-processing" title="Import in progress"><span class="visually-hidden">Import in progress</span></span>
+                    }
+                    else if (_openImport is { Status: FavoriteDestinationImportStatus.Failed })
+                    {
+                        <span class="badge rounded-pill text-bg-danger ms-1" data-testid="favorite-import-failed-badge" title="Import failed">!<span class="visually-hidden"> Import failed</span></span>
+                    }
+                </button>
+            </li>
+        </ul>
+
+        @if (_activeTab == FavoritesTab.Import)
+        {
+            <div id="favorite-panel-import" role="tabpanel" aria-labelledby="favorite-tab-import">
+                <FavoriteDestinationImport OnImported="ReloadFavoritesAsync" OnCancel="ShowListTab" OnImportChanged="ImportChanged" />
+            </div>
+        }
+        else
+        {
+        <div id="favorite-panel-list" role="tabpanel" aria-labelledby="favorite-tab-list" class="card favorites-card">
             <div class="card-header">
                 <div class="row g-2 align-items-center">
                     <div class="col-12 col-md-6">
@@ -37,9 +71,6 @@
                             <button id="favorite-add" type="button" class="btn btn-sm btn-primary" title="Add a new favorite" @onclick="ShowCreateForm">
                                 <ActionIcon Name="add" CssClass="me-1 align-text-bottom" />New
                             </button>
-                            <button id="favorite-import-toggle" type="button" class="btn btn-sm btn-outline-secondary" title="Import favorites from a JSON or CSV file" aria-expanded="@(_showImport ? "true" : "false")" @onclick="ToggleImport">
-                                <ActionIcon Name="import" CssClass="me-1 align-text-bottom" />Import
-                            </button>
                             <button id="favorite-delete-selected" type="button" class="btn btn-sm btn-outline-danger" title="Delete the selected favorites" disabled="@(SelectedFavorites.Count == 0)" @onclick="RequestBulkDelete">
                                 <ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete@(SelectedFavorites.Count > 0 ? $" ({SelectedFavorites.Count})" : null)
                             </button>
@@ -48,17 +79,14 @@
                 </div>
             </div>
             <div class="card-body">
-                @if (_showImport || _saveMessage is not null)
+                @if (_saveMessage is not null)
                 {
                     <div class="favorites-card-section">
-                        @if (_showImport)
-                        {
-                            <FavoriteDestinationImport OnImported="ReloadFavoritesAsync" OnCancel="CloseImport" />
-                        }
-                        @if (_saveMessage is not null)
-                        {
-                            <div class="alert alert-success" role="status">@_saveMessage</div>
-                        }
+                        <div class="alert alert-success alert-dismissible d-flex align-items-center gap-2" role="status" data-testid="favorite-save-message">
+                            <ActionIcon Name="success" CssClass="flex-shrink-0" />
+                            <span>@_saveMessage</span>
+                            <button id="favorite-save-message-close" type="button" class="btn-close" aria-label="Dismiss message" @onclick="DismissSaveMessage"></button>
+                        </div>
                     </div>
                 }
 
@@ -110,6 +138,7 @@
                 }
             </div>
         </div>
+        }
     }
 
     @if (_showForm || _editingFavorite is not null)
@@ -192,7 +221,7 @@
     private bool _isSaving;
     private bool _isDeleting;
     private bool _showForm;
-    private bool _showImport;
+    private FavoritesTab _activeTab = FavoritesTab.List;
     private bool _showBulkDeleteConfirm;
     private bool _isBulkDeleting;
     private string? _bulkDeleteError;
@@ -209,19 +238,122 @@
     private UpdateFavoriteDestinationRequest? _pendingDuplicateUpdate;
     private Guid? _pendingDuplicateFavoriteId;
     private int _searchRequestVersion;
+    private CancellationTokenSource? _saveMessageTimer;
+    private FavoriteDestinationImportJobDto? _openImport;
+    private CancellationTokenSource? _importWatch;
+
+    [Parameter] public TimeSpan SaveMessageDuration { get; set; } = TimeSpan.FromSeconds(5);
+    [Parameter] public TimeSpan ImportPollInterval { get; set; } = TimeSpan.FromSeconds(3);
+
+    // Flagged places plus possible duplicates that are not already flagged.
+    private int ReviewItemCount
+        => _openImport is null
+            ? 0
+            : _openImport.Ambiguities.Count
+                + _openImport.PossibleDuplicates.Count(duplicate => _openImport.Ambiguities.All(ambiguity => ambiguity.RowNumber != duplicate.RowNumber));
 
     protected override async Task OnInitializedAsync()
     {
         await CallApiAsync(
             async () => _favorites = await FavoriteApi.GetAsync(),
             message => _loadError = message);
+        // An import still running or waiting for review opens the Import tab; failing to check is not worth an error.
+        await CallApiAsync(
+            async () =>
+            {
+                _openImport = (await FavoriteApi.GetOpenImportsAsync()).FirstOrDefault();
+                if (_openImport is not null)
+                {
+                    _activeTab = FavoritesTab.Import;
+                }
+            },
+            _ => { });
         _isLoading = false;
     }
 
-    private void ToggleImport()
+    private enum FavoritesTab
     {
-        _showImport = !_showImport;
-        _saveMessage = null;
+        List,
+        Import
+    }
+
+    private void ShowListTab()
+    {
+        _activeTab = FavoritesTab.List;
+        StartImportWatch();
+    }
+
+    private void ShowImportTab()
+    {
+        _activeTab = FavoritesTab.Import;
+        StopImportWatch();
+        DismissSaveMessage();
+    }
+
+    private void ImportChanged(FavoriteDestinationImportJobDto? import)
+        => _openImport = import;
+
+    // The importer is not rendered on the Favorites tab, so the page keeps the tab badge current itself.
+    private void StartImportWatch()
+    {
+        if (_importWatch is not null || _openImport is not { Status: FavoriteDestinationImportStatus.Queued or FavoriteDestinationImportStatus.Processing })
+        {
+            return;
+        }
+
+        _importWatch = new CancellationTokenSource();
+        _ = WatchImportAsync(_importWatch);
+    }
+
+    private void StopImportWatch()
+    {
+        _importWatch?.Cancel();
+        _importWatch = null;
+    }
+
+    private async Task WatchImportAsync(CancellationTokenSource source)
+    {
+        var cancellationToken = source.Token;
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested
+                && _openImport is { Status: FavoriteDestinationImportStatus.Queued or FavoriteDestinationImportStatus.Processing } import)
+            {
+                await Task.Delay(ImportPollInterval, cancellationToken);
+                await CallApiAsync(
+                    async () =>
+                    {
+                        var latest = await FavoriteApi.GetImportAsync(import.ImportId, cancellationToken);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            return;
+                        }
+
+                        if (latest?.Status == FavoriteDestinationImportStatus.Completed)
+                        {
+                            _openImport = null;
+                            _favorites = await FavoriteApi.GetAsync(_search, cancellationToken);
+                            ShowSaveMessage($"{latest.ImportedCount} destination{(latest.ImportedCount == 1 ? string.Empty : "s")} imported");
+                            return;
+                        }
+
+                        _openImport = latest;
+                    },
+                    _ => { });
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_importWatch, source))
+            {
+                _importWatch = null;
+            }
+            source.Dispose();
+        }
     }
 
     // Only rows currently listed count, so a search filter never deletes hidden selections.
@@ -299,15 +431,10 @@
                 _selectedIds.ExceptWith(ids);
                 _showBulkDeleteConfirm = false;
                 _favorites = await FavoriteApi.GetAsync(_search);
-                _saveMessage = $"{deleted} favorite{(deleted == 1 ? string.Empty : "s")} removed";
+                ShowSaveMessage($"{deleted} favorite{(deleted == 1 ? string.Empty : "s")} removed");
             },
             message => _bulkDeleteError = message);
         _isBulkDeleting = false;
-    }
-
-    private void CloseImport()
-    {
-        _showImport = false;
     }
 
     private void ShowCreateForm()
@@ -408,7 +535,7 @@
                 _favorites = await FavoriteApi.GetAsync(_search);
                 ClearDuplicateWarning();
                 _showForm = false;
-                _saveMessage = "Favorite destination saved";
+                ShowSaveMessage("Favorite destination saved");
             },
             message => _formError = message);
 
@@ -452,7 +579,7 @@
                 _favorites = await FavoriteApi.GetAsync(_search);
                 _editingFavorite = null;
                 ClearDuplicateWarning();
-                _saveMessage = "Favorite destination updated";
+                ShowSaveMessage("Favorite destination updated");
             },
             message => _formError = message);
 
@@ -494,7 +621,7 @@
                 _deleteCandidate = null;
                 _editingFavorite = null;
                 _favorites = await FavoriteApi.GetAsync(_search);
-                _saveMessage = "Favorite destination removed";
+                ShowSaveMessage("Favorite destination removed");
             },
             message => _deleteError = message);
         _isDeleting = false;
@@ -511,5 +638,53 @@
         _pendingDuplicateRequest = null;
         _pendingDuplicateUpdate = null;
         _pendingDuplicateFavoriteId = null;
+    }
+
+    private void ShowSaveMessage(string message)
+    {
+        StopSaveMessageTimer();
+        _saveMessage = message;
+        _saveMessageTimer = new CancellationTokenSource();
+        _ = HideSaveMessageAsync(_saveMessageTimer.Token);
+    }
+
+    private async Task HideSaveMessageAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(SaveMessageDuration, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        await InvokeAsync(() =>
+        {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                _saveMessage = null;
+                StateHasChanged();
+            }
+        });
+    }
+
+    private void DismissSaveMessage()
+    {
+        StopSaveMessageTimer();
+        _saveMessage = null;
+    }
+
+    private void StopSaveMessageTimer()
+    {
+        _saveMessageTimer?.Cancel();
+        _saveMessageTimer?.Dispose();
+        _saveMessageTimer = null;
+    }
+
+    public void Dispose()
+    {
+        StopSaveMessageTimer();
+        StopImportWatch();
     }
 }

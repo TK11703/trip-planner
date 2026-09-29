@@ -62,6 +62,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<ITripCommandRepository, TripCommandRepository>();
         builder.Services.AddScoped<ITripItemRepository, TripItemRepository>();
         builder.Services.AddScoped<IFavoriteDestinationRepository, FavoriteDestinationRepository>();
+        builder.Services.AddScoped<IFavoriteDestinationImportRepository, FavoriteDestinationImportRepository>();
         builder.Services.AddScoped<ITimelineRepository, TimelineRepository>();
         builder.Services.AddScoped<ITripSharingRepository, TripSharingRepository>();
         builder.Services.AddScoped<ITripSearchDocumentRepository, TripSearchDocumentRepository>();
@@ -84,6 +85,9 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton<FavoriteDestinationValidator>();
         builder.Services.AddSingleton<FavoriteDestinationImportParser>();
         builder.Services.AddScoped<FavoriteDestinationImportService>();
+        builder.Services.AddScoped<FavoriteDestinationImportProcessor>();
+        builder.Services.AddSingleton<FavoriteDestinationImportSignal>();
+        builder.Services.AddHostedService<FavoriteDestinationImportWorker>();
         builder.Services.AddSingleton<NotificationValidator>();
         builder.Services.AddSingleton<NotificationPreferenceValidator>();
         builder.Services.AddSingleton<ITimezoneIdValidator, TimezoneIdValidator>();
@@ -118,6 +122,15 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IPlaceSuggestionLookup>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
         builder.Services.AddScoped<IPlaceGeocoder>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
         builder.Services.AddScoped<IPlaceTimeZoneLookup>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
+        builder.Services.AddHttpClient(GoogleMapsUrlResolver.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false
+            });
+        builder.Services.AddScoped<GoogleMapsUrlResolver>();
 
         builder.Services.AddSingleton<DatabaseInitializer>();
         builder.Services.AddSingleton<DatabaseMigrationState>();

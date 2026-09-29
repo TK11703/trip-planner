@@ -1,4 +1,6 @@
 @inherits ApiComponentBase
+@implements IDisposable
+@using System.Globalization
 @using Microsoft.AspNetCore.Components.Forms
 @using TripPlanner.Contracts.FavoriteDestinations
 @using TripPlanner.Web.Features.FavoriteDestinations
@@ -6,58 +8,146 @@
 
 <section class="card card-body favorite-import mb-3" aria-label="Import favorite destinations">
     <h2 class="card-title h5">Import favorites</h2>
-    <div>
-        <label class="form-label" for="favorite-import-file">JSON or CSV file</label>
-        <InputFile id="favorite-import-file" class="form-control" accept=".json,.csv,application/json,text/csv" OnChange="OnFileSelected" disabled="@_isImporting" />
-        <p class="form-text mb-0">CSV headers: <code>name,address,notes</code>. JSON: an array of objects with <code>name</code>, <code>address</code>, and optional <code>notes</code>.</p>
-    </div>
-    @if (_selectedFile is not null)
+    @if (_job is null)
     {
-        <p class="small text-secondary mt-2 mb-0">@_selectedFile.Name (@FormatSize(_selectedFile.Size))</p>
+        <div>
+            <label class="form-label" for="favorite-import-file">JSON or CSV file</label>
+            <InputFile id="favorite-import-file" class="form-control" accept=".json,.csv,application/json,text/csv" OnChange="OnFileSelected" disabled="@_isImporting" />
+            <p class="form-text mb-0">CSV headers: <code>name,address,notes</code>, or a Google Maps export with <code>Title,Note,URL,Tags,Comment</code>. Google links are converted through Azure Maps when possible; otherwise the original URL is retained. JSON: an array of objects with <code>name</code>, <code>address</code>, and optional <code>notes</code>. Places are looked up in the background, so you can leave this page while a large file is processed.</p>
+        </div>
+        @if (_selectedFile is not null)
+        {
+            <p class="small text-secondary mt-2 mb-0">@_selectedFile.Name (@FormatSize(_selectedFile.Size))</p>
+        }
     }
     @if (_error is not null)
     {
         <div class="alert alert-danger mt-3 mb-0" role="alert">@_error</div>
     }
-    @if (_response is not null && _response.Errors.Count > 0)
+    @if (_uploadErrors.Count > 0)
     {
         <div class="alert alert-danger mt-3 mb-0" role="alert" data-testid="favorite-import-errors">
             <p class="mb-1">Nothing was imported. Correct these errors and try again.</p>
             <ul class="mb-0">
-                @foreach (var issue in _response.Errors)
+                @foreach (var issue in _uploadErrors)
                 {
                     <li>@(issue.RowNumber is { } row ? $"Row {row}: " : null)@issue.Message</li>
                 }
             </ul>
         </div>
     }
-    @if (_response is { RequiresDuplicateConfirmation: true })
+    @if (_job is { Status: FavoriteDestinationImportStatus.Queued or FavoriteDestinationImportStatus.Processing })
     {
-        <div class="alert alert-warning mt-3 mb-0" role="alert" data-testid="favorite-import-duplicate-warning">
-            <p class="mb-2">Possible duplicates were found. Import them as separate favorites?</p>
-            <ul class="mb-2">
-                @foreach (var duplicate in _response.PossibleDuplicates)
+        <div class="mt-3" role="status" data-testid="favorite-import-progress">
+            <p class="mb-1">
+                @if (_job.Status == FavoriteDestinationImportStatus.Queued)
                 {
-                    <li>Row @duplicate.RowNumber: @duplicate.Name, @duplicate.Address</li>
+                    <text>@_job.FileName is waiting to start.</text>
                 }
-            </ul>
-            <div class="d-flex gap-2">
-                <button id="favorite-import-confirm-duplicates" type="button" class="btn btn-sm btn-warning" disabled="@_isImporting" @onclick="() => ImportAsync(confirmDuplicates: true)">Import duplicates</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_isImporting" @onclick="CancelDuplicateConfirmation">Cancel</button>
+                else
+                {
+                    <text>Looking up places in @_job.FileName: @_job.ProcessedRows of @_job.TotalRows rows.</text>
+                }
+                You can leave this page; the import continues in the background.
+            </p>
+            <div class="progress" role="progressbar" aria-label="Import progress" aria-valuenow="@ProgressPercent" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar" style="width: @(ProgressPercent)%"></div>
             </div>
         </div>
+    }
+    @if (_job is { Status: FavoriteDestinationImportStatus.NeedsReview })
+    {
+        <div class="mt-3" data-testid="favorite-import-review">
+            <p class="mb-2">@_job.FileName is ready to import. Nothing is saved until you finish the import.</p>
+            @if (_job.Ambiguities.Count > 0)
+            {
+                <p class="mb-2">These places matched more than one location with the same name. Choose the one you meant.</p>
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-2" data-testid="favorite-import-review-progress">
+                    <span class="fw-semibold" role="status">@ChosenCount of @_job.Ambiguities.Count places chosen</span>
+                    <div class="progress flex-grow-1" style="min-width: 8rem; max-width: 20rem;" role="progressbar" aria-label="Places chosen" aria-valuenow="@ChosenCount" aria-valuemin="0" aria-valuemax="@_job.Ambiguities.Count">
+                        <div class="progress-bar bg-success" style="width: @(ChosenPercent)%"></div>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input id="favorite-import-unchosen-only" class="form-check-input" type="checkbox" role="switch" checked="@_showUnchosenOnly" @onchange="args => _showUnchosenOnly = args.Value is true" />
+                        <label class="form-check-label" for="favorite-import-unchosen-only">Only show places still needing a choice</label>
+                    </div>
+                </div>
+                @if (_showUnchosenOnly && ChosenCount == _job.Ambiguities.Count)
+                {
+                    <p class="text-secondary mb-2">Every place has a choice.</p>
+                }
+                @foreach (var ambiguity in VisibleAmbiguities)
+                {
+                    var rowNumber = ambiguity.RowNumber;
+                    <fieldset class="border rounded p-2 mb-2" data-testid="favorite-import-ambiguity-@rowNumber">
+                        <legend class="h6 float-none w-auto px-1 mb-1">Row @rowNumber: @ambiguity.Name</legend>
+                        @for (var i = 0; i < ambiguity.Candidates.Count; i++)
+                        {
+                            var index = i;
+                            var candidate = ambiguity.Candidates[index];
+                            var inputId = $"favorite-import-{rowNumber}-{index}";
+                            <div class="form-check mb-1">
+                                <input class="form-check-input" type="radio" name="favorite-import-row-@rowNumber" id="@inputId" checked="@IsSelected(rowNumber, index)" disabled="@_isImporting" @onchange="() => Select(rowNumber, index)" />
+                                <label class="form-check-label" for="@inputId">
+                                    <span class="fw-semibold">@candidate.Name</span>
+                                    <span class="d-block small text-secondary">@(candidate.Address ?? FormatCoordinates(candidate))</span>
+                                </label>
+                                <a class="small d-inline-block" href="@MapUrl(candidate)" target="_blank" rel="noopener noreferrer" aria-label="View @candidate.Name on the map (opens in a new tab)">View on map</a>
+                            </div>
+                        }
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="favorite-import-row-@rowNumber" id="favorite-import-@rowNumber-none" checked="@IsSelected(rowNumber, null)" disabled="@_isImporting" @onchange="() => Select(rowNumber, null)" />
+                            <label class="form-check-label" for="favorite-import-@rowNumber-none">None of these (keep the imported address without a map location)</label>
+                        </div>
+                    </fieldset>
+                }
+            }
+            @if (_job.PossibleDuplicates.Count > 0)
+            {
+                <div class="alert alert-warning mb-0" role="alert" data-testid="favorite-import-duplicate-warning">
+                    <p class="mb-2">Possible duplicates were found.</p>
+                    <ul class="mb-2">
+                        @foreach (var duplicate in _job.PossibleDuplicates)
+                        {
+                            <li>Row @duplicate.RowNumber: @duplicate.Name, @duplicate.Address</li>
+                        }
+                    </ul>
+                    <div class="form-check">
+                        <input id="favorite-import-confirm-duplicates" class="form-check-input" type="checkbox" checked="@_confirmDuplicates" disabled="@_isImporting" @onchange="args => _confirmDuplicates = args.Value is true" />
+                        <label class="form-check-label" for="favorite-import-confirm-duplicates">Import them as separate favorites</label>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    @if (_job is { Status: FavoriteDestinationImportStatus.Failed })
+    {
+        <div class="alert alert-danger mt-3 mb-0" role="alert" data-testid="favorite-import-failed">@(_job.ErrorMessage ?? "The import could not be processed.")</div>
     }
     @if (_successMessage is not null)
     {
         <div class="alert alert-success mt-3 mb-0" role="status">@_successMessage</div>
     }
     <div class="d-flex gap-2 mt-3">
-        <button id="favorite-import-submit" type="button" class="btn btn-primary" disabled="@(_selectedFile is null || _isImporting)" @onclick="() => ImportAsync()">
-            @(_isImporting ? "Importing..." : "Import file")
-        </button>
+        @if (_job is null)
+        {
+            <button id="favorite-import-submit" type="button" class="btn btn-primary" disabled="@(_selectedFile is null || _isImporting)" @onclick="ImportAsync">
+                @(_isImporting ? "Uploading..." : "Import file")
+            </button>
+        }
+        else if (_job.Status == FavoriteDestinationImportStatus.NeedsReview)
+        {
+            <button id="favorite-import-finish" type="button" class="btn btn-primary" disabled="@(!CanFinish || _isImporting)" @onclick="FinishAsync">
+                @(_isImporting ? "Importing..." : "Finish import")
+            </button>
+        }
+        @if (_job is not null)
+        {
+            <button id="favorite-import-discard" type="button" class="btn btn-outline-danger" disabled="@_isImporting" @onclick="DiscardAsync">Discard import</button>
+        }
         @if (OnCancel.HasDelegate)
         {
-            <button id="favorite-import-cancel" type="button" class="btn btn-outline-secondary" disabled="@_isImporting" @onclick="OnCancel">@(_successMessage is null ? "Cancel" : "Close")</button>
+            <button id="favorite-import-cancel" type="button" class="btn btn-outline-secondary" disabled="@_isImporting" @onclick="OnCancel">@(_job is null && _successMessage is null ? "Cancel" : "Close")</button>
         }
     </div>
 </section>
@@ -66,28 +156,85 @@
     public const long MaximumUploadBytes = 2 * 1024 * 1024;
 
     private IBrowserFile? _selectedFile;
-    private FavoriteDestinationImportResponse? _response;
+    private IReadOnlyList<FavoriteDestinationImportIssue> _uploadErrors = Array.Empty<FavoriteDestinationImportIssue>();
+    private FavoriteDestinationImportJobDto? _job;
+    private readonly Dictionary<int, int?> _selections = [];
+    private bool _confirmDuplicates;
+    private bool _showUnchosenOnly;
     private string? _error;
     private string? _successMessage;
     private bool _isImporting;
+    private CancellationTokenSource? _pollCancellation;
 
     [Parameter] public EventCallback OnImported { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(2);
+
+    // Raised with the current unfinished import (null when there is none) whenever it changes.
+    [Parameter] public EventCallback<FavoriteDestinationImportJobDto?> OnImportChanged { get; set; }
+
+    private bool _initialized;
+    private bool _hasReported;
+    private FavoriteDestinationImportJobDto? _reportedJob;
+
+    private int ProgressPercent
+        => _job is null || _job.TotalRows == 0 ? 0 : (int)Math.Round(100d * _job.ProcessedRows / _job.TotalRows);
+
+    private bool CanFinish
+        => _job is not null
+            && _job.Ambiguities.All(ambiguity => _selections.ContainsKey(ambiguity.RowNumber))
+            && (_job.PossibleDuplicates.Count == 0 || _confirmDuplicates);
+
+    private int ChosenCount
+        => _job?.Ambiguities.Count(ambiguity => _selections.ContainsKey(ambiguity.RowNumber)) ?? 0;
+
+    private int ChosenPercent
+        => _job is null || _job.Ambiguities.Count == 0 ? 0 : (int)Math.Round(100d * ChosenCount / _job.Ambiguities.Count);
+
+    private IEnumerable<FavoriteDestinationImportAmbiguity> VisibleAmbiguities
+        => _job is null
+            ? []
+            : _showUnchosenOnly
+                ? _job.Ambiguities.Where(ambiguity => !_selections.ContainsKey(ambiguity.RowNumber))
+                : _job.Ambiguities;
+
+    // Resume the newest unfinished import, so leaving the page never strands one.
+    protected override async Task OnInitializedAsync()
+    {
+        await CallApiAsync(
+            async () =>
+            {
+                var open = await FavoriteApi.GetOpenImportsAsync();
+                if (open.Count > 0)
+                {
+                    SetJob(open[0]);
+                }
+            },
+            message => _error = message);
+        _initialized = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_initialized || (_hasReported && ReferenceEquals(_reportedJob, _job)))
+        {
+            return;
+        }
+
+        _hasReported = true;
+        _reportedJob = _job;
+        await OnImportChanged.InvokeAsync(_job);
+    }
 
     public void OnFileSelected(InputFileChangeEventArgs args)
     {
         _selectedFile = args.File;
-        _response = null;
+        _uploadErrors = Array.Empty<FavoriteDestinationImportIssue>();
         _error = null;
         _successMessage = null;
     }
 
-    private void CancelDuplicateConfirmation()
-    {
-        _response = null;
-    }
-
-    private async Task ImportAsync(bool confirmDuplicates = false)
+    private async Task ImportAsync()
     {
         if (_selectedFile is null)
         {
@@ -102,17 +249,21 @@
         _isImporting = true;
         _error = null;
         _successMessage = null;
+        _uploadErrors = Array.Empty<FavoriteDestinationImportIssue>();
         try
         {
             await using var stream = _selectedFile.OpenReadStream(MaximumUploadBytes);
-            _response = await FavoriteApi.ImportAsync(_selectedFile.Name, stream, confirmDuplicates);
-            if (_response.Errors.Count > 0 || _response.RequiresDuplicateConfirmation)
+            var response = await FavoriteApi.ImportAsync(_selectedFile.Name, stream);
+            if (response.Import is null || response.Errors.Count > 0)
             {
+                _uploadErrors = response.Errors.Count > 0
+                    ? response.Errors
+                    : [new FavoriteDestinationImportIssue(null, "The import could not be started.")];
                 return;
             }
 
-            _successMessage = $"{_response.Imported.Count} destination{(_response.Imported.Count == 1 ? string.Empty : "s")} imported";
-            await OnImported.InvokeAsync();
+            _selectedFile = null;
+            await SetJobAsync(response.Import);
         }
         catch (Exception exception)
         {
@@ -124,6 +275,183 @@
         }
     }
 
+    private async Task FinishAsync()
+    {
+        if (_job is not { } job || !CanFinish)
+        {
+            return;
+        }
+
+        _isImporting = true;
+        _error = null;
+        var request = new CompleteFavoriteDestinationImportRequest(
+            _selections.Select(selection => new FavoriteDestinationImportSelection(selection.Key, selection.Value)).ToArray(),
+            _confirmDuplicates);
+        await CallApiAsync(
+            async () =>
+            {
+                var result = await FavoriteApi.CompleteImportAsync(job.ImportId, request);
+                if (result.ErrorMessage is not null || result.Import is null)
+                {
+                    _error = result.ErrorMessage ?? "The import could not be completed.";
+                    return;
+                }
+
+                await SetJobAsync(result.Import);
+                if (result.Import is { Status: FavoriteDestinationImportStatus.NeedsReview } review
+                    && review.PossibleDuplicates.Count > job.PossibleDuplicates.Count)
+                {
+                    _confirmDuplicates = false;
+                    _error = "Some of your choices match favorites you already have. Confirm the possible duplicates to finish the import.";
+                }
+            },
+            message => _error = message);
+        _isImporting = false;
+    }
+
+    private async Task DiscardAsync()
+    {
+        if (_job is not { } job)
+        {
+            return;
+        }
+
+        _isImporting = true;
+        _error = null;
+        await CallApiAsync(
+            async () =>
+            {
+                if (await FavoriteApi.DiscardImportAsync(job.ImportId))
+                {
+                    ClearJob();
+                }
+                else
+                {
+                    _error = "The import could not be discarded. Try again.";
+                }
+            },
+            message => _error = message);
+        _isImporting = false;
+    }
+
+    private void SetJob(FavoriteDestinationImportJobDto job)
+    {
+        if (_job?.ImportId != job.ImportId)
+        {
+            _selections.Clear();
+            _confirmDuplicates = false;
+        }
+
+        _job = job;
+        if (job.Status is FavoriteDestinationImportStatus.Queued or FavoriteDestinationImportStatus.Processing)
+        {
+            StartPolling();
+        }
+    }
+
+    private async Task SetJobAsync(FavoriteDestinationImportJobDto job)
+    {
+        if (job.Status == FavoriteDestinationImportStatus.Completed)
+        {
+            ClearJob();
+            _successMessage = $"{job.ImportedCount} destination{(job.ImportedCount == 1 ? string.Empty : "s")} imported";
+            await OnImported.InvokeAsync();
+            return;
+        }
+
+        SetJob(job);
+    }
+
+    private void ClearJob()
+    {
+        StopPolling();
+        _job = null;
+        _selections.Clear();
+        _confirmDuplicates = false;
+    }
+
+    private void StartPolling()
+    {
+        if (_pollCancellation is not null)
+        {
+            return;
+        }
+
+        _pollCancellation = new CancellationTokenSource();
+        _ = PollAsync(_pollCancellation);
+    }
+
+    private void StopPolling()
+    {
+        _pollCancellation?.Cancel();
+        _pollCancellation = null;
+    }
+
+    private async Task PollAsync(CancellationTokenSource source)
+    {
+        var cancellationToken = source.Token;
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested
+                && _job is { Status: FavoriteDestinationImportStatus.Queued or FavoriteDestinationImportStatus.Processing } job)
+            {
+                await Task.Delay(PollInterval, cancellationToken);
+                await CallApiAsync(
+                    async () =>
+                    {
+                        var latest = await FavoriteApi.GetImportAsync(job.ImportId, cancellationToken);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            return;
+                        }
+
+                        _error = null;
+                        if (latest is null)
+                        {
+                            ClearJob();
+                            _error = "The import is no longer available.";
+                            return;
+                        }
+
+                        await SetJobAsync(latest);
+                    },
+                    message => _error = message);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_pollCancellation, source))
+            {
+                _pollCancellation = null;
+            }
+            source.Dispose();
+        }
+    }
+
+    private bool IsSelected(int rowNumber, int? candidateIndex)
+        => _selections.TryGetValue(rowNumber, out var selected) && selected == candidateIndex;
+
+    private void Select(int rowNumber, int? candidateIndex)
+        => _selections[rowNumber] = candidateIndex;
+
+    // Azure Maps has no public viewer, so the Azure Maps coordinates open in Bing Maps.
+    private static string MapUrl(FavoriteDestinationPlaceCandidate candidate)
+    {
+        var latitude = candidate.Latitude.ToString("0.######", CultureInfo.InvariantCulture);
+        var longitude = candidate.Longitude.ToString("0.######", CultureInfo.InvariantCulture);
+        var title = Uri.EscapeDataString(candidate.Name.Replace('_', ' '));
+        return $"https://www.bing.com/maps?cp={latitude}~{longitude}&lvl=17&sp=point.{latitude}_{longitude}_{title}";
+    }
+
+    private static string FormatCoordinates(FavoriteDestinationPlaceCandidate candidate)
+        => string.Create(CultureInfo.InvariantCulture, $"{candidate.Latitude:0.#####}, {candidate.Longitude:0.#####}");
+
     private static string FormatSize(long bytes)
         => bytes < 1024 ? $"{bytes} B" : $"{bytes / 1024d:0.#} KB";
+
+    public void Dispose() => StopPolling();
 }
