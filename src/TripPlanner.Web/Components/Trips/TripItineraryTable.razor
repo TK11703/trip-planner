@@ -24,19 +24,6 @@
 }
 else
 {
-    @if (OnAddLeg.HasDelegate || OnAddItem.HasDelegate)
-    {
-        <div class="tp-itinerary-actions">
-            @if (OnAddLeg.HasDelegate)
-            {
-                <button id="tp-table-add-leg" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add leg" @onclick="OnAddLeg">Add leg</button>
-            }
-            @if (OnAddItem.HasDelegate)
-            {
-                <button id="tp-table-add-item" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add item" @onclick="() => OnAddItem.InvokeAsync(null)">Add item</button>
-            }
-        </div>
-    }
     <div class="tp-itinerary-table-region" role="region" aria-label="Itinerary table" tabindex="0">
         <table class="tp-itinerary-table">
             @* The surrounding card header already names this table on screen. *@
@@ -84,7 +71,7 @@ else
                             }
                             @if (leg.CanContainItems && OnAddItem.HasDelegate)
                             {
-                                <button id="@AddItemActionId(leg.TripLegId)" type="button" class="btn btn-sm btn-link tp-itinerary-row-action" aria-label="Add item to @leg.Title" @onclick="() => OnAddItem.InvokeAsync(leg.TripLegId)">Add item</button>
+                                <button id="@AddItemActionId(leg.TripLegId)" type="button" class="ttl-leg-add tp-itinerary-row-add" title="Add an item to @leg.Title" aria-label="Add item to @leg.Title" @onclick="() => OnAddItem.InvokeAsync(leg.TripLegId)"><span aria-hidden="true">+</span> Add item</button>
                             }
                         </th>
                     </tr>

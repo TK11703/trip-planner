@@ -89,21 +89,17 @@ public class TripItineraryTableTests : BunitContext
     }
 
     [Fact]
-    public void TableActionsInvokeCreateCallbacks()
+    public void PopulatedTableLeavesTripLevelCreateActionsToTheHost()
     {
-        var addLegCount = 0;
-        Guid? initialLeg = TripFixtures.ArrivalLegId;
         var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
         var cut = Render<TripItineraryTable>(parameters => parameters
             .Add(component => component.Model, model)
-            .Add(component => component.OnAddLeg, () => addLegCount++)
-            .Add(component => component.OnAddItem, id => initialLeg = id));
+            .Add(component => component.OnAddLeg, () => { })
+            .Add(component => component.OnAddItem, _ => { }));
 
-        cut.Find("[aria-label='Add leg']").Click();
-        cut.Find("[aria-label='Add item']").Click();
-
-        Assert.Equal(1, addLegCount);
-        Assert.Null(initialLeg);
+        Assert.Empty(cut.FindAll("[aria-label='Add leg']"));
+        Assert.Empty(cut.FindAll("[aria-label='Add item']"));
+        Assert.NotEmpty(cut.FindAll("[aria-label='Add item to Arrival']"));
     }
 
     [Fact]

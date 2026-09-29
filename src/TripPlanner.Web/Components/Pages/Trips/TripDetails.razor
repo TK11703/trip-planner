@@ -8,6 +8,27 @@
 
 <PageTitle>Trip details</PageTitle>
 
+<TripsBreadcrumb Current="@(_trip?.Name ?? "Trip")">
+    @if (_trip is not null)
+    {
+        <span class="small text-secondary">View mode:</span>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
+            <button type="button"
+                    class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")"
+                    aria-pressed="@(_planningView == TripPlanningView.Table)"
+                    @onclick="() => _planningView = TripPlanningView.Table">
+                Table
+            </button>
+            <button type="button"
+                    class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")"
+                    aria-pressed="@(_planningView == TripPlanningView.Timeline)"
+                    @onclick="() => _planningView = TripPlanningView.Timeline">
+                Timeline
+            </button>
+        </div>
+    }
+</TripsBreadcrumb>
+
 @if (_loading)
 {
     <TripAccessState State="TripAccessState.TripAccessStateKind.Loading" />
@@ -27,66 +48,38 @@ else
                 <span class="badge @AccessBadgeClass mt-2">Shared - @AccessLevelLabel</span>
             }
         </div>
-        <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary" href="/trips">All trips</a>
-            @if (_trip.IsOwner)
-            {
-                <a class="btn btn-outline-secondary" href="@($"/trips/{TripId}/print")">Print</a>
-                <button class="btn btn-outline-primary" @onclick="OpenShareModal">Share</button>
-            }
+        <div class="d-flex flex-wrap gap-2 align-items-center">
             @if (CanEditContent)
             {
-                <div class="btn-group">
-                    <button type="button" class="btn btn-primary" @onclick="OpenTripEditModal">Edit trip</button>
-                    <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="visually-hidden">Toggle trip actions</span>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><button class="dropdown-item" type="button" @onclick="OpenCreateLegModal">Add trip leg</button></li>
-                        <li><button class="dropdown-item" type="button" @onclick="OpenCreateItemModal">Add a tracked item</button></li>
-                        @if (_trip.IsOwner)
-                        {
-                            <li><hr class="dropdown-divider" /></li>
-                            <li><button class="dropdown-item text-danger" type="button" @onclick="OpenDeleteModal">Delete trip</button></li>
-                        }
-                    </ul>
-                </div>
+                <button type="button" class="btn btn-sm btn-primary" @onclick="OpenTripEditModal"><ActionIcon Name="edit" CssClass="me-1 align-text-bottom" />Edit trip</button>
+            }
+            @if (_trip.IsOwner)
+            {
+                <a class="btn btn-sm btn-outline-secondary" href="@($"/trips/{TripId}/print")"><ActionIcon Name="print" CssClass="me-1 align-text-bottom" />Print</a>
+                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OpenShareModal"><ActionIcon Name="share" CssClass="me-1 align-text-bottom" />Share</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="OpenDeleteModal"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete trip</button>
             }
         </div>
     </header>
 
     <div class="row g-3">
         <div class="col-12">
+            @{ var itinerary = TripPrintFormatting.BuildItineraryTable(_trip); }
             <div class="card shadow-sm mb-3 tp-static">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div>
-                        <div class="fw-semibold">@(_planningView == TripPlanningView.Timeline ? "Trip timeline" : "Itinerary table")</div>
-                        @if (_planningView == TripPlanningView.Timeline)
-                        {
-                            <div class="small text-secondary">Trip legs are listed on the left. Scroll the grid to see each day, hour, and the items on each leg. Select a leg or item to edit it.</div>
-                        }
-                    </div>
+                    <div class="fw-semibold">@(_planningView == TripPlanningView.Timeline ? "Trip timeline" : "Itinerary table")</div>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
+                        @if (CanEditContent && itinerary.HasContent)
+                        {
+                            <button id="tp-table-add-leg" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add leg" @onclick="OpenTableCreateLeg"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add leg</button>
+                            <button id="tp-table-add-item" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add item" @onclick="() => OpenTableCreateItem(null)"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add item</button>
+                        }
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 @onclick="OpenMapModal" disabled="@(!CanOpenMap)"
                                 title="@(CanOpenMap ? "View all trip locations on a map" : "Add a location to an item to view the map")"
                                 aria-label="View all trip locations on a map">
-                            View map
+                            <ActionIcon Name="map" CssClass="me-1 align-text-bottom" />View map
                         </button>
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
-                            <button type="button"
-                                    class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")"
-                                    aria-pressed="@(_planningView == TripPlanningView.Table)"
-                                    @onclick="() => _planningView = TripPlanningView.Table">
-                                Table
-                            </button>
-                            <button type="button"
-                                    class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")"
-                                    aria-pressed="@(_planningView == TripPlanningView.Timeline)"
-                                    @onclick="() => _planningView = TripPlanningView.Timeline">
-                                Timeline
-                            </button>
-                        </div>
                         @if (_planningView == TripPlanningView.Timeline)
                         {
                             var navDates = _timeline?.TripDates ?? (IReadOnlyList<DateOnly>)Array.Empty<DateOnly>();
@@ -143,14 +136,14 @@ else
                         }
                     </div>
                 </div>
-                <div class="card-body">
+                <div class="card-body @(_planningView == TripPlanningView.Table && itinerary.HasContent ? "tp-itinerary-flush" : null)">
                     @if (_planningView == TripPlanningView.Timeline)
                     {
                         <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" OnAddLegRequested="OpenCreateLegModal" OnLoaded="HandleTimelineLoaded" OnActiveDateChanged="HandleActiveDateChanged" />
                     }
                     else
                     {
-                        <TripItineraryTable Model="@TripPrintFormatting.BuildItineraryTable(_trip)"
+                        <TripItineraryTable Model="@itinerary"
                                             OnEditLeg="@(CanEditContent ? EventCallback.Factory.Create<Guid>(this, OpenTableEditLeg) : default)"
                                             OnEditItem="@(CanEditContent ? EventCallback.Factory.Create<Guid>(this, OpenTableEditItem) : default)"
                                             OnAddLeg="@(CanEditContent ? EventCallback.Factory.Create(this, OpenTableCreateLeg) : default)"
@@ -314,7 +307,7 @@ else
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" @onclick="CloseDeleteModal" disabled="@_isDeleting">Cancel</button>
-                        <button type="button" class="btn btn-danger" @onclick="HandleTripDeleteAsync" disabled="@_isDeleting">@(_isDeleting ? "Deleting…" : "Delete trip")</button>
+                        <button type="button" class="btn btn-danger" @onclick="HandleTripDeleteAsync" disabled="@_isDeleting"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />@(_isDeleting ? "Deleting…" : "Delete trip")</button>
                     </div>
                 </div>
             </div>
@@ -506,8 +499,6 @@ else
         _editingLeg = leg;
         _activeModal = ActiveModal.EditLeg;
     }
-
-    private void OpenCreateItemModal() => OpenCreateItemModal(null);
 
     private void OpenCreateItemModal(Guid? initialTripLegId)
     {

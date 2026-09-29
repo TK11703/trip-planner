@@ -1,0 +1,20 @@
+<div class="tp-breadcrumb-row d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/trips">Trips</a></li>
+            <li class="breadcrumb-item active" aria-current="page">@Current</li>
+        </ol>
+    </nav>
+    @if (ChildContent is not null)
+    {
+        <div class="d-flex flex-wrap align-items-center gap-2">@ChildContent</div>
+    }
+</div>
+
+@code {
+    /// <summary>Title of the current page below Trips.</summary>
+    [Parameter, EditorRequired] public string Current { get; set; } = string.Empty;
+
+    /// <summary>Optional controls shown at the far right of the breadcrumb row.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

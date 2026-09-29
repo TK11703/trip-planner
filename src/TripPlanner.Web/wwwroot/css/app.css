@@ -993,11 +993,27 @@ body {
     outline-offset: 2px;
 }
 
-.tp-itinerary-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .5rem;
-    margin-bottom: .75rem;
+/* Populated table spans the card body edge to edge; its outer cells line up with the card header. */
+.tp-itinerary-flush {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 0 0 calc(.75rem - 1px) calc(.75rem - 1px);
+}
+
+.tp-itinerary-flush .tp-itinerary-table-region:focus-visible {
+    outline-offset: -2px;
+}
+
+.tp-itinerary-flush .tp-itinerary-table tr > :first-child {
+    padding-left: 1rem;
+}
+
+.tp-itinerary-flush .tp-itinerary-table tr > :last-child {
+    padding-right: 1rem;
+}
+
+.tp-itinerary-flush .tp-itinerary-table tbody tr:last-child > * {
+    border-bottom-width: 0;
 }
 
 .tp-itinerary-table {
@@ -1083,20 +1099,9 @@ body {
     overflow-wrap: anywhere;
 }
 
-.tp-itinerary-row-action {
-    margin: -.25rem 0 -.25rem .35rem;
-    padding: .25rem .35rem;
-    font-weight: 600;
-    text-decoration: none;
-}
-
-.tp-itinerary-row-action:hover {
-    text-decoration: underline;
-}
-
-.tp-itinerary-row-action:focus-visible {
-    outline: 2px solid var(--bs-primary);
-    outline-offset: 1px;
+.tp-itinerary-row-add {
+    margin-left: .35rem;
+    vertical-align: middle;
 }
 
 .tp-itinerary-empty {

@@ -366,9 +366,14 @@
 
     public async ValueTask DisposeAsync()
     {
+        AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
         _requestCancellation?.Cancel();
-        await SessionStore.SyncPaneAsync(_panel, false);
+        try
+        {
+            await SessionStore.SyncPaneAsync(_panel, false);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException)
+        {
+        }
     }
-
-    public void Dispose() => AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
 }

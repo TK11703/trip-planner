@@ -32,7 +32,36 @@ public class TripDetailsTableViewTests : BunitContext
     }
 
     [Fact]
-    public void HeaderControlsRunFromMapThroughTheToggleToTheDateNavigation()
+    public void BreadcrumbLinksToTripsAndHostsTheViewModeToggleAtTheRight()
+    {
+        var cut = RenderDetails();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".tp-breadcrumb-row [role='group'][aria-label='Itinerary view']")));
+
+        var crumbs = cut.FindAll(".breadcrumb .breadcrumb-item");
+        Assert.Equal(2, crumbs.Count);
+        Assert.Equal("/trips", crumbs[0].QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("page", crumbs[1].GetAttribute("aria-current"));
+        Assert.Contains("View mode:", cut.Find(".tp-breadcrumb-row").TextContent);
+        Assert.Single(cut.FindAll("[role='group'][aria-label='Itinerary view']"));
+    }
+
+    [Fact]
+    public void PageHeaderOrdersSmallActionsWithoutAnEditDropdown()
+    {
+        var cut = RenderDetails();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("header .btn")));
+
+        var header = cut.Find("header");
+        var actions = header.QuerySelectorAll("a.btn, button.btn").Select(e => e.TextContent.Trim()).ToArray();
+
+        Assert.Equal(new[] { "Edit trip", "Print", "Share", "Delete trip" }, actions);
+        Assert.All(header.QuerySelectorAll("a.btn, button.btn"), e => Assert.Contains("btn-sm", e.ClassList));
+        Assert.Empty(header.QuerySelectorAll(".dropdown-toggle, .dropdown-menu, [aria-label='Itinerary view']"));
+        Assert.Empty(cut.Find(".card-header").QuerySelectorAll("[aria-label='Itinerary view']"));
+    }
+
+    [Fact]
+    public void CardHeaderRunsFromMapToTheDateNavigationInTimelineView()
     {
         var cut = RenderDetails();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("[role='group'][aria-label='Itinerary view']")));
@@ -48,14 +77,45 @@ public class TripDetailsTableViewTests : BunitContext
         int IndexOfLabel(string label) => headerElements.FindIndex(e => e.GetAttribute("aria-label") == label);
 
         var mapIndex = IndexOfLabel("View all trip locations on a map");
-        var toggleIndex = IndexOfLabel("Itinerary view");
         var stepIndex = IndexOfLabel("Step timeline by day");
         var jumpIndex = IndexOfLabel("Jump to a date in the trip");
 
-        Assert.True(mapIndex >= 0, "View map should render in the header.");
-        Assert.True(mapIndex < toggleIndex, "View map should precede the itinerary view toggle.");
-        Assert.True(toggleIndex < stepIndex, "The day-step controls should follow the itinerary view toggle.");
+        Assert.True(mapIndex >= 0, "View map should render in the card header.");
+        Assert.True(mapIndex < stepIndex, "The day-step controls should follow View map.");
         Assert.True(stepIndex < jumpIndex, "Jump to date should follow the day-step controls.");
+    }
+
+    [Fact]
+    public void AddActionsLeadTheCardHeaderInBothViews()
+    {
+        var cut = RenderDetails();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("table.tp-itinerary-table")));
+
+        AssertAddActionsPrecedeMap(cut);
+        Assert.NotNull(cut.Find(".card-body.tp-itinerary-flush table.tp-itinerary-table"));
+
+        cut.Find(".card-header [aria-label='Add leg']").Click();
+        Assert.Single(cut.FindComponents<TripLegForm>());
+        cut.Find("[aria-label='Close']").Click();
+
+        ViewButton(cut, "Timeline").Click();
+        AssertAddActionsPrecedeMap(cut);
+        Assert.Empty(cut.FindAll(".tp-itinerary-flush"));
+
+        cut.Find(".card-header [aria-label='Add item']").Click();
+        Assert.Single(cut.FindComponents<TrackedItemForm>());
+    }
+
+    private static void AssertAddActionsPrecedeMap(IRenderedComponent<TripDetails> cut)
+    {
+        var headerElements = cut.Find(".card-header").QuerySelectorAll("*").ToList();
+        int IndexOfLabel(string label) => headerElements.FindIndex(e => e.GetAttribute("aria-label") == label);
+        var addLegIndex = IndexOfLabel("Add leg");
+        var addItemIndex = IndexOfLabel("Add item");
+        var mapIndex = IndexOfLabel("View all trip locations on a map");
+
+        Assert.True(addLegIndex >= 0 && addLegIndex < addItemIndex, "Add item should follow Add leg.");
+        Assert.True(addItemIndex < mapIndex, "View map should follow the add actions.");
     }
 
     [Fact]
@@ -101,7 +161,7 @@ public class TripDetailsTableViewTests : BunitContext
     public void AddLegUsesTheTripDateRange()
     {
         var cut = RenderDetails();
-        cut.WaitForAssertion(() => cut.FindAll("button").Single(button => button.TextContent.Trim() == "Add trip leg").Click());
+        cut.WaitForAssertion(() => cut.Find(".card-header [aria-label='Add leg']").Click());
 
         var form = cut.FindComponent<TripLegForm>();
 
