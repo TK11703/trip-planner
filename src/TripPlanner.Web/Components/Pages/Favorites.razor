@@ -30,6 +30,7 @@
             <li class="nav-item" role="presentation">
                 <button id="favorite-tab-list" type="button" role="tab" class="nav-link @(_activeTab == FavoritesTab.List ? "active" : null)" aria-selected="@(_activeTab == FavoritesTab.List ? "true" : "false")" aria-controls="favorite-panel-list" @onclick="ShowListTab">
                     Favorites
+                    <span class="badge rounded-pill text-bg-secondary ms-1" data-testid="favorite-count-badge" title="@_totalFavorites favorite@(_totalFavorites == 1 ? null : "s") saved">@_totalFavorites<span class="visually-hidden"> favorite@(_totalFavorites == 1 ? null : "s") saved</span></span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -261,6 +262,7 @@
 
 @code {
     private IReadOnlyList<FavoriteDestinationDto> _favorites = Array.Empty<FavoriteDestinationDto>();
+    private int _totalFavorites;
     private bool _isLoading = true;
     private bool _isSaving;
     private bool _isDeleting;
@@ -303,7 +305,7 @@
     protected override async Task OnInitializedAsync()
     {
         await CallApiAsync(
-            async () => _favorites = await FavoriteApi.GetAsync(),
+            () => RefreshFavoritesAsync(),
             message => _loadError = message);
         // An import still running or waiting for review opens the Import tab; failing to check is not worth an error.
         await CallApiAsync(
@@ -380,7 +382,7 @@
                         if (latest?.Status == FavoriteDestinationImportStatus.Completed)
                         {
                             _openImport = null;
-                            _favorites = await FavoriteApi.GetAsync(_search, cancellationToken);
+                            await RefreshFavoritesAsync(cancellationToken);
                             ShowSaveMessage($"{latest.ImportedCount} destination{(latest.ImportedCount == 1 ? string.Empty : "s")} imported");
                             return;
                         }
@@ -478,7 +480,7 @@
 
                 _selectedIds.ExceptWith(ids);
                 _showBulkDeleteConfirm = false;
-                _favorites = await FavoriteApi.GetAsync(_search);
+                await RefreshFavoritesAsync();
                 ShowSaveMessage($"{deleted} favorite{(deleted == 1 ? string.Empty : "s")} removed");
             },
             message => _bulkDeleteError = message);
@@ -537,8 +539,17 @@
     private async Task ReloadFavoritesAsync()
     {
         await CallApiAsync(
-            async () => _favorites = await FavoriteApi.GetAsync(_search),
+            () => RefreshFavoritesAsync(),
             message => _loadError = message);
+    }
+
+    // Searching only filters the list; the tab badge always counts every saved favorite.
+    private async Task RefreshFavoritesAsync(CancellationToken cancellationToken = default)
+    {
+        _favorites = await FavoriteApi.GetAsync(_search, cancellationToken);
+        _totalFavorites = string.IsNullOrWhiteSpace(_search)
+            ? _favorites.Count
+            : (await FavoriteApi.GetAsync(ct: cancellationToken)).Count;
     }
 
     private async Task CreateAsync(CreateFavoriteDestinationRequest request)
@@ -580,7 +591,7 @@
                     return;
                 }
 
-                _favorites = await FavoriteApi.GetAsync(_search);
+                await RefreshFavoritesAsync();
                 ClearDuplicateWarning();
                 _showForm = false;
                 ShowSaveMessage("Favorite destination saved");
@@ -624,7 +635,7 @@
                     return;
                 }
 
-                _favorites = await FavoriteApi.GetAsync(_search);
+                await RefreshFavoritesAsync();
                 _editingFavorite = null;
                 ClearDuplicateWarning();
                 ShowSaveMessage("Favorite destination updated");
@@ -668,7 +679,7 @@
 
                 _deleteCandidate = null;
                 _editingFavorite = null;
-                _favorites = await FavoriteApi.GetAsync(_search);
+                await RefreshFavoritesAsync();
                 ShowSaveMessage("Favorite destination removed");
             },
             message => _deleteError = message);
@@ -727,7 +738,7 @@
 
                 _selectedIds.Remove(favorite.FavoriteDestinationId);
                 CloseFavoriteMap();
-                _favorites = await FavoriteApi.GetAsync(_search);
+                await RefreshFavoritesAsync();
                 ShowSaveMessage("Favorite destination removed");
             },
             message => _mapRemoveError = message);

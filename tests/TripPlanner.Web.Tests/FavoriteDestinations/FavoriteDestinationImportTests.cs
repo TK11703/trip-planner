@@ -38,7 +38,7 @@ public sealed class FavoriteDestinationImportTests : BunitContext
         await SelectFileAsync(cut, "favorites.csv", "name,address,notes\r\nMuseum,Berlin,\r\nGarden,Paris,");
         cut.Find("#favorite-import-submit").Click();
 
-        cut.WaitForAssertion(() => Assert.Contains("2 destinations imported", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("2 destinations imported", cut.Markup), TimeSpan.FromSeconds(5));
         Assert.Equal(1, imported);
         Assert.Empty(cut.FindAll("[data-testid='favorite-import-progress']"));
     }

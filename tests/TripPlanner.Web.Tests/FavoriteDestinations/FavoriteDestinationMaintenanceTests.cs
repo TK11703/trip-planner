@@ -36,6 +36,30 @@ public sealed class FavoriteDestinationMaintenanceTests : BunitContext
     }
 
     [Fact]
+    public void FavoritesTabBadge_CountsAllSavedFavorites_EvenWhileSearching()
+    {
+        var first = Favorite("First place", "First address", null, null, null);
+        var second = Favorite("Second place", "Second address", null, null, null);
+        var third = Favorite("Third place", "Third address", null, null, null);
+        var api = new MaintenanceFavoriteDestinationApiClient([first, second, third]);
+        var cut = RenderPage(api);
+        cut.WaitForAssertion(() => Assert.Contains("Third place", cut.Markup));
+        var badge = cut.Find("[data-testid='favorite-count-badge']");
+        Assert.Equal("3 favorites saved", badge.TextContent.Trim());
+        Assert.Equal("3 favorites saved", badge.GetAttribute("title"));
+
+        cut.Find("#favorite-search").Input("First");
+        cut.WaitForAssertion(() => Assert.DoesNotContain("Second place", cut.Markup));
+        Assert.Equal("3 favorites saved", cut.Find("[data-testid='favorite-count-badge']").GetAttribute("title"));
+
+        cut.Find($"[data-testid='favorite-select-{first.FavoriteDestinationId}']").Change(true);
+        cut.Find("#favorite-delete-selected").Click();
+        cut.Find("#favorite-bulk-delete-confirm").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal("2 favorites saved", cut.Find("[data-testid='favorite-count-badge']").GetAttribute("title")));
+    }
+
+    [Fact]
     public void EditPersistsFullResearchContext_AndDeleteRequiresConfirmation()
     {
         var favorite = Favorite("Old name", "Old address", "Old city", "Old country", new string('n', 800));
