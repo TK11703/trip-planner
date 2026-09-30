@@ -52,7 +52,7 @@ public sealed class FavoritesPageTests : BunitContext
         cut.WaitForAssertion(() => Assert.Contains("Museum Island", cut.Markup));
         Assert.Equal(["", "Name", "Address", "City", "Country"], cut.FindAll(".favorites-table thead th").Select(th => th.TextContent.Trim()));
         Assert.NotNull(cut.Find("#favorite-select-all"));
-        var cells = cut.FindAll(".favorites-table tbody tr > *").Skip(1).Select(cell => cell.TextContent.Trim()).ToArray();
+        var cells = cut.FindAll(".favorites-table tbody tr > *").Skip(1).Select(cell => cell.TextContent.Trim()).Where(text => text.Length > 0).ToArray();
         Assert.Equal(["Museum Island", "Bodestraße 1, Berlin", "Berlin", "Germany"], cells);
         Assert.Empty(cut.FindAll(".modal"));
 
@@ -122,6 +122,32 @@ public sealed class FavoritesPageTests : BunitContext
         cut.WaitForAssertion(() => Assert.Contains("2 destinations imported", cut.Markup));
         Assert.Empty(cut.FindAll("[data-testid='favorite-import-processing']"));
         Assert.Contains("Imported place", cut.Markup);
+    }
+
+    [Fact]
+    public void KeptImportUrl_RendersAsCompactLinkThatOpensMapDialog()
+    {
+        const string googleUrl = "https://www.google.com/maps/place/Eiffel+Tower/data=!4m2!3m1!1s0x47e66e2964e34e2d:0x8ddca9ee380ef7e0";
+        var unmatched = Favorite("Eiffel Tower", googleUrl, null, null, null);
+        var matched = Favorite("Louvre", "Rue de Rivoli, Paris", "Paris", "France", null);
+        var unsafeLink = Favorite("Odd import", "javascript:alert(1)", null, null, null);
+        Services.AddSingleton<IFavoriteDestinationApiClient>(new RecordingFavoriteDestinationApiClient([unmatched, matched, unsafeLink]));
+
+        var cut = Render<FavoritesPage>();
+
+        cut.WaitForAssertion(() => Assert.Contains("Louvre", cut.Markup));
+        var link = cut.Find($"[data-testid='favorite-map-{unmatched.FavoriteDestinationId}']");
+        Assert.Equal("Unmatched Destination - Click here to view", link.TextContent.Trim());
+        Assert.Contains("Eiffel Tower", link.GetAttribute("title"));
+        Assert.DoesNotContain(googleUrl, cut.Find(".favorites-table tbody").TextContent);
+        Assert.Equal("Rue de Rivoli, Paris", cut.Find($"[data-testid='favorite-map-{matched.FavoriteDestinationId}']").TextContent.Trim());
+        Assert.Equal("javascript:alert(1)", cut.Find($"[data-testid='favorite-map-{unsafeLink.FavoriteDestinationId}']").TextContent.Trim());
+        Assert.Empty(cut.FindAll(".favorites-table tbody a"));
+
+        link.Click();
+
+        Assert.Equal(googleUrl, cut.Find("#favorite-place-map-open").GetAttribute("href"));
+        Assert.Equal("_blank", cut.Find("#favorite-place-map-open").GetAttribute("target"));
     }
 
     [Fact]

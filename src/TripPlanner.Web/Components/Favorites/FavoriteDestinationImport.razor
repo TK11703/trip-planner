@@ -92,7 +92,7 @@
                                     <span class="fw-semibold">@candidate.Name</span>
                                     <span class="d-block small text-secondary">@(candidate.Address ?? FormatCoordinates(candidate))</span>
                                 </label>
-                                <a class="small d-inline-block" href="@MapUrl(candidate)" target="_blank" rel="noopener noreferrer" aria-label="View @candidate.Name on the map (opens in a new tab)">View on map</a>
+                                <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-testid="favorite-import-map-@rowNumber-@index" aria-label="View @candidate.Name at @(candidate.Address ?? FormatCoordinates(candidate)) on a map" @onclick="() => _mapTarget = (rowNumber, index, candidate)">View on map</button>
                             </div>
                         }
                         <div class="form-check">
@@ -152,6 +152,22 @@
     </div>
 </section>
 
+@if (_mapTarget is { } mapTarget)
+{
+    var isSelected = IsSelected(mapTarget.RowNumber, mapTarget.Index);
+    <FavoritePlaceMapModal Name="@mapTarget.Candidate.Name"
+                           Address="@mapTarget.Candidate.Address"
+                           Latitude="mapTarget.Candidate.Latitude"
+                           Longitude="mapTarget.Candidate.Longitude"
+                           OnClose="() => _mapTarget = null">
+        <Actions>
+            <button id="favorite-place-map-select" type="button" class="btn btn-primary" disabled="@isSelected" @onclick="() => SelectFromMap(mapTarget.RowNumber, mapTarget.Index)">
+                <ActionIcon Name="success" CssClass="me-1 align-text-bottom" />@(isSelected ? "Selected" : "Select location")
+            </button>
+        </Actions>
+    </FavoritePlaceMapModal>
+}
+
 @code {
     public const long MaximumUploadBytes = 2 * 1024 * 1024;
 
@@ -161,6 +177,7 @@
     private readonly Dictionary<int, int?> _selections = [];
     private bool _confirmDuplicates;
     private bool _showUnchosenOnly;
+    private (int RowNumber, int Index, FavoriteDestinationPlaceCandidate Candidate)? _mapTarget;
     private string? _error;
     private string? _successMessage;
     private bool _isImporting;
@@ -438,13 +455,10 @@
     private void Select(int rowNumber, int? candidateIndex)
         => _selections[rowNumber] = candidateIndex;
 
-    // Azure Maps has no public viewer, so the Azure Maps coordinates open in Bing Maps.
-    private static string MapUrl(FavoriteDestinationPlaceCandidate candidate)
+    private void SelectFromMap(int rowNumber, int candidateIndex)
     {
-        var latitude = candidate.Latitude.ToString("0.######", CultureInfo.InvariantCulture);
-        var longitude = candidate.Longitude.ToString("0.######", CultureInfo.InvariantCulture);
-        var title = Uri.EscapeDataString(candidate.Name.Replace('_', ' '));
-        return $"https://www.bing.com/maps?cp={latitude}~{longitude}&lvl=17&sp=point.{latitude}_{longitude}_{title}";
+        Select(rowNumber, candidateIndex);
+        _mapTarget = null;
     }
 
     private static string FormatCoordinates(FavoriteDestinationPlaceCandidate candidate)

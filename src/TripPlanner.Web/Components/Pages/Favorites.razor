@@ -127,7 +127,13 @@
                                         <th scope="row">
                                             <button type="button" class="btn btn-link p-0 text-start fw-semibold" data-testid="favorite-edit-@favorite.FavoriteDestinationId" @onclick="() => EditFavorite(favorite)">@favorite.Name</button>
                                         </th>
-                                        <td>@favorite.Address</td>
+                                        <td>
+                                            <button type="button" class="btn btn-link p-0 text-start" data-testid="favorite-map-@favorite.FavoriteDestinationId" title="View @favorite.Name on a map" @onclick="() => ShowFavoriteMap(favorite)">
+                                                @(IsWebLink(favorite.Address) ? "Unmatched Destination - Click here to view"
+                                                    : string.IsNullOrWhiteSpace(favorite.Address) ? "View on map"
+                                                    : favorite.Address)
+                                            </button>
+                                        </td>
                                         <td>@favorite.City</td>
                                         <td>@favorite.Country</td>
                                     </tr>
@@ -213,6 +219,44 @@
         </div>
         <div class="modal-backdrop show"></div>
     }
+
+    @if (_mapFavorite is { } mapFavorite)
+    {
+        <FavoritePlaceMapModal Name="@mapFavorite.Name"
+                               Address="@mapFavorite.Address"
+                               Latitude="mapFavorite.Latitude"
+                               Longitude="mapFavorite.Longitude"
+                               OnClose="CloseFavoriteMap">
+            <BodyContent>
+                @if (_confirmMapRemove)
+                {
+                    <div class="alert alert-warning mt-3 mb-0" role="alert" data-testid="favorite-map-remove-warning">Remove <strong>@mapFavorite.Name</strong> from your favorites? Existing trip items will not change.</div>
+                }
+                @if (_mapRemoveError is not null)
+                {
+                    <div class="alert alert-danger mt-3 mb-0" role="alert">@_mapRemoveError</div>
+                }
+            </BodyContent>
+            <Actions>
+                @if (_confirmMapRemove)
+                {
+                    <button id="favorite-map-remove-confirm" type="button" class="btn btn-danger" disabled="@_isRemovingFromMap" @onclick="RemoveFromMapAsync">
+                        <ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />@(_isRemovingFromMap ? "Removing..." : "Remove favorite")
+                    </button>
+                    <button id="favorite-map-remove-cancel" type="button" class="btn btn-outline-secondary" disabled="@_isRemovingFromMap" @onclick="() => _confirmMapRemove = false">Keep favorite</button>
+                }
+                else
+                {
+                    <button id="favorite-map-keep" type="button" class="btn btn-primary" @onclick="CloseFavoriteMap">
+                        <ActionIcon Name="success" CssClass="me-1 align-text-bottom" />Keep favorite
+                    </button>
+                    <button id="favorite-map-remove" type="button" class="btn btn-outline-danger" @onclick="() => _confirmMapRemove = true">
+                        <ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Remove favorite
+                    </button>
+                }
+            </Actions>
+        </FavoritePlaceMapModal>
+    }
 </section>
 
 @code {
@@ -241,6 +285,10 @@
     private CancellationTokenSource? _saveMessageTimer;
     private FavoriteDestinationImportJobDto? _openImport;
     private CancellationTokenSource? _importWatch;
+    private FavoriteDestinationDto? _mapFavorite;
+    private bool _confirmMapRemove;
+    private bool _isRemovingFromMap;
+    private string? _mapRemoveError;
 
     [Parameter] public TimeSpan SaveMessageDuration { get; set; } = TimeSpan.FromSeconds(5);
     [Parameter] public TimeSpan ImportPollInterval { get; set; } = TimeSpan.FromSeconds(3);
@@ -638,6 +686,52 @@
         _pendingDuplicateRequest = null;
         _pendingDuplicateUpdate = null;
         _pendingDuplicateFavoriteId = null;
+    }
+
+    // Imports keep the original link when no map match was chosen; only http(s) links are ever rendered as hrefs.
+    private static bool IsWebLink(string address)
+        => Uri.TryCreate(address.Trim(), UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
+
+    private void ShowFavoriteMap(FavoriteDestinationDto favorite)
+    {
+        _mapFavorite = favorite;
+        _confirmMapRemove = false;
+        _mapRemoveError = null;
+    }
+
+    private void CloseFavoriteMap()
+    {
+        _mapFavorite = null;
+        _confirmMapRemove = false;
+        _mapRemoveError = null;
+    }
+
+    private async Task RemoveFromMapAsync()
+    {
+        if (_mapFavorite is not { } favorite)
+        {
+            return;
+        }
+
+        _isRemovingFromMap = true;
+        _mapRemoveError = null;
+        await CallApiAsync(
+            async () =>
+            {
+                if (!await FavoriteApi.DeleteAsync(favorite.FavoriteDestinationId))
+                {
+                    _mapRemoveError = "The favorite could not be removed. Refresh and try again.";
+                    return;
+                }
+
+                _selectedIds.Remove(favorite.FavoriteDestinationId);
+                CloseFavoriteMap();
+                _favorites = await FavoriteApi.GetAsync(_search);
+                ShowSaveMessage("Favorite destination removed");
+            },
+            message => _mapRemoveError = message);
+        _isRemovingFromMap = false;
     }
 
     private void ShowSaveMessage(string message)

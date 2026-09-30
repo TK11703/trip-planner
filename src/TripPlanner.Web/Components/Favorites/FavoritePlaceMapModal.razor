@@ -1,0 +1,134 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+@using System.Globalization
+
+<div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="favorite-place-map-title" data-testid="favorite-place-map">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 class="modal-title h5" id="favorite-place-map-title">@Name</h2>
+                    @if (Subtitle is not null)
+                    {
+                        <p class="small text-secondary mb-0 text-break">@Subtitle</p>
+                    }
+                </div>
+                <button id="favorite-place-map-close-x" type="button" class="btn-close" aria-label="Close map" @onclick="CloseAsync"></button>
+            </div>
+            <div class="modal-body">
+                @if (HasCoordinates)
+                {
+                    <div class="tp-map-canvas" @ref="_mapElement" aria-label="Map showing @Name"></div>
+                }
+                else
+                {
+                    <div class="alert alert-info mb-0" role="status" data-testid="favorite-place-map-unplaced">
+                        This place has no map location yet, so it can't be pinned on the map.@(ExternalMapUrl is null ? null : " You can still open it in a new tab.")
+                    </div>
+                }
+                @BodyContent
+            </div>
+            <div class="modal-footer">
+                @Actions
+                @if (ExternalMapUrl is not null)
+                {
+                    <a id="favorite-place-map-open" class="btn btn-outline-secondary" href="@ExternalMapUrl" target="_blank" rel="noopener noreferrer" title="Open @Name in a new tab or window">
+                        <ActionIcon Name="map" CssClass="me-1 align-text-bottom" />Open in new tab
+                    </a>
+                }
+                <button id="favorite-place-map-close" type="button" class="btn btn-outline-secondary" @onclick="CloseAsync">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop show"></div>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter] public string? Address { get; set; }
+    [Parameter] public double? Latitude { get; set; }
+    [Parameter] public double? Longitude { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    // Extra footer buttons, shown first (left).
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? BodyContent { get; set; }
+
+    private ElementReference _mapElement;
+    private IJSObjectReference? _module;
+    private string? _mapHandle;
+
+    private bool HasCoordinates => Latitude is not null && Longitude is not null;
+
+    private bool AddressIsWebLink
+        => Uri.TryCreate(Address?.Trim(), UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
+
+    private string? Subtitle
+        => AddressIsWebLink ? "Imported link (no matched address)"
+            : !string.IsNullOrWhiteSpace(Address) ? Address
+            : HasCoordinates ? string.Create(CultureInfo.InvariantCulture, $"{Latitude:0.#####}, {Longitude:0.#####}")
+            : null;
+
+    // Azure Maps has no public viewer, so Azure Maps coordinates open in Bing Maps.
+    private string? ExternalMapUrl
+    {
+        get
+        {
+            if (HasCoordinates)
+            {
+                var latitude = Latitude!.Value.ToString("0.######", CultureInfo.InvariantCulture);
+                var longitude = Longitude!.Value.ToString("0.######", CultureInfo.InvariantCulture);
+                var title = Uri.EscapeDataString(Name.Replace('_', ' '));
+                return $"https://www.bing.com/maps?cp={latitude}~{longitude}&lvl=17&sp=point.{latitude}_{longitude}_{title}";
+            }
+
+            if (AddressIsWebLink)
+            {
+                return Address!.Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(Address)
+                ? null
+                : $"https://www.bing.com/maps?q={Uri.EscapeDataString(Address.Trim())}";
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !HasCoordinates)
+        {
+            return;
+        }
+
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/tripMap.js");
+        var point = new
+        {
+            title = Name,
+            location = AddressIsWebLink ? null : Address,
+            latitude = Latitude,
+            longitude = Longitude
+        };
+        _mapHandle = await _module.InvokeAsync<string>("init", _mapElement, new[] { point }, null, new { singlePointZoom = 16 });
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null && _mapHandle is not null)
+            {
+                await _module.InvokeVoidAsync("dispose", _mapHandle);
+            }
+            if (_module is not null)
+            {
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}

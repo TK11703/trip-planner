@@ -73,7 +73,7 @@ function buildPopup(point, dotNetRef) {
     return container;
 }
 
-export async function init(element, points, dotNetRef) {
+export async function init(element, points, dotNetRef, options) {
     await ensureLeaflet();
     const L = window.L;
     configureDefaultIcon(L);
@@ -90,7 +90,7 @@ export async function init(element, points, dotNetRef) {
 
     if (markers.length === 1) {
         // A single point can't form a bounds; center on it at a reasonable zoom.
-        map.setView(markers[0].getLatLng(), 13);
+        map.setView(markers[0].getLatLng(), options?.singlePointZoom ?? 13);
     } else if (markers.length > 1) {
         map.fitBounds(L.featureGroup(markers).getBounds(), { padding: [40, 40] });
     } else {

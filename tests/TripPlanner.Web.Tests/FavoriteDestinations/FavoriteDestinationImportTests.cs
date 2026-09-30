@@ -70,14 +70,29 @@ public sealed class FavoriteDestinationImportTests : BunitContext
         var options = cut.Find("[data-testid='favorite-import-ambiguity-2']");
         Assert.Contains("66 Mint St, San Francisco, CA 94103", options.TextContent);
         Assert.Contains("300 Webster St, Oakland, CA 94607", options.TextContent);
-        var links = options.QuerySelectorAll("a").Select(link => link.GetAttribute("href") ?? string.Empty).ToArray();
-        Assert.Equal(
-            ["https://www.bing.com/maps?cp=37.8~-122.27&lvl=17&sp=point.37.8_-122.27_Blue%20Bottle%20Coffee",
-             "https://www.bing.com/maps?cp=37.78~-122.41&lvl=17&sp=point.37.78_-122.41_Blue%20Bottle%20Coffee"],
-            links);
+        Assert.Empty(options.QuerySelectorAll("a"));
         Assert.True(cut.Find("#favorite-import-finish").HasAttribute("disabled"));
 
-        cut.Find("#favorite-import-2-1").Change(true);
+        cut.Find("[data-testid='favorite-import-map-2-1']").Click();
+        var mapModal = cut.Find("[data-testid='favorite-place-map']");
+        Assert.Contains("66 Mint St, San Francisco, CA 94103", mapModal.TextContent);
+        Assert.Single(cut.FindAll(".tp-map-canvas"));
+        var openExternally = cut.Find("#favorite-place-map-open");
+        Assert.Equal("https://www.bing.com/maps?cp=37.78~-122.41&lvl=17&sp=point.37.78_-122.41_Blue%20Bottle%20Coffee", openExternally.GetAttribute("href"));
+        Assert.Equal("_blank", openExternally.GetAttribute("target"));
+        Assert.Contains("noopener", openExternally.GetAttribute("rel"));
+        cut.Find("#favorite-place-map-close").Click();
+        Assert.Empty(cut.FindAll("[data-testid='favorite-place-map']"));
+
+        cut.Find("[data-testid='favorite-import-map-2-1']").Click();
+        Assert.Equal("Select location", cut.Find("#favorite-place-map-select").TextContent.Trim());
+        cut.Find("#favorite-place-map-select").Click();
+        Assert.Empty(cut.FindAll("[data-testid='favorite-place-map']"));
+        Assert.True(cut.Find("#favorite-import-2-1").HasAttribute("checked"));
+        cut.Find("[data-testid='favorite-import-map-2-1']").Click();
+        Assert.True(cut.Find("#favorite-place-map-select").HasAttribute("disabled"));
+        cut.Find("#favorite-place-map-close-x").Click();
+
         cut.Find("#favorite-import-finish").Click();
 
         cut.WaitForAssertion(() => Assert.Contains("2 destinations imported", cut.Markup));
