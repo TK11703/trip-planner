@@ -95,12 +95,6 @@
     "azureMapsResourceId": {
       "value": "${AZURE_MAPS_RESOURCE_ID}"
     },
-    "budgetAmount": {
-      "value": "${AZURE_BUDGET_AMOUNT}"
-    },
-    "budgetContact": {
-      "value": "${AZURE_BUDGET_CONTACT}"
-    },
     "emailRelayEnabled": {
       "value": "${EMAIL_RELAY_ENABLED=false}"
     },

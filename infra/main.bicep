@@ -108,12 +108,6 @@ param emailRelayFolderPath string = 'Inbox'
 @description('Mail folder the relay moves a message to once the API accepts it. Must already exist in the mailbox.')
 param emailRelayProcessedFolderPath string = 'Processed'
 
-@description('Monthly cost threshold in subscription currency. Blank disables the budget alert.')
-param budgetAmount string = ''
-
-@description('Email address notified when the budget threshold is crossed.')
-param budgetContact string = ''
-
 var tags = {
   'azd-env-name': environmentName
   workload: 'trip-planner'
@@ -296,16 +290,6 @@ module emailRelay 'email-relay.bicep' = {
     mailFolderPath: emailRelayFolderPath
     processedFolderPath: emailRelayProcessedFolderPath
     enabled: emailRelayOn
-  }
-}
-
-// Skipped until the budget inputs are supplied.
-module budget 'budget.bicep' = if (!empty(budgetAmount) && !empty(budgetContact)) {
-  name: 'budget'
-  params: {
-    environmentName: environmentName
-    amount: int(budgetAmount)
-    contactEmail: budgetContact
   }
 }
 

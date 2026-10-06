@@ -168,8 +168,6 @@ jobs:
       # An unset variable arrives as "", which azd's `=default` keeps and Bicep rejects as an int.
       TRIP_CHAT_EMBEDDING_DIMENSIONS: ${{ vars.TRIP_CHAT_EMBEDDING_DIMENSIONS || '1536' }}
       TRIP_CHAT_RESOURCE_ID: ${{ vars.TRIP_CHAT_RESOURCE_ID }}
-      AZURE_BUDGET_AMOUNT: ${{ vars.AZURE_BUDGET_AMOUNT }}
-      AZURE_BUDGET_CONTACT: ${{ vars.AZURE_BUDGET_CONTACT }}
     steps:
       - uses: actions/checkout@v7
 
@@ -249,8 +247,6 @@ jobs:
       TRIP_CHAT_EMBEDDING_DEPLOYMENT_NAME: ${{ vars.TRIP_CHAT_EMBEDDING_DEPLOYMENT_NAME }}
       TRIP_CHAT_EMBEDDING_DIMENSIONS: ${{ vars.TRIP_CHAT_EMBEDDING_DIMENSIONS || '1536' }}
       TRIP_CHAT_RESOURCE_ID: ${{ vars.TRIP_CHAT_RESOURCE_ID }}
-      AZURE_BUDGET_AMOUNT: ${{ vars.AZURE_BUDGET_AMOUNT }}
-      AZURE_BUDGET_CONTACT: ${{ vars.AZURE_BUDGET_CONTACT }}
     steps:
       - uses: actions/checkout@v7
 

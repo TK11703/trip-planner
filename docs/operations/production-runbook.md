@@ -722,8 +722,6 @@ the running production server is not at risk during a restore.
 - **Health endpoints** — `/alive` (liveness) and `/health` (readiness). Both return
   `{"status":"..."}` with `Cache-Control: no-store` and deliberately leak no dependency
   names.
-- **Budget** — monthly alert-only budget at 80% actual and 100% forecast, notified to
-  `AZURE_BUDGET_CONTACT`. It alerts; it never blocks provisioning.
 
 ---
 
@@ -816,6 +814,5 @@ verification categories assert, so a passing release has already answered them.
   storage is free up to 100% of provisioned storage.
 - Container registry is Basic (~$5.08/mo); Log Analytics retention is the 30-day minimum
   with a daily ingestion cap, and the first 5 GB/month is free.
-- Expect roughly **$24/month** total. The budget alert is the backstop, not the control;
-  the things most likely to break the estimate are a forgotten restored server (§4.2 step 6)
+- Expect roughly **$24/month** total. The things most likely to break the estimate are a forgotten restored server (§4.2 step 6)
   and Azure OpenAI token consumption, which is billed separately and is not capped here.
