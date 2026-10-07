@@ -7,15 +7,26 @@ architectural rationale.
 
 **Naming.** `web` and `api` are the azd service names. The deployed container apps are
 named `ca-web-<env>` and `ca-api-<env>`. Their images live in the **shared** container
-registry `acracccommon` (resource group `rg-common`), which other applications also push
+registry `acccrshared` (resource group `rg-platform`), which other applications also push
 to, so this project's repositories are prefixed: `trip-planner-web` and `trip-planner-api`.
 Where this runbook says "the `api` app" it means the `ca-api-<env>` resource; use the
 prefixed name in any `az containerapp` command.
 
-**Shared registry.** Bicep references the registry as an existing resource and never
-creates, modifies, or deletes it. Override it with the `AZURE_CONTAINER_REGISTRY_NAME` and
-`AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP` repository variables (defaults `acracccommon` /
-`rg-common`); it must be in the same subscription. Never delete repositories or tags that
+**Topology.** The app runs on shared infrastructure in two resource groups (North Central US):
+
+| Resource group | Shared (platform-owned, referenced only) | Owned by this deployment |
+| --- | --- | --- |
+| `rg-apps` (`AZURE_RESOURCE_GROUP`) | Container Apps environment `cae-shared` (with its Aspire dashboard), Log Analytics `law-shared` | `ca-web-<env>`, `ca-api-<env>`, email-relay Logic App and Outlook connection, identities `id-<env>-web` / `-api` / `-relay` |
+| `rg-platform` (`AZURE_PLATFORM_RESOURCE_GROUP`) | Registry `acccrshared`, PostgreSQL `accpsqlshared`, Foundry `aif-shared-acc`, Azure Maps `am-shared` (East US) | Key Vault and storage account (tagged `azd-env-name=<env>`), the `tripplanner` database, and `id-shared-acrpull` |
+
+`infra/main.bicep` deploys into `rg-apps` and reaches `rg-platform` through cross-group
+modules. Shared resources are declared `existing` and are never created, modified, or
+deleted by a provision; changes to them (server parameters, firewall, model deployments,
+the Aspire dashboard) are platform work done with the Azure CLI.
+
+**Shared registry.** Override it with the `AZURE_CONTAINER_REGISTRY_NAME` and
+`AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP` repository variables (defaults `acccrshared` /
+`rg-platform`); it must be in the same subscription. Never delete repositories or tags that
 are not prefixed `trip-planner-` — they belong to other applications.
 
 ---
@@ -254,8 +265,8 @@ success, so a directory gap cannot fail an otherwise healthy infrastructure depl
 > **The caller needs directory permissions, not just Azure RBAC.** Exposing the role requires
 > `Application.ReadWrite.All` and assigning it requires `AppRoleAssignment.ReadWrite.All`;
 > the **Cloud Application Administrator** role covers both. Subscription Owner does not — this
-> is a tenant operation. If the CI service principal lacks these, the hook warns and the
-> relay stays unauthorized until an administrator runs the script.
+> is a tenant operation. The CI service principal does not hold these, so the hook only warns
+> in CI: whenever the relay identity is (re)created, an administrator must run the script.
 
 The workflow already requests its token for `api://<AZURE_ENTRA_API_CLIENT_ID>`. Because the
 registration sets `requestedAccessTokenVersion: 2`, the issued `aud` is the bare client id,
@@ -271,7 +282,7 @@ which is what `AzureEntra__Audience` validates.
 #### Step 2 — authorize the Outlook.com connection
 
 The connection is provisioned unauthorized; OAuth consent cannot be scripted. Open
-**Resource group → `con-<environment-name>-outlook` → Edit API connection**, sign in as
+**`rg-apps` → `con-<environment-name>-outlook` → Edit API connection**, sign in as
 the mailbox owner, and save. Until this is done every run fails at the trigger.
 
 The mailbox is whichever account authorizes the connection — it is not a Bicep parameter.
@@ -333,9 +344,9 @@ never from the relay's own identity.
 ### 2.0 One-time database bootstrap
 
 **Do this once, after the first `azd provision`, before the first `deploy`.** The API
-authenticates to PostgreSQL with its managed identity and carries no password. Bicep can
-create the *server* and nominate an Entra administrator, but it cannot create a *database
-role* — that is data-plane work. Until you run this, the API will fail every connection
+authenticates to PostgreSQL with its managed identity and carries no password. The server
+is the platform's; Bicep creates only the `tripplanner` *database* on it, and cannot create
+a *database role* — that is data-plane work. Until you run this, the API will fail every connection
 with `password authentication failed for user "id-trip-planner-api"`, and the symptom looks
 like a networking or secret problem rather than a missing role.
 
@@ -350,15 +361,12 @@ like a networking or secret problem rather than a missing role.
    ```
 
 2. Connect **as an Entra administrator of the server**. Ordinary admin-password logins
-   cannot create Entra-backed roles.
-
-   When the deployment runs in CI, `deployerPrincipalId` is the GitHub OIDC *service
-   principal* — nobody can interactively sign in as it, so it cannot be used here. Add
-   yourself as a second administrator first:
+   cannot create Entra-backed roles. The deployment does not nominate any administrator on
+   the shared server, so if you are not one, have a platform owner add you:
 
    ```powershell
    $me = az ad signed-in-user show --query id -o tsv
-   az postgres flexible-server microsoft-entra-admin create -g rg-trip-planner -s <server-name> `
+   az postgres flexible-server microsoft-entra-admin create -g rg-platform -s accpsqlshared `
      --object-id $me --display-name (az ad signed-in-user show --query userPrincipalName -o tsv) --type User
    ```
 
@@ -370,7 +378,7 @@ like a networking or secret problem rather than a missing role.
    truncated form. Read the stored value rather than assuming it:
 
    ```powershell
-   az postgres flexible-server microsoft-entra-admin list -g rg-trip-planner -s <server-name> `
+   az postgres flexible-server microsoft-entra-admin list -g rg-platform -s accpsqlshared `
      --query "[].principalName" -o tsv
 
    $env:PGPASSWORD = az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv
@@ -400,9 +408,9 @@ like a networking or secret problem rather than a missing role.
    `CREATE EXTENSION IF NOT EXISTS "pgcrypto"` and `017_trip_search_documents.sql` declares
    `CREATE EXTENSION IF NOT EXISTS vector`, but the API role holds no `CREATE` privilege
    on the database, so it cannot create either itself. Creating them here turns those
-   statements into no-ops. (`infra/postgres.bicep` sets the `azure.extensions` server
-   parameter to `pgcrypto,vector`, without which Flexible Server rejects the statement for
-   *any* caller.)
+   statements into no-ops. (The server-wide `azure.extensions` parameter must list
+   `pgcrypto,vector`, without which Flexible Server rejects the statement for *any* caller.
+   It is platform-owned; see *Existing servers* below.)
 
    ```sql
    CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -434,6 +442,16 @@ This survives server restarts and redeployments. Repeat it only if the server is
 restored to a new server, since a restored copy carries the roles of the source — but a
 *rebuilt* server carries none.
 
+#### Moving the database to another server
+
+[`scripts/migrate-postgres-data.ps1`](../../scripts/migrate-postgres-data.ps1) copies
+`tripplanner` between servers (it was used to move from the retired per-app server to
+`accpsqlshared`). Bootstrap the target first (steps 1–6, with the target's API identity),
+then run it; it is re-runnable and verifies per-table row counts. Scale `ca-api-<env>` to
+zero for the final copy so nothing writes during it. It uses a `postgres:16` container, so
+only Docker is needed locally, and grants your Entra admin membership in the API role on
+both servers — required to read and restore objects that role owns.
+
 #### Existing servers: enable pgvector before the trip chat release
 
 A server bootstrapped before trip chat has only `pgcrypto`. The release pipeline provisions
@@ -441,12 +459,14 @@ infrastructure and rolls out the new API in one `azd provision`, so there is no 
 create the extension between the two — do it **before** merging the release. Otherwise the
 new API fails migration `017_trip_search_documents.sql` and never becomes ready.
 
-1. Allow-list `vector`. The value matches `infra/postgres.bicep`, so the next provision is
-   a no-op for this parameter. It is dynamic; no restart is needed:
+1. Allow-list `vector`. This parameter is server-wide on a shared server, so **append** to
+   the current value rather than replacing it, and coordinate with the platform owner. It is
+   dynamic; no restart is needed:
 
    ```powershell
-   az postgres flexible-server parameter set -g rg-trip-planner -s <server-name> `
-     --name azure.extensions --value pgcrypto,vector
+   az postgres flexible-server parameter show -g rg-platform -s accpsqlshared --name azure.extensions --query value -o tsv
+   az postgres flexible-server parameter set -g rg-platform -s accpsqlshared `
+     --name azure.extensions --value <current-values>,pgcrypto,vector
    ```
 
 2. Connect to `tripplanner` as an Entra administrator (step 2 above) and create it:
@@ -538,7 +558,7 @@ at the existing images.
 1. Identify the last known-good commit SHA — the most recent run whose
    `verification-<sha>` artifact reports `overallStatus: pass`.
 2. Confirm the images still exist:
-   `az acr repository show-tags -n acracccommon --repository trip-planner-web` (and `trip-planner-api`).
+   `az acr repository show-tags -n acccrshared --repository trip-planner-web` (and `trip-planner-api`).
 3. Run the workflow with `rollback_sha` set to that SHA and approve the `production` gate.
 4. Confirm the post-deployment verification gate passes on the rolled-back release.
 5. If verification fails on `readiness`, the schema and the code
@@ -601,17 +621,12 @@ az containerapp revision restart -n ca-web-<environment-name> -g <resource-group
 
 - **The web app's Entra credential is not in this list.** It is a federated managed
   identity (§1.2), which has no expiry and nothing to rotate.
-- **`postgres-password`** — the Flexible Server administrator login, used for schema
-  bootstrap and break-glass only. Change it on the server first, then write the new value
-  to Key Vault. No app restart is needed, because nothing reads it at runtime:
-
-  ```bash
-  az postgres flexible-server update -g <rg> -n <server> --admin-password '<new>'
-  ```
-
-  Then rotate `postgres-password` in Key Vault and update the `POSTGRES_PASSWORD` GitHub
-  secret in the same change, otherwise the next `azd provision` resets the server back to
-  the old password.
+- **`postgres-password`** — the administrator login of the **shared** `accpsqlshared`
+  server, stored for break-glass only. The platform owns the password; when it changes on
+  the server, write the new value to Key Vault and update the `POSTGRES_PASSWORD` GitHub
+  secret in the same change. No app restart is needed, because nothing reads it at runtime,
+  and a provision never changes the server — it only rewrites the Key Vault secret, so a
+  stale GitHub secret puts an outdated value back in the vault.
 
 ---
 
@@ -619,9 +634,10 @@ az containerapp revision restart -n ca-web-<environment-name> -g <resource-group
 
 ### 4.1 What exists
 
-- PostgreSQL is an **Azure Database for PostgreSQL Flexible Server** (Burstable `Standard_B1ms`,
-  32 GB storage, PG 16). It is a platform service, not a container app, so nothing in the
-  Container Apps environment holds database state.
+- PostgreSQL is the **shared** Azure Database for PostgreSQL Flexible Server `accpsqlshared`
+  in `rg-platform` (Burstable `Standard_B1ms`, PG 16); this app owns only the `tripplanner`
+  database on it. Backup retention, geo-redundancy, and restores are server-level, so they
+  are platform decisions that affect every database on the server.
 - Backups are continuous. The platform takes a daily full backup plus transaction-log
   backups, giving **point-in-time restore to any second within the last 7 days**. There is
   no job to trigger, monitor, or fail.
@@ -632,7 +648,9 @@ az containerapp revision restart -n ca-web-<environment-name> -g <resource-group
 ### 4.2 Restore procedure
 
 Point-in-time restore always creates a **new server**. It never overwrites the source, so
-the running production server is not at risk during a restore.
+the running production server is not at risk during a restore. The restored server holds
+**every** database on `accpsqlshared`, not just `tripplanner`; use it as a source to copy
+from rather than repointing other apps at it.
 
 1. Confirm the window actually covers the moment you want:
 
@@ -688,8 +706,10 @@ the running production server is not at risk during a restore.
    `api` app first so nothing writes during the swap. **Recreate the
    `AllowAllAzureServicesAndResourcesWithinAzureIps` rule on the restored server** — without
    it the Container Apps environment cannot reach the database, and this topology has no
-   VNet to fall back on. Then repoint `AZURE_POSTGRES_FQDN` / the `tripplanner` connection
-   string at the restored server, restart `api`, and run `scripts/deployment-verify.ps1`
+   VNet to fall back on. Then either copy `tripplanner` back onto `accpsqlshared` with
+   `scripts/migrate-postgres-data.ps1 -SourceServer <restored> -SourceResourceGroup rg-platform`,
+   or set `AZURE_POSTGRES_SERVER_NAME` to the restored server and re-provision. Restart `api`,
+   and run `scripts/deployment-verify.ps1`
    before declaring the incident closed.
 6. **Delete the restored server once the incident is closed.** It bills at the same rate as
    production and is the most likely source of a surprise invoice after an incident.
@@ -701,35 +721,41 @@ the running production server is not at risk during a restore.
 - **RTO** — bounded by how long Azure takes to stand up the restored server, typically tens
   of minutes, plus verification. Slower than restoring a dump for a dataset this small, but
   it needs no operator-maintained tooling.
-- **Last rehearsed** — 2026-09-18. Restore of `psql-trip-planner-ggg3cumf6h2cs` to a
+- **Last rehearsed** — 2026-09-18, against the retired per-app server
+  `psql-trip-planner-ggg3cumf6h2cs`: restore to a
   throwaway server took **8.1 minutes**; the ledger came back intact through
   `014_trip_leg_modes.sql`. Entra admins and the `azure.extensions` allow-list were
   inherited; firewall rules were not, which is why step 3 and step 5 now call that out.
-  Rehearse again after any change to the server's authentication or networking.
+  Not yet rehearsed on `accpsqlshared`; rehearse again after any change to the server's
+  authentication or networking.
 - **Retention** — 7 days. Damage discovered on day 8 is unrecoverable. If that is too tight,
-  raise `backupRetentionDays` in [`infra/postgres.bicep`](../../infra/postgres.bicep) (max 35);
+  ask the platform owner to raise it on the server
+  (`az postgres flexible-server update --backup-retention <days>`, max 35);
   retention beyond provisioned storage is billed at $0.095/GB-month.
 
 ### 4.4 What this does not cover
 
-- **Region loss.** Geo-redundant backup is disabled, so an eastus2 outage means waiting for
-  the region. Enabling it must be done **at server creation** — it cannot be turned on later
-  without rebuilding the server — and roughly doubles backup storage cost.
-- **Accidental server deletion.** Deleting the server deletes its backups. The readiness
-  script's `infrastructure-preview` check blocks a template change that would delete the
-  server, which is the main defence.
+- **Region loss.** Geo-redundant backup is disabled, so a North Central US outage means
+  waiting for the region. Enabling it must be done **at server creation** — it cannot be
+  turned on later without rebuilding the server — and roughly doubles backup storage cost.
+- **Accidental server deletion.** Deleting the server deletes its backups. The server is no
+  longer in this app's template, so a provision cannot delete it; protecting it (for
+  example with a `CanNotDelete` lock) is the platform owner's responsibility.
 
 ---
 
 ## 5. Monitoring
 
-- **Aspire dashboard** — managed dashboard on the Container Apps environment; the entry
+- **Aspire dashboard** — managed dashboard on the shared `cae-shared` environment (added
+  once via the CLI, not by this deployment); the entry
   point is in the Azure portal under the environment's *Monitoring* section. Web and API
   export OTLP over gRPC to the environment-internal endpoint, so telemetry never leaves
-  the managed environment. Every trace, metric, and log carries `service.version` and
+  the managed environment — but other apps in the environment share the same dashboard.
+  Every trace, metric, and log carries `service.version` and
   `trip_planner.release_id` set to the deployed commit SHA, which is what makes "did this
   start with the last release?" answerable from the dashboard alone.
-- **Log Analytics** — `law-<environmentName>`, 30-day retention.
+- **Log Analytics** — the shared `law-shared` workspace in `rg-apps`; filter on the
+  `ca-*-<env>` container app names.
 - **Health endpoints** — `/alive` (liveness) and `/health` (readiness). Both return
   `{"status":"..."}` with `Cache-Control: no-store` and deliberately leak no dependency
   names.
@@ -743,23 +769,28 @@ a storage key, a registry password, or a Key Vault access policy.
 
 | Identity | Used by | Roles |
 | --- | --- | --- |
-| `id-<env>-acrpull` | image pulls for both container apps | AcrPull on the shared registry (`acracccommon` in `rg-common`) |
-| `id-<env>-web` | `ca-web-<env>` container app | Key Vault Secrets User, Key Vault Crypto User, Storage Blob Data Contributor |
-| `id-<env>-api` | `ca-api-<env>` container app | Key Vault Secrets User, Cognitive Services OpenAI User (email parsing and trip chat accounts), plus a PostgreSQL role of the same name (§2.0) |
+| `id-shared-acrpull` (`rg-platform`) | image pulls for every container app on the shared environment | AcrPull on `acccrshared` only |
+| `id-<env>-web` (`rg-apps`) | `ca-web-<env>` container app | Key Vault Secrets User, Key Vault Crypto User, Storage Blob Data Contributor; federated onto the web app registration (§1.2) |
+| `id-<env>-api` (`rg-apps`) | `ca-api-<env>` container app | Key Vault Secrets User, Cognitive Services OpenAI User (email parsing and trip chat accounts), Azure Maps Data Reader, Graph `User.ReadBasic.All` (§1.4), plus a PostgreSQL role of the same name (§2.0) |
+
+The app identities are user-assigned so their object ids — and therefore their role
+assignments, federated credential, Graph grant, and PostgreSQL role — survive container
+app replacement. Deleting and recreating one changes its object id and requires redoing
+§1.2, §1.4, §1.6 step 1, and §2.0.
 
 ### Symptoms and corrections
 
 | Symptom | Cause | Correction |
 | --- | --- | --- |
-| Revision fails with `ImagePullBackOff` / registry 401 | acrPull identity missing or not attached | Re-run `azd provision`; `infra/rbac-acr.bicep` re-asserts the assignment on the shared registry in `rg-common`. Confirm the app's `registries[].identity` names the acrPull identity. If provisioning fails on that assignment, the deploying principal lacks role-assignment rights on `rg-common`. |
+| Revision fails with `ImagePullBackOff` / registry 401 | Pull identity missing, not attached, or lacking AcrPull | Re-run `azd provision`; `infra/acr-pull.bicep` re-asserts `id-shared-acrpull` and its assignment on `acccrshared` in `rg-platform`. Confirm the app's `registries[].identity` names that identity. |
 | App starts then fails readiness with a secret resolution error | Workload identity lacks **Key Vault Secrets User** | Re-run `azd provision`. Role propagation can lag; restart the revision after a minute. |
 | `web` loses sessions on every restart | Data Protection key ring unreachable — identity lacks **Storage Blob Data Contributor** or the Key Vault key is disabled | Verify the role on the `dataprotection` container and that the Key Vault key is enabled, then restart `web`. |
 | Email ingestion fails with a 403 from Azure OpenAI | API identity lacks the inference role on the OpenAI account | The OpenAI account is often in another resource group; confirm `AZURE_OPENAI_RESOURCE_ID` is set so `infra/rbac-openai.bicep` can scope the assignment. |
 | `api` fails every database call with `password authentication failed for user "id-<env>-api"` | The PostgreSQL role for the API's managed identity was never created | Run the one-time bootstrap in §2.0. This is not a networking or secret problem, and re-provisioning will not fix it — Bicep cannot create database roles. |
 | `api` connects but migrations fail with `permission denied for schema public` | The API role exists but lacks `CREATE` on `public` | Re-apply the grants in §2.0 as the Entra administrator. |
-| `api` crashes on `000_init.sql` with `extension "pgcrypto" is not allow-listed` | The `azure.extensions` server parameter does not list `pgcrypto` | Re-run `azd provision` — `infra/postgres.bicep` sets it. The parameter is dynamic, so no restart is needed. |
+| `api` crashes on `000_init.sql` with `extension "pgcrypto" is not allow-listed` | The `azure.extensions` server parameter does not list `pgcrypto` | Have the platform owner append it (§2.0 *Existing servers*, step 1). Provisioning does not manage this shared parameter. It is dynamic, so no restart is needed. |
 | `api` crashes on `000_init.sql` with `permission denied to create extension "pgcrypto"` | The extension is allow-listed but not yet created, and the API role has no `CREATE` on the database | Create it once as the Entra administrator (§2.0 step 4); `CREATE EXTENSION IF NOT EXISTS` then becomes a no-op. |
-| `api` crashes on `017_trip_search_documents.sql` with `extension "vector" is not allow-listed` | `azure.extensions` still lists only `pgcrypto` | Allow-list it as in §2.0 *Existing servers*, or re-run `azd provision`. |
+| `api` crashes on `017_trip_search_documents.sql` with `extension "vector" is not allow-listed` | `azure.extensions` does not list `vector` | Allow-list it as in §2.0 *Existing servers*. |
 | `api` crashes on `017_trip_search_documents.sql` with `Because vector isn't a trusted extension, only members of "azure_pg_admin" are allowed to use CREATE EXTENSION vector` | `vector` was never created in `tripplanner`. Azure checks this even for `CREATE EXTENSION IF NOT EXISTS`, which is why `017` only issues the statement when the extension is missing | Create it as the Entra administrator (§2.0 *Existing servers*, step 2), then restart the failed revision. |
 | Entra admin login fails with `password authentication failed for user "<you>"` | Supplied the email or full UPN instead of the stored (truncated) role name, or a password instead of an access token | Read the stored name with `microsoft-entra-admin list` and use `az account get-access-token --resource-type oss-rdbms` as the password (§2.0 step 2). |
 | Trip chat always answers *temporarily unavailable* | `TRIP_CHAT_*` repository variables are unset, so chat is disabled | Set them (§2.2) and redeploy. |
@@ -820,11 +851,12 @@ verification categories assert, so a passing release has already answered them.
   penalty covered by the startup probe's wide failure window. With no always-on container,
   their combined monthly consumption sits inside the Container Apps free grant, so app
   compute is effectively $0 at this traffic level.
-- **PostgreSQL Flexible Server is the only always-on cost** — `Standard_B1ms` at ~$12.41/mo
-  plus 32 GB storage at ~$3.68/mo (eastus2 retail, verified at time of writing). Backup
-  storage is free up to 100% of provisioned storage.
-- Container registry is the shared `acracccommon`, so it adds no cost attributable to this
-  project; Log Analytics retention is the 30-day minimum
-  with a daily ingestion cap, and the first 5 GB/month is free.
-- Expect roughly **$24/month** total. The things most likely to break the estimate are a forgotten restored server (§4.2 step 6)
-  and Azure OpenAI token consumption, which is billed separately and is not capped here.
+- **PostgreSQL is shared.** `accpsqlshared` (`Standard_B1ms` plus storage, ~$16/mo) is the
+  only always-on cost, and it is split across every app on the server rather than carried
+  by this one. Backup storage is free up to 100% of provisioned storage.
+- The container registry (`acccrshared`), Container Apps environment, Log Analytics
+  workspace, Foundry account, and Azure Maps account are all shared platform resources,
+  so they add no fixed cost attributable to this project. This app's own fixed footprint is
+  a Key Vault and a storage account, both effectively free at this volume.
+- Expect a few dollars a month attributable to the app, plus its share of the server. The things most likely to break the estimate are a forgotten restored server (§4.2 step 6)
+  and Azure OpenAI token consumption on `aif-shared-acc`, which is billed separately and is not capped here.
