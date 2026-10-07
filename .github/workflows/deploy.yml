@@ -31,11 +31,13 @@ concurrency:
 
 env:
   DOTNET_VERSION: '10.0.x'
-  # The Bicep deployment is resource-group scoped, so every job resolves the same group.
-  AZURE_RESOURCE_GROUP: rg-${{ vars.AZURE_ENV_NAME }}
-  # Images live in a shared registry outside the project resource group.
-  AZURE_CONTAINER_REGISTRY_NAME: ${{ vars.AZURE_CONTAINER_REGISTRY_NAME || 'acracccommon' }}
-  AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP: ${{ vars.AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP || 'rg-common' }}
+  # The Bicep deployment is scoped to the shared apps group; app-owned platform resources
+  # (Key Vault, storage, database, image-pull identity) land in the platform group.
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-apps' }}
+  AZURE_PLATFORM_RESOURCE_GROUP: ${{ vars.AZURE_PLATFORM_RESOURCE_GROUP || 'rg-platform' }}
+  # Images live in the shared platform registry.
+  AZURE_CONTAINER_REGISTRY_NAME: ${{ vars.AZURE_CONTAINER_REGISTRY_NAME || 'acccrshared' }}
+  AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP: ${{ vars.AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP || 'rg-platform' }}
 
 jobs:
   build-test:
@@ -94,15 +96,19 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Ensure resource group
+      - name: Verify resource groups
         run: |
-          # This job runs before the readiness gate validates configuration, so an unset
-          # variable would otherwise reach the CLI as the bare prefix `rg-`.
+          # The shared groups are platform-owned; this pipeline never creates them.
           if [ -z "${{ vars.AZURE_ENV_NAME }}" ]; then
             echo "::error::Repository variable AZURE_ENV_NAME is not set."
             exit 1
           fi
-          az group create -n "${{ env.AZURE_RESOURCE_GROUP }}" -l "${{ vars.AZURE_LOCATION }}" --only-show-errors
+          for rg in "${{ env.AZURE_RESOURCE_GROUP }}" "${{ env.AZURE_PLATFORM_RESOURCE_GROUP }}"; do
+            if [ "$(az group exists -n "$rg")" != "true" ]; then
+              echo "::error::Resource group '$rg' does not exist."
+              exit 1
+            fi
+          done
 
       - name: Resolve registry
         # The images must exist before `azd provision` can point the container apps at them,
@@ -148,10 +154,6 @@ jobs:
       AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_PRINCIPAL_ID: ${{ secrets.AZURE_DEPLOYER_PRINCIPAL_ID }}
-      # Recorded as the PostgreSQL Entra administrator. CI federates as an app registration,
-      # so this must match the service principal's display name exactly.
-      AZURE_PRINCIPAL_NAME: ${{ vars.AZURE_DEPLOYER_PRINCIPAL_NAME }}
-      AZURE_PRINCIPAL_TYPE: ServicePrincipal
       AZURE_ENTRA_WEB_CLIENT_ID: ${{ secrets.AZURE_ENTRA_WEB_CLIENT_ID }}
       AZURE_ENTRA_API_CLIENT_ID: ${{ secrets.AZURE_ENTRA_API_CLIENT_ID }}
       AZURE_ENTRA_DOMAIN: ${{ vars.AZURE_ENTRA_DOMAIN }}
@@ -230,8 +232,6 @@ jobs:
       AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_PRINCIPAL_ID: ${{ secrets.AZURE_DEPLOYER_PRINCIPAL_ID }}
-      AZURE_PRINCIPAL_NAME: ${{ vars.AZURE_DEPLOYER_PRINCIPAL_NAME }}
-      AZURE_PRINCIPAL_TYPE: ServicePrincipal
       AZURE_ENTRA_WEB_CLIENT_ID: ${{ secrets.AZURE_ENTRA_WEB_CLIENT_ID }}
       AZURE_ENTRA_API_CLIENT_ID: ${{ secrets.AZURE_ENTRA_API_CLIENT_ID }}
       AZURE_ENTRA_DOMAIN: ${{ vars.AZURE_ENTRA_DOMAIN }}

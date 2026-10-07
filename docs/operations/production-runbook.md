@@ -339,11 +339,13 @@ role* — that is data-plane work. Until you run this, the API will fail every c
 with `password authentication failed for user "id-trip-planner-api"`, and the symptom looks
 like a networking or secret problem rather than a missing role.
 
-1. Collect the two values the statements need:
+1. Collect the two values the statements need. The server is the shared `accpsqlshared` in
+   `rg-platform`; the API identity lives in `rg-apps`. The server-wide `azure.extensions`
+   allow-list (`pgcrypto,vector`) is platform-owned and not set by this deployment.
 
    ```powershell
-   $server = az postgres flexible-server list -g rg-trip-planner --query '[0].fullyQualifiedDomainName' -o tsv
-   $apiOid = az identity show -g rg-trip-planner -n id-trip-planner-api --query principalId -o tsv
+   $server = az postgres flexible-server show -g rg-platform -n accpsqlshared --query fullyQualifiedDomainName -o tsv
+   $apiOid = az identity show -g rg-apps -n id-trip-planner-api --query principalId -o tsv
    $apiName = 'id-trip-planner-api'
    ```
 

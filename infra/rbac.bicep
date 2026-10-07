@@ -1,11 +1,6 @@
 // Least-privilege role assignments, each scoped to the single resource the identity needs.
-// No identity receives a subscription-level Owner or Contributor role.
-@description('Container registry name that the pull identity may read from.')
-param registryName string
-
-@description('Resource group holding the (shared) container registry.')
-param registryResourceGroup string = resourceGroup().name
-
+// No identity receives a subscription-level Owner or Contributor role. Deployed into the
+// resource group holding the Key Vault and storage account; image pull is in acr-pull.bicep.
 @description('Key Vault name holding runtime secrets and the data-protection key.')
 param keyVaultName string
 
@@ -24,14 +19,9 @@ param tripChatResourceId string = ''
 @description('Resource id of the Azure Maps account. Empty = skip the search role assignment.')
 param azureMapsResourceId string = ''
 
-param acrPullPrincipalId string
 param webPrincipalId string
 param apiPrincipalId string
 
-var acrPullRoleId = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-)
 var keyVaultSecretsUserRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '4633458b-17de-408a-b874-0445c86b69e6'
@@ -73,18 +63,6 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01'
 resource dataProtectionContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' existing = {
   parent: blobService
   name: dataProtectionContainerName
-}
-
-// --- Image pull -------------------------------------------------------------
-
-module acrPullAssignment 'rbac-acr.bicep' = {
-  name: 'rbac-acr-pull'
-  scope: resourceGroup(registryResourceGroup)
-  params: {
-    registryName: registryName
-    principalId: acrPullPrincipalId
-    roleDefinitionId: acrPullRoleId
-  }
 }
 
 // --- Web runtime ------------------------------------------------------------

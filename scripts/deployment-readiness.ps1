@@ -37,9 +37,15 @@ param(
 
     [string] $ResourceGroup = $env:AZURE_RESOURCE_GROUP,
 
-    [string] $RegistryName = $(if ($env:AZURE_CONTAINER_REGISTRY_NAME) { $env:AZURE_CONTAINER_REGISTRY_NAME } else { 'acracccommon' }),
+    [string] $PlatformResourceGroup = $(if ($env:AZURE_PLATFORM_RESOURCE_GROUP) { $env:AZURE_PLATFORM_RESOURCE_GROUP } else { 'rg-platform' }),
 
-    [string] $RegistryResourceGroup = $(if ($env:AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP) { $env:AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP } else { 'rg-common' }),
+    [string] $PostgresServerName = $(if ($env:AZURE_POSTGRES_SERVER_NAME) { $env:AZURE_POSTGRES_SERVER_NAME } else { 'accpsqlshared' }),
+
+    [string] $AcrPullIdentityName = 'id-shared-acrpull',
+
+    [string] $RegistryName = $(if ($env:AZURE_CONTAINER_REGISTRY_NAME) { $env:AZURE_CONTAINER_REGISTRY_NAME } else { 'acccrshared' }),
+
+    [string] $RegistryResourceGroup = $(if ($env:AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP) { $env:AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP } else { 'rg-platform' }),
 
     [string] $AcceptedRiskPath = (Join-Path $PSScriptRoot '../.azure/accepted-risks.json'),
 
@@ -99,10 +105,11 @@ function Test-FirstRelease {
     if ($exists -eq 'false') { return $true }
     if ($exists -ne 'true') { return $false }
 
-    # An existing but empty group is still a first release: azd creates the group before
-    # any resource lands in it, and a failed initial provision leaves it behind.
+    # The group is shared with other apps, so only this environment's container apps count;
+    # they are the last thing a provision creates.
     $count = "$(Invoke-AzCommand -Argument @(
             'resource', 'list', '--resource-group', $ResourceGroup,
+            '--resource-type', 'Microsoft.App/containerApps', '--tag', "azd-env-name=$EnvironmentName",
             '--query', 'length(@)', '-o', 'tsv'))".Trim()
 
     if ([string]::IsNullOrWhiteSpace($count)) { return $false }
@@ -397,9 +404,12 @@ function Test-Identity {
         return
     }
 
-    $expected = @('acrpull', 'web', 'api') | ForEach-Object { "id-$EnvironmentName-$_" }
+    $expected = @('web', 'api') | ForEach-Object { "id-$EnvironmentName-$_" }
     $actual = Invoke-AzCommand -Argument @('identity', 'list', '--resource-group', $ResourceGroup, '--query', '[].name', '-o', 'json')
     $actualNames = @($actual)
+    $pullIdentity = Invoke-AzCommand -Argument @('identity', 'show', '--resource-group', $RegistryResourceGroup, '--name', $AcrPullIdentityName, '--query', 'name', '-o', 'tsv')
+    if (-not [string]::IsNullOrWhiteSpace("$pullIdentity")) { $actualNames += "$pullIdentity" }
+    $expected += $AcrPullIdentityName
 
     $missing = @($expected | Where-Object { $actualNames -notcontains $_ })
     if ($missing.Count -eq 0) {
@@ -409,7 +419,7 @@ function Test-Identity {
     else {
         Add-Check -Id 'identity-user-assigned' -Category 'identity' -Status 'fail' `
             -Summary "Missing user-assigned identities: $($missing -join ', ')." `
-            -CorrectiveAction 'Re-run provisioning so infra/identity.bicep creates the missing identities.'
+            -CorrectiveAction 'Re-run provisioning so infra/identity.bicep and infra/acr-pull.bicep create the missing identities.'
     }
 
     # `--all` is subscription-wide and the CLI rejects it alongside `--resource-group`.
@@ -419,7 +429,7 @@ function Test-Identity {
         'role', 'assignment', 'list', '--all',
         '--query', '[].{role:roleDefinitionName,scope:scope}', '-o', 'json')
 
-    $groupScope = "/resourceGroups/$ResourceGroup/"
+    $groupScope = "/resourceGroups/$PlatformResourceGroup/"
     $registryScope = "/resourceGroups/$RegistryResourceGroup/providers/Microsoft.ContainerRegistry/registries/$RegistryName/"
     $roleNames = @($assignments |
         Where-Object { "$($_.scope)/" -like "*$groupScope*" -or "$($_.scope)/" -like "*$registryScope" } |
@@ -455,12 +465,15 @@ function Test-SecretReferences {
         return
     }
 
+    # The platform group is shared, so the vault is identified by its azd environment tag.
     $vaultName = Invoke-AzCommand -Argument @(
-        'keyvault', 'list', '--resource-group', $ResourceGroup, '--query', '[0].name', '-o', 'tsv')
+        'resource', 'list', '--resource-group', $PlatformResourceGroup,
+        '--resource-type', 'Microsoft.KeyVault/vaults', '--tag', "azd-env-name=$EnvironmentName",
+        '--query', '[0].name', '-o', 'tsv')
 
     if ([string]::IsNullOrWhiteSpace("$vaultName")) {
         Add-Check -Id 'secret-references-present' -Category 'secret-reference' -Status 'fail' `
-            -Summary "No Key Vault found in resource group '$ResourceGroup'." `
+            -Summary "No Key Vault tagged azd-env-name=$EnvironmentName found in resource group '$PlatformResourceGroup'." `
             -CorrectiveAction 'Re-run provisioning so infra/key-vault.bicep creates the vault before deploying the applications.'
         return
     }
@@ -635,10 +648,13 @@ function Test-DataProtection {
         return
     }
 
-    $account = Invoke-AzCommand -Argument @('storage', 'account', 'list', '--resource-group', $ResourceGroup, '--query', '[0].name', '-o', 'tsv')
+    $account = Invoke-AzCommand -Argument @(
+        'resource', 'list', '--resource-group', $PlatformResourceGroup,
+        '--resource-type', 'Microsoft.Storage/storageAccounts', '--tag', "azd-env-name=$EnvironmentName",
+        '--query', '[0].name', '-o', 'tsv')
     if ([string]::IsNullOrWhiteSpace("$account")) {
         Add-Check -Id 'data-protection-key-ring' -Category 'data-protection' -Status 'fail' `
-            -Summary "No storage account found in '$ResourceGroup' to hold the data-protection key ring." `
+            -Summary "No storage account tagged azd-env-name=$EnvironmentName found in '$PlatformResourceGroup' to hold the data-protection key ring." `
             -CorrectiveAction 'Re-run provisioning so infra/storage.bicep creates the storage account and containers.'
         return
     }
@@ -765,13 +781,13 @@ function Test-DatabaseRecovery {
     # is the window actually open" - a server that was just created reports a restore point
     # in the future until the first base backup completes.
     $server = Invoke-AzCommand -Argument @(
-        'postgres', 'flexible-server', 'list', '--resource-group', $ResourceGroup,
-        '--query', '[0].{name:name,earliest:backup.earliestRestoreDate,retention:backup.backupRetentionDays}', '-o', 'json')
+        'postgres', 'flexible-server', 'show', '--resource-group', $PlatformResourceGroup, '--name', $PostgresServerName,
+        '--query', '{name:name,earliest:backup.earliestRestoreDate,retention:backup.backupRetentionDays}', '-o', 'json')
 
     if ($null -eq $server -or [string]::IsNullOrWhiteSpace("$($server.name)")) {
         Add-Check -Id 'database-recovery-point' -Category 'database-recovery' -Status 'fail' `
-            -Summary 'No PostgreSQL flexible server found in the resource group.' `
-            -CorrectiveAction 'Re-run provisioning so the database server exists before deploying a change that touches the database.'
+            -Summary "PostgreSQL flexible server '$PostgresServerName' not found in '$PlatformResourceGroup'." `
+            -CorrectiveAction 'Confirm the shared server name and resource group, and that the deploying identity can read it.'
         return
     }
 
@@ -833,9 +849,12 @@ function Test-Security {
         return
     }
 
+    # Other apps share the group; only this environment's apps are judged here.
     $externalApps = @(Invoke-AzCommand -Argument @(
             'containerapp', 'list', '--resource-group', $ResourceGroup,
-            '--query', '[?properties.configuration.ingress.external==`true`].name', '-o', 'json'))
+            '--query', '[?properties.configuration.ingress.external==`true`].{name:name,tags:tags}', '-o', 'json') |
+        Where-Object { $_ -and $_.tags -and $_.tags.'azd-env-name' -eq $EnvironmentName } |
+        ForEach-Object { $_.name })
 
     $expectedExternal = @("ca-web-$EnvironmentName", "ca-api-$EnvironmentName")
     $unexpected = @($externalApps | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") -and $_ -notin $expectedExternal })

@@ -11,17 +11,20 @@
     "deployerPrincipalId": {
       "value": "${AZURE_PRINCIPAL_ID}"
     },
-    "deployerPrincipalName": {
-      "value": "${AZURE_PRINCIPAL_NAME}"
+    "platformResourceGroup": {
+      "value": "${AZURE_PLATFORM_RESOURCE_GROUP=rg-platform}"
     },
-    "deployerPrincipalType": {
-      "value": "${AZURE_PRINCIPAL_TYPE=User}"
+    "containerAppsEnvironmentName": {
+      "value": "${AZURE_CONTAINER_APPS_ENVIRONMENT_NAME=cae-shared}"
+    },
+    "postgresServerName": {
+      "value": "${AZURE_POSTGRES_SERVER_NAME=accpsqlshared}"
     },
     "registryName": {
-      "value": "${AZURE_CONTAINER_REGISTRY_NAME=acracccommon}"
+      "value": "${AZURE_CONTAINER_REGISTRY_NAME=acccrshared}"
     },
     "registryResourceGroup": {
-      "value": "${AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP=rg-common}"
+      "value": "${AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP=rg-platform}"
     },
     "postgresPassword": {
       "value": "${POSTGRES_PASSWORD}"

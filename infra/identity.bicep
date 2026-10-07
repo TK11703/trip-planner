@@ -1,14 +1,9 @@
 // One user-assigned managed identity per trust boundary, so a compromised workload cannot
-// reach another workload's secrets. Azure role assignments live in rbac.bicep.
+// reach another workload's secrets. Azure role assignments live in rbac.bicep; the image-pull
+// identity is shared across apps and lives with the registry (acr-pull.bicep).
 param environmentName string
 param location string = resourceGroup().location
 param tags object = {}
-
-resource acrPullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: 'id-${environmentName}-acrpull'
-  location: location
-  tags: tags
-}
 
 resource webIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: 'id-${environmentName}-web'
@@ -32,12 +27,6 @@ resource relayIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01
   name: 'id-${environmentName}-relay'
   location: location
   tags: tags
-}
-
-output acrPull object = {
-  id: acrPullIdentity.id
-  principalId: acrPullIdentity.properties.principalId
-  clientId: acrPullIdentity.properties.clientId
 }
 
 output web object = {

@@ -1,26 +1,33 @@
 // Root deployment for the Trip Planner production environment.
-// Deployed at resource-group scope, so the azd environment must set AZURE_RESOURCE_GROUP.
-// Incremental/idempotent: create-if-missing, preserves the PostgreSQL server and its data.
+// Deployed into the shared apps resource group (AZURE_RESOURCE_GROUP, e.g. rg-apps), which
+// holds the shared Container Apps environment. App-owned resources that belong with the
+// platform (Key Vault, storage, database, image-pull identity) deploy into the platform group.
+// Shared servers, registry, environment, and AI/Maps accounts are referenced, never managed.
 targetScope = 'resourceGroup'
 
 @description('Naming seed for all resources (from AZURE_ENV_NAME).')
 param environmentName string
 
+@description('Region of the apps resource group; must match the shared Container Apps environment.')
 param location string = resourceGroup().location
+
+@description('Resource group of the shared platform services (registry, PostgreSQL, Key Vault, storage).')
+param platformResourceGroup string = 'rg-platform'
+
+@description('Existing shared Container Apps environment in this resource group.')
+param containerAppsEnvironmentName string = 'cae-shared'
+
+@description('Existing Log Analytics workspace backing the shared environment, in this resource group.')
+param logAnalyticsWorkspaceName string = 'law-shared'
+
+@description('Existing shared PostgreSQL Flexible Server in the platform resource group.')
+param postgresServerName string = 'accpsqlshared'
+
+@description('Shared image-pull identity, created in the registry resource group and attached to every container app.')
+param acrPullIdentityName string = 'id-shared-acrpull'
 
 @description('Object id of the principal running the deployment. Used only to grant secret rotation rights.')
 param deployerPrincipalId string = ''
-
-@description('Display name of the deploying principal, recorded as the PostgreSQL Entra administrator.')
-param deployerPrincipalName string = ''
-
-@allowed([
-  'User'
-  'Group'
-  'ServicePrincipal'
-])
-@description('Principal type of the deploying principal. CI deploys as a ServicePrincipal.')
-param deployerPrincipalType string = 'User'
 
 @description('Full image reference for the web app, e.g. <acr>.azurecr.io/trip-planner-web:<sha>.')
 param webImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
@@ -29,12 +36,12 @@ param webImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 param apiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Name of the existing shared container registry holding the web and api images.')
-param registryName string = 'acracccommon'
+param registryName string = 'acccrshared'
 
 @description('Resource group of the existing shared container registry (same subscription).')
-param registryResourceGroup string = 'rg-common'
+param registryResourceGroup string = platformResourceGroup
 
-@description('PostgreSQL administrator password. Used for schema bootstrap and break-glass; stored in Key Vault, never surfaced as an output.')
+@description('Administrator password of the shared PostgreSQL server. Stored in Key Vault for break-glass only; never surfaced as an output.')
 @secure()
 param postgresPassword string
 
@@ -136,6 +143,7 @@ var emailRelayConnectionName = 'con-${environmentName}-outlook'
 
 module storage 'storage.bicep' = {
   name: 'storage'
+  scope: resourceGroup(platformResourceGroup)
   params: {
     environmentName: environmentName
     location: location
@@ -145,6 +153,7 @@ module storage 'storage.bicep' = {
 
 module keyVault 'key-vault.bicep' = {
   name: 'key-vault'
+  scope: resourceGroup(platformResourceGroup)
   params: {
     environmentName: environmentName
     location: location
@@ -155,13 +164,12 @@ module keyVault 'key-vault.bicep' = {
   }
 }
 
-module appEnvironment 'environment.bicep' = {
-  name: 'environment'
-  params: {
-    environmentName: environmentName
-    location: location
-    tags: tags
-  }
+resource managedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
+  name: containerAppsEnvironmentName
+}
+
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: logAnalyticsWorkspaceName
 }
 
 module identity 'identity.bicep' = {
@@ -173,39 +181,36 @@ module identity 'identity.bicep' = {
   }
 }
 
-resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
-  name: registryName
+module acrPull 'acr-pull.bicep' = {
+  name: 'acr-pull'
   scope: resourceGroup(registryResourceGroup)
+  params: {
+    identityName: acrPullIdentityName
+    registryName: registryName
+    location: location
+  }
 }
 
 module rbac 'rbac.bicep' = {
   name: 'rbac'
+  scope: resourceGroup(platformResourceGroup)
   params: {
-    registryName: registry.name
-    registryResourceGroup: registryResourceGroup
     keyVaultName: keyVault.outputs.name
     storageAccountName: storage.outputs.name
     dataProtectionContainerName: storage.outputs.dataProtectionContainerName
     azureOpenAiResourceId: azureOpenAiResourceId
     tripChatResourceId: tripChatResourceId
     azureMapsResourceId: azureMapsResourceId
-    acrPullPrincipalId: identity.outputs.acrPull.principalId
     webPrincipalId: identity.outputs.web.principalId
     apiPrincipalId: identity.outputs.api.principalId
   }
 }
 
-module postgres 'postgres.bicep' = {
+module postgres 'postgres-database.bicep' = {
   name: 'postgres'
+  scope: resourceGroup(platformResourceGroup)
   params: {
-    environmentName: environmentName
-    location: location
-    tags: tags
-    administratorPassword: postgresPassword
-    entraTenantId: entraTenantId
-    entraAdminObjectId: deployerPrincipalId
-    entraAdminPrincipalName: deployerPrincipalName
-    entraAdminPrincipalType: deployerPrincipalType
+    serverName: postgresServerName
   }
 }
 
@@ -215,11 +220,11 @@ module api 'api.bicep' = {
     appName: 'ca-api-${environmentName}'
     location: location
     tags: tags
-    environmentId: appEnvironment.outputs.environmentId
-    environmentDefaultDomain: appEnvironment.outputs.defaultDomain
+    environmentId: managedEnvironment.id
+    environmentDefaultDomain: managedEnvironment.properties.defaultDomain
     containerImage: apiImage
-    registryLoginServer: registry.properties.loginServer
-    acrPullIdentityId: identity.outputs.acrPull.id
+    registryLoginServer: acrPull.outputs.loginServer
+    acrPullIdentityId: acrPull.outputs.id
     apiIdentityId: identity.outputs.api.id
     apiIdentityClientId: identity.outputs.api.clientId
     keyVaultUri: keyVault.outputs.uri
@@ -255,11 +260,11 @@ module web 'web.bicep' = {
     appName: 'ca-web-${environmentName}'
     location: location
     tags: tags
-    environmentId: appEnvironment.outputs.environmentId
-    environmentDefaultDomain: appEnvironment.outputs.defaultDomain
+    environmentId: managedEnvironment.id
+    environmentDefaultDomain: managedEnvironment.properties.defaultDomain
     containerImage: webImage
-    registryLoginServer: registry.properties.loginServer
-    acrPullIdentityId: identity.outputs.acrPull.id
+    registryLoginServer: acrPull.outputs.loginServer
+    acrPullIdentityId: acrPull.outputs.id
     webIdentityId: identity.outputs.web.id
     webIdentityClientId: identity.outputs.web.clientId
     dataProtectionBlobUri: '${storage.outputs.dataProtectionContainerUri}/keys.xml'
@@ -299,16 +304,17 @@ module emailRelay 'email-relay.bicep' = {
 // --- azd conventional outputs ------------------------------------------------
 
 output AZURE_LOCATION string = location
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = registry.properties.loginServer
-output AZURE_CONTAINER_REGISTRY_NAME string = registry.name
+output AZURE_PLATFORM_RESOURCE_GROUP string = platformResourceGroup
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = acrPull.outputs.loginServer
+output AZURE_CONTAINER_REGISTRY_NAME string = registryName
 output AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP string = registryResourceGroup
-output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = appEnvironment.outputs.environmentId
-output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = appEnvironment.outputs.environmentName
-output AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = appEnvironment.outputs.defaultDomain
+output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = managedEnvironment.id
+output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = managedEnvironment.name
+output AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = managedEnvironment.properties.defaultDomain
 output AZURE_KEY_VAULT_NAME string = keyVault.outputs.name
 output AZURE_KEY_VAULT_ENDPOINT string = keyVault.outputs.uri
 output AZURE_STORAGE_ACCOUNT_NAME string = storage.outputs.name
-output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = appEnvironment.outputs.logAnalyticsWorkspaceId
+output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = logAnalytics.id
 output AZURE_OPENAI_ENDPOINT string = azureOpenAiEndpoint
 output AZURE_OPENAI_DEPLOYMENT_NAME string = effectiveOpenAiDeployment
 output SERVICE_WEB_NAME string = web.outputs.name
