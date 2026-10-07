@@ -141,8 +141,9 @@ and exit non-zero when the release should not proceed.
 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
 
 - **Pull requests** run build + test only (required status check — no deploy).
-- **Push to `main`** builds and tests, publishes the `web` and `api` images to
-  ACR tagged with the **commit SHA** (never `latest`), runs the readiness gate, waits for
+- **Push to `main`** builds and tests, publishes the `trip-planner-web` and
+  `trip-planner-api` images to the **shared** ACR (`acracccommon` in `rg-common`) tagged
+  with the **commit SHA** (never `latest`), runs the readiness gate, waits for
   **manual approval** on the `production` environment, runs `azd provision`, then runs the
   verification gate and uploads its report.
 - **Manual dispatch** with a `rollback_sha` input repoints the container apps at a
@@ -150,7 +151,7 @@ and exit non-zero when the release should not proceed.
 
 Hosting is cheap by design: `web` and `api` run on **Container Apps Consumption** with
 `minReplicas: 0`, which keeps their combined consumption inside the Container Apps free
-grant; images live in a **Basic** ACR; telemetry goes to the **managed Aspire dashboard**
+grant; images live in a **shared** ACR used by other apps, so it adds no project cost; telemetry goes to the **managed Aspire dashboard**
 (no extra compute); Log Analytics is capped at 1 GB/day. The **Azure Database for
 PostgreSQL Flexible Server** (Burstable `Standard_B1ms`) is the only always-on cost,
 at **≈ $24/month**. The full line-item breakdown is generated locally into
@@ -165,12 +166,15 @@ Cloud auth uses **OIDC** (no stored credentials). Configure once (see
 - **Variables**: `AZURE_ENV_NAME`, `AZURE_LOCATION`, `AZURE_BUDGET_AMOUNT`,
   `AZURE_BUDGET_CONTACT`, `AZURE_DEPLOYER_PRINCIPAL_NAME`. `AZURE_ENV_NAME` seeds every
   resource name and the `rg-<env-name>` resource group, so changing it repoints the
-  whole deployment.
+  whole deployment. Optional: `AZURE_CONTAINER_REGISTRY_NAME` and
+  `AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP` override the shared registry (defaults
+  `acracccommon` / `rg-common`).
 - **Secrets**: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`,
   `POSTGRES_PASSWORD`, `AZURE_ENTRA_WEB_CLIENT_ID`, `AZURE_ENTRA_API_CLIENT_ID`.
 - A GitHub **`production` environment** (federated credential subjects for `main` and the
   environment), plus an Entra app registration granted `Contributor` +
-  `User Access Administrator` on the target scope.
+  `User Access Administrator` on the target scope, and on `rg-common` (to push images and
+  grant AcrPull on the shared registry).
 
 Runtime secrets are never passed to containers as literals — every one is a **Key Vault
 reference resolved by a user-assigned managed identity**, so rotation needs no rebuild.

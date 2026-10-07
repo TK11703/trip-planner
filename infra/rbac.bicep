@@ -3,6 +3,9 @@
 @description('Container registry name that the pull identity may read from.')
 param registryName string
 
+@description('Resource group holding the (shared) container registry.')
+param registryResourceGroup string = resourceGroup().name
+
 @description('Key Vault name holding runtime secrets and the data-protection key.')
 param keyVaultName string
 
@@ -52,10 +55,6 @@ var azureMapsDataReaderRoleId = subscriptionResourceId(
   '423170ca-a8f6-4b0f-8487-9e4eb8f49bfa'
 )
 
-resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
-  name: registryName
-}
-
 resource vault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
 }
@@ -78,13 +77,13 @@ resource dataProtectionContainer 'Microsoft.Storage/storageAccounts/blobServices
 
 // --- Image pull -------------------------------------------------------------
 
-resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(registry.id, acrPullPrincipalId, acrPullRoleId)
-  scope: registry
-  properties: {
-    roleDefinitionId: acrPullRoleId
+module acrPullAssignment 'rbac-acr.bicep' = {
+  name: 'rbac-acr-pull'
+  scope: resourceGroup(registryResourceGroup)
+  params: {
+    registryName: registryName
     principalId: acrPullPrincipalId
-    principalType: 'ServicePrincipal'
+    roleDefinitionId: acrPullRoleId
   }
 }
 

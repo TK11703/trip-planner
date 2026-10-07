@@ -22,11 +22,17 @@ param deployerPrincipalName string = ''
 @description('Principal type of the deploying principal. CI deploys as a ServicePrincipal.')
 param deployerPrincipalType string = 'User'
 
-@description('Full image reference for the web app, e.g. <acr>.azurecr.io/web:<sha>.')
+@description('Full image reference for the web app, e.g. <acr>.azurecr.io/trip-planner-web:<sha>.')
 param webImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
-@description('Full image reference for the api app, e.g. <acr>.azurecr.io/api:<sha>.')
+@description('Full image reference for the api app, e.g. <acr>.azurecr.io/trip-planner-api:<sha>.')
 param apiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('Name of the existing shared container registry holding the web and api images.')
+param registryName string = 'acracccommon'
+
+@description('Resource group of the existing shared container registry (same subscription).')
+param registryResourceGroup string = 'rg-common'
 
 @description('PostgreSQL administrator password. Used for schema bootstrap and break-glass; stored in Key Vault, never surfaced as an output.')
 @secure()
@@ -167,19 +173,16 @@ module identity 'identity.bicep' = {
   }
 }
 
-module registry 'registry.bicep' = {
-  name: 'registry'
-  params: {
-    environmentName: environmentName
-    location: location
-    tags: tags
-  }
+resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
+  name: registryName
+  scope: resourceGroup(registryResourceGroup)
 }
 
 module rbac 'rbac.bicep' = {
   name: 'rbac'
   params: {
-    registryName: registry.outputs.name
+    registryName: registry.name
+    registryResourceGroup: registryResourceGroup
     keyVaultName: keyVault.outputs.name
     storageAccountName: storage.outputs.name
     dataProtectionContainerName: storage.outputs.dataProtectionContainerName
@@ -215,7 +218,7 @@ module api 'api.bicep' = {
     environmentId: appEnvironment.outputs.environmentId
     environmentDefaultDomain: appEnvironment.outputs.defaultDomain
     containerImage: apiImage
-    registryLoginServer: registry.outputs.loginServer
+    registryLoginServer: registry.properties.loginServer
     acrPullIdentityId: identity.outputs.acrPull.id
     apiIdentityId: identity.outputs.api.id
     apiIdentityClientId: identity.outputs.api.clientId
@@ -255,7 +258,7 @@ module web 'web.bicep' = {
     environmentId: appEnvironment.outputs.environmentId
     environmentDefaultDomain: appEnvironment.outputs.defaultDomain
     containerImage: webImage
-    registryLoginServer: registry.outputs.loginServer
+    registryLoginServer: registry.properties.loginServer
     acrPullIdentityId: identity.outputs.acrPull.id
     webIdentityId: identity.outputs.web.id
     webIdentityClientId: identity.outputs.web.clientId
@@ -296,8 +299,9 @@ module emailRelay 'email-relay.bicep' = {
 // --- azd conventional outputs ------------------------------------------------
 
 output AZURE_LOCATION string = location
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = registry.outputs.loginServer
-output AZURE_CONTAINER_REGISTRY_NAME string = registry.outputs.name
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = registry.properties.loginServer
+output AZURE_CONTAINER_REGISTRY_NAME string = registry.name
+output AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP string = registryResourceGroup
 output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = appEnvironment.outputs.environmentId
 output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = appEnvironment.outputs.environmentName
 output AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = appEnvironment.outputs.defaultDomain

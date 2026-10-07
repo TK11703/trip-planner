@@ -33,6 +33,9 @@ env:
   DOTNET_VERSION: '10.0.x'
   # The Bicep deployment is resource-group scoped, so every job resolves the same group.
   AZURE_RESOURCE_GROUP: rg-${{ vars.AZURE_ENV_NAME }}
+  # Images live in a shared registry outside the project resource group.
+  AZURE_CONTAINER_REGISTRY_NAME: ${{ vars.AZURE_CONTAINER_REGISTRY_NAME || 'acracccommon' }}
+  AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP: ${{ vars.AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP || 'rg-common' }}
 
 jobs:
   build-test:
@@ -101,19 +104,17 @@ jobs:
           fi
           az group create -n "${{ env.AZURE_RESOURCE_GROUP }}" -l "${{ vars.AZURE_LOCATION }}" --only-show-errors
 
-      - name: Provision registry
-        # Registry-only bootstrap: the images must exist before `azd provision` can point
-        # the container apps at them, and before the readiness gate verifies the tags.
+      - name: Resolve registry
+        # The images must exist before `azd provision` can point the container apps at them,
+        # and before the readiness gate verifies the tags.
         id: registry
         run: |
-          outputs=$(az deployment group create \
-            -g "${{ env.AZURE_RESOURCE_GROUP }}" \
-            -n "registry-${{ github.run_id }}" \
-            -f infra/registry.bicep \
-            -p environmentName="${{ vars.AZURE_ENV_NAME }}" location="${{ vars.AZURE_LOCATION }}" \
-            --query properties.outputs -o json)
-          echo "login_server=$(echo "$outputs" | jq -r '.loginServer.value')" >> "$GITHUB_OUTPUT"
-          echo "acr_name=$(echo "$outputs" | jq -r '.name.value')" >> "$GITHUB_OUTPUT"
+          login_server=$(az acr show \
+            -n "${{ env.AZURE_CONTAINER_REGISTRY_NAME }}" \
+            -g "${{ env.AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP }}" \
+            --query loginServer -o tsv)
+          echo "login_server=$login_server" >> "$GITHUB_OUTPUT"
+          echo "acr_name=${{ env.AZURE_CONTAINER_REGISTRY_NAME }}" >> "$GITHUB_OUTPUT"
 
       - name: Build & push images
         # Same .NET SDK container publish that `azd package` uses for dotnet/containerapp
@@ -126,12 +127,12 @@ jobs:
           dotnet publish src/TripPlanner.Api/TripPlanner.Api.csproj -c Release \
             -t:PublishContainer \
             -p:ContainerRegistry="$ACR" \
-            -p:ContainerRepository=api \
+            -p:ContainerRepository=trip-planner-api \
             -p:ContainerImageTag="$TAG"
           dotnet publish src/TripPlanner.Web/TripPlanner.Web.csproj -c Release \
             -t:PublishContainer \
             -p:ContainerRegistry="$ACR" \
-            -p:ContainerRepository=web \
+            -p:ContainerRepository=trip-planner-web \
             -p:ContainerImageTag="$TAG"
 
   readiness:
@@ -184,7 +185,7 @@ jobs:
         run: |
           login_server="${{ needs.package.outputs.login_server }}"
           if [ -z "$login_server" ]; then
-            login_server=$(az acr list -g "${{ env.AZURE_RESOURCE_GROUP }}" --query '[0].loginServer' -o tsv 2>/dev/null || echo "")
+            login_server=$(az acr show -n "${{ env.AZURE_CONTAINER_REGISTRY_NAME }}" -g "${{ env.AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP }}" --query loginServer -o tsv 2>/dev/null || echo "")
           fi
           echo "login_server=$login_server" >> "$GITHUB_OUTPUT"
 
@@ -287,7 +288,7 @@ jobs:
       - name: Resolve registry
         id: registry
         run: |
-          login_server=$(az acr list -g "${{ env.AZURE_RESOURCE_GROUP }}" --query '[0].loginServer' -o tsv)
+          login_server=$(az acr show -n "${{ env.AZURE_CONTAINER_REGISTRY_NAME }}" -g "${{ env.AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP }}" --query loginServer -o tsv)
           echo "login_server=$login_server" >> "$GITHUB_OUTPUT"
 
       - name: Configure azd environment

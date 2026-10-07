@@ -37,6 +37,10 @@ param(
 
     [string] $ResourceGroup = $env:AZURE_RESOURCE_GROUP,
 
+    [string] $RegistryName = $(if ($env:AZURE_CONTAINER_REGISTRY_NAME) { $env:AZURE_CONTAINER_REGISTRY_NAME } else { 'acracccommon' }),
+
+    [string] $RegistryResourceGroup = $(if ($env:AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP) { $env:AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP } else { 'rg-common' }),
+
     [string] $AcceptedRiskPath = (Join-Path $PSScriptRoot '../.azure/accepted-risks.json'),
 
     [string] $OutputPath,
@@ -416,8 +420,9 @@ function Test-Identity {
         '--query', '[].{role:roleDefinitionName,scope:scope}', '-o', 'json')
 
     $groupScope = "/resourceGroups/$ResourceGroup/"
+    $registryScope = "/resourceGroups/$RegistryResourceGroup/providers/Microsoft.ContainerRegistry/registries/$RegistryName/"
     $roleNames = @($assignments |
-        Where-Object { "$($_.scope)/" -like "*$groupScope*" } |
+        Where-Object { "$($_.scope)/" -like "*$groupScope*" -or "$($_.scope)/" -like "*$registryScope" } |
         ForEach-Object { $_.role })
 
     $requiredRoles = @('AcrPull', 'Key Vault Secrets User', 'Storage Blob Data Contributor')
@@ -664,16 +669,16 @@ function Test-Artifacts {
         return
     }
 
-    $registry = Invoke-AzCommand -Argument @('acr', 'list', '--resource-group', $ResourceGroup, '--query', '[0].name', '-o', 'tsv')
+    $registry = Invoke-AzCommand -Argument @('acr', 'show', '--name', $RegistryName, '--resource-group', $RegistryResourceGroup, '--query', 'name', '-o', 'tsv')
     if ([string]::IsNullOrWhiteSpace("$registry")) {
         Add-Check -Id 'artifact-images-tagged' -Category 'artifact' -Status 'fail' `
-            -Summary "No container registry found in '$ResourceGroup'." `
-            -CorrectiveAction 'Re-run provisioning so infra/registry.bicep creates the registry before images are pushed.'
+            -Summary "Container registry '$RegistryName' not found in '$RegistryResourceGroup'." `
+            -CorrectiveAction 'Confirm the shared registry exists and the deploying principal can read it.'
         return
     }
 
     $missingTags = [System.Collections.Generic.List[string]]::new()
-    foreach ($repository in @('web', 'api')) {
+    foreach ($repository in @('trip-planner-web', 'trip-planner-api')) {
         $tag = Invoke-AzCommand -Argument @(
             'acr', 'repository', 'show-tags', '--name', "$registry", '--repository', $repository,
             '--query', "[?@=='$ReleaseId'] | [0]", '-o', 'tsv')

@@ -74,6 +74,6 @@ runs:
         azd env set EMAIL_RELAY_ENABLED "${RELAY:-false}"
         if [ -n "$REGISTRY" ]; then
           # Immutable, commit-pinned image references — never `latest`.
-          azd env set WEB_IMAGE "$REGISTRY/web:$TAG"
-          azd env set API_IMAGE "$REGISTRY/api:$TAG"
+          azd env set WEB_IMAGE "$REGISTRY/trip-planner-web:$TAG"
+          azd env set API_IMAGE "$REGISTRY/trip-planner-api:$TAG"
         fi

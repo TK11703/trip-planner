@@ -17,6 +17,12 @@
     "deployerPrincipalType": {
       "value": "${AZURE_PRINCIPAL_TYPE=User}"
     },
+    "registryName": {
+      "value": "${AZURE_CONTAINER_REGISTRY_NAME=acracccommon}"
+    },
+    "registryResourceGroup": {
+      "value": "${AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP=rg-common}"
+    },
     "postgresPassword": {
       "value": "${POSTGRES_PASSWORD}"
     },

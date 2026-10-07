@@ -5,10 +5,18 @@ documents: [quickstart](../../specs/026-azure-deployment-readiness/quickstart.md
 first-time setup, and [plan](../../specs/026-azure-deployment-readiness/plan.md) for the
 architectural rationale.
 
-**Naming.** `web` and `api` are the azd service names, and also the container registry
-repositories. The deployed container apps are named `ca-web-<env>` and `ca-api-<env>`.
+**Naming.** `web` and `api` are the azd service names. The deployed container apps are
+named `ca-web-<env>` and `ca-api-<env>`. Their images live in the **shared** container
+registry `acracccommon` (resource group `rg-common`), which other applications also push
+to, so this project's repositories are prefixed: `trip-planner-web` and `trip-planner-api`.
 Where this runbook says "the `api` app" it means the `ca-api-<env>` resource; use the
 prefixed name in any `az containerapp` command.
+
+**Shared registry.** Bicep references the registry as an existing resource and never
+creates, modifies, or deletes it. Override it with the `AZURE_CONTAINER_REGISTRY_NAME` and
+`AZURE_CONTAINER_REGISTRY_RESOURCE_GROUP` repository variables (defaults `acracccommon` /
+`rg-common`); it must be in the same subscription. Never delete repositories or tags that
+are not prefixed `trip-planner-` — they belong to other applications.
 
 ---
 
@@ -456,7 +464,8 @@ minutes while a replica is running, so answers cover older trips gradually after
 Releases run through [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml):
 
 1. `build-test` — solution build and full test suite. Required check on pull requests.
-2. `package` — builds both container images and pushes them tagged with the **commit SHA**.
+2. `package` — builds both container images and pushes them to the shared registry
+   (`trip-planner-web`, `trip-planner-api`) tagged with the **commit SHA**.
    Tags are immutable; `latest` is never deployed.
 3. `readiness` — runs [`scripts/deployment-readiness.ps1`](../../scripts/deployment-readiness.ps1)
    and uploads the sanitized JSON report. Runs **before** the approval gate so the
@@ -527,7 +536,7 @@ at the existing images.
 1. Identify the last known-good commit SHA — the most recent run whose
    `verification-<sha>` artifact reports `overallStatus: pass`.
 2. Confirm the images still exist:
-   `az acr repository show-tags -n <acr> --repository web` (and `api`).
+   `az acr repository show-tags -n acracccommon --repository trip-planner-web` (and `trip-planner-api`).
 3. Run the workflow with `rollback_sha` set to that SHA and approve the `production` gate.
 4. Confirm the post-deployment verification gate passes on the rolled-back release.
 5. If verification fails on `readiness`, the schema and the code
@@ -732,7 +741,7 @@ a storage key, a registry password, or a Key Vault access policy.
 
 | Identity | Used by | Roles |
 | --- | --- | --- |
-| `id-<env>-acrpull` | image pulls for both container apps | AcrPull on the registry |
+| `id-<env>-acrpull` | image pulls for both container apps | AcrPull on the shared registry (`acracccommon` in `rg-common`) |
 | `id-<env>-web` | `ca-web-<env>` container app | Key Vault Secrets User, Key Vault Crypto User, Storage Blob Data Contributor |
 | `id-<env>-api` | `ca-api-<env>` container app | Key Vault Secrets User, Cognitive Services OpenAI User (email parsing and trip chat accounts), plus a PostgreSQL role of the same name (§2.0) |
 
@@ -740,7 +749,7 @@ a storage key, a registry password, or a Key Vault access policy.
 
 | Symptom | Cause | Correction |
 | --- | --- | --- |
-| Revision fails with `ImagePullBackOff` / registry 401 | acrPull identity missing or not attached | Re-run `azd provision`; `infra/rbac.bicep` re-asserts the assignment. Confirm the app's `registries[].identity` names the acrPull identity. |
+| Revision fails with `ImagePullBackOff` / registry 401 | acrPull identity missing or not attached | Re-run `azd provision`; `infra/rbac-acr.bicep` re-asserts the assignment on the shared registry in `rg-common`. Confirm the app's `registries[].identity` names the acrPull identity. If provisioning fails on that assignment, the deploying principal lacks role-assignment rights on `rg-common`. |
 | App starts then fails readiness with a secret resolution error | Workload identity lacks **Key Vault Secrets User** | Re-run `azd provision`. Role propagation can lag; restart the revision after a minute. |
 | `web` loses sessions on every restart | Data Protection key ring unreachable — identity lacks **Storage Blob Data Contributor** or the Key Vault key is disabled | Verify the role on the `dataprotection` container and that the Key Vault key is enabled, then restart `web`. |
 | Email ingestion fails with a 403 from Azure OpenAI | API identity lacks the inference role on the OpenAI account | The OpenAI account is often in another resource group; confirm `AZURE_OPENAI_RESOURCE_ID` is set so `infra/rbac-openai.bicep` can scope the assignment. |
@@ -812,7 +821,8 @@ verification categories assert, so a passing release has already answered them.
 - **PostgreSQL Flexible Server is the only always-on cost** — `Standard_B1ms` at ~$12.41/mo
   plus 32 GB storage at ~$3.68/mo (eastus2 retail, verified at time of writing). Backup
   storage is free up to 100% of provisioned storage.
-- Container registry is Basic (~$5.08/mo); Log Analytics retention is the 30-day minimum
+- Container registry is the shared `acracccommon`, so it adds no cost attributable to this
+  project; Log Analytics retention is the 30-day minimum
   with a daily ingestion cap, and the first 5 GB/month is free.
 - Expect roughly **$24/month** total. The things most likely to break the estimate are a forgotten restored server (§4.2 step 6)
   and Azure OpenAI token consumption, which is billed separately and is not capped here.
