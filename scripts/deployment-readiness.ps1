@@ -87,6 +87,24 @@ if ([string]::IsNullOrWhiteSpace($EnvironmentName)) {
     $EnvironmentName = 'unknown'
 }
 
+function Get-EnvironmentResourceName {
+    <#
+    .SYNOPSIS
+        Names of resources of one type in a shared group that carry this azd environment's tag.
+        Returns $null when the lookup itself fails, so callers can tell that apart from "none".
+    #>
+    param([string] $Group, [string] $ResourceType)
+
+    # az refuses --tag together with --resource-group, so the tag is matched here. The list is
+    # wrapped in an object because a bare empty list is indistinguishable from a failed call.
+    $result = Invoke-AzCommand -Argument @(
+        'resource', 'list', '--resource-group', $Group, '--resource-type', $ResourceType,
+        '--query', '{items: [].{name: name, tags: tags}}', '-o', 'json')
+    if ($null -eq $result) { return $null }
+
+    return , @($result.items | Where-Object { $_.tags -and $_.tags.'azd-env-name' -eq $EnvironmentName } | ForEach-Object { $_.name })
+}
+
 function Test-FirstRelease {
     <#
     .SYNOPSIS
@@ -107,13 +125,9 @@ function Test-FirstRelease {
 
     # The group is shared with other apps, so only this environment's container apps count;
     # they are the last thing a provision creates.
-    $count = "$(Invoke-AzCommand -Argument @(
-            'resource', 'list', '--resource-group', $ResourceGroup,
-            '--resource-type', 'Microsoft.App/containerApps', '--tag', "azd-env-name=$EnvironmentName",
-            '--query', 'length(@)', '-o', 'tsv'))".Trim()
-
-    if ([string]::IsNullOrWhiteSpace($count)) { return $false }
-    return $count -eq '0'
+    $apps = Get-EnvironmentResourceName -Group $ResourceGroup -ResourceType 'Microsoft.App/containerApps'
+    if ($null -eq $apps) { return $false }
+    return $apps.Count -eq 0
 }
 
 # Resources that only exist after a successful first deployment.
@@ -466,10 +480,7 @@ function Test-SecretReferences {
     }
 
     # The platform group is shared, so the vault is identified by its azd environment tag.
-    $vaultName = Invoke-AzCommand -Argument @(
-        'resource', 'list', '--resource-group', $PlatformResourceGroup,
-        '--resource-type', 'Microsoft.KeyVault/vaults', '--tag', "azd-env-name=$EnvironmentName",
-        '--query', '[0].name', '-o', 'tsv')
+    $vaultName = @(Get-EnvironmentResourceName -Group $PlatformResourceGroup -ResourceType 'Microsoft.KeyVault/vaults') | Select-Object -First 1
 
     if ([string]::IsNullOrWhiteSpace("$vaultName")) {
         Add-Check -Id 'secret-references-present' -Category 'secret-reference' -Status 'fail' `
@@ -648,10 +659,7 @@ function Test-DataProtection {
         return
     }
 
-    $account = Invoke-AzCommand -Argument @(
-        'resource', 'list', '--resource-group', $PlatformResourceGroup,
-        '--resource-type', 'Microsoft.Storage/storageAccounts', '--tag', "azd-env-name=$EnvironmentName",
-        '--query', '[0].name', '-o', 'tsv')
+    $account = @(Get-EnvironmentResourceName -Group $PlatformResourceGroup -ResourceType 'Microsoft.Storage/storageAccounts') | Select-Object -First 1
     if ([string]::IsNullOrWhiteSpace("$account")) {
         Add-Check -Id 'data-protection-key-ring' -Category 'data-protection' -Status 'fail' `
             -Summary "No storage account tagged azd-env-name=$EnvironmentName found in '$PlatformResourceGroup' to hold the data-protection key ring." `
