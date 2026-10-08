@@ -67,7 +67,8 @@ public sealed class TripDataChatOperationalTests(TestApiFactory factory) : IClas
         var handler = new TripDataChatHandler(
             new TripSearchRetrievalService(new EmptyRepository(), model),
             model);
-        await handler.AskAsync(new TripDataChatRequest(privatePrompt), "private-user-id", "private@example.test", default);
+        await handler.AskAsync(new TripDataChatRequest(privatePrompt), "private-user-id", "private@example.test",
+            new TripDataChatDateContext(new DateOnly(2026, 10, 8), "UTC"), default);
 
         Assert.Contains(metricValues, tag => tag.Contains("status=unavailable", StringComparison.Ordinal));
         Assert.DoesNotContain(metricValues, tag => tag.Contains(privatePrompt, StringComparison.Ordinal));
@@ -90,7 +91,7 @@ public sealed class TripDataChatOperationalTests(TestApiFactory factory) : IClas
         public Task<string> EmbedAsync(string text, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<TripDataChatGeneration?> GenerateAsync(string question, IReadOnlyList<string> priorUserMessages,
             IReadOnlyList<TripSearchSource> sources, IReadOnlyDictionary<(Guid TripId, string SourceKind, Guid SourceId), string> citationKeys,
-            CancellationToken cancellationToken) => throw new NotSupportedException();
+            TripDataChatDateContext dateContext, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class EmptyRepository : ITripSearchDocumentRepository

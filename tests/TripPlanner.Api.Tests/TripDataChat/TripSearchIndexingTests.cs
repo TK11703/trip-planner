@@ -62,7 +62,7 @@ public sealed class TripSearchIndexingTests
 
         public Task<TripDataChatGeneration?> GenerateAsync(string question, IReadOnlyList<string> priorUserMessages,
             IReadOnlyList<TripSearchSource> sources, IReadOnlyDictionary<(Guid TripId, string SourceKind, Guid SourceId), string> citationKeys,
-            CancellationToken cancellationToken) => throw new NotSupportedException();
+            TripDataChatDateContext dateContext, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class FakeRepository : ITripSearchDocumentRepository

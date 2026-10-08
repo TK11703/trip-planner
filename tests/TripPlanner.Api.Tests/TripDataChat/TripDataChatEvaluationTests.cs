@@ -60,6 +60,7 @@ public sealed class TripDataChatEvaluationTests
                 evaluationCase.PriorUserMessages,
                 sources,
                 citationKeys,
+                new TripDataChatDateContext(DateOnly.FromDateTime(DateTime.UtcNow), "UTC"),
                 default);
             stopwatch.Stop();
             latencySamples.Add(stopwatch.Elapsed.TotalMilliseconds);

@@ -13,6 +13,7 @@ public sealed class TripDataChatHandler(
         TripDataChatRequest request,
         string callerUserId,
         string? callerEmail,
+        TripDataChatDateContext dateContext,
         CancellationToken cancellationToken)
     {
         var started = Stopwatch.GetTimestamp();
@@ -45,19 +46,20 @@ public sealed class TripDataChatHandler(
                 item => (item.Source.TripId, item.Source.SourceKind, item.Source.SourceId),
                 item => item.CitationKey);
             var generation = await agent.GenerateAsync(
-                request.Message, prior, retrieved.Select(item => item.Source).ToArray(), keys, cancellationToken);
+                request.Message, prior, retrieved.Select(item => item.Source).ToArray(), keys, dateContext, cancellationToken);
             if (generation is null || string.IsNullOrWhiteSpace(generation.Answer) || generation.CitationKeys.Count == 0)
             {
                 return Complete(TripDataChatStatus.InsufficientData, "I couldn't determine that from the trip information available to me.", [], sourceCount);
             }
 
             var byKey = retrieved.ToDictionary(item => item.CitationKey, StringComparer.Ordinal);
-            if (generation.CitationKeys.Any(key => !byKey.ContainsKey(key)))
+            if (generation.CitationKeys.Any(key => key != TripDataChatDateContext.CitationKey && !byKey.ContainsKey(key)))
             {
                 return Complete(TripDataChatStatus.InsufficientData, "I couldn't determine that from the trip information available to me.", [], sourceCount);
             }
 
             var citations = generation.CitationKeys
+                .Where(key => key != TripDataChatDateContext.CitationKey)
                 .Distinct(StringComparer.Ordinal)
                 .Select(key => byKey[key].Source)
                 .Select(source => new TripDataChatCitation(

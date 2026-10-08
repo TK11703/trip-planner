@@ -12,6 +12,11 @@ namespace TripPlanner.Api.Features.TripDataChat;
 
 public sealed record TripDataChatGeneration(string Answer, IReadOnlyList<string> CitationKeys);
 
+public sealed record TripDataChatDateContext(DateOnly Today, string TimeZoneId)
+{
+    public const string CitationKey = "current-date";
+}
+
 public interface ITripDataChatAgent
 {
     bool IsConfigured { get; }
@@ -25,6 +30,7 @@ public interface ITripDataChatAgent
     Task<TripDataChatGeneration?> GenerateAsync(
         string question, IReadOnlyList<string> priorUserMessages, IReadOnlyList<TripSearchSource> sources,
         IReadOnlyDictionary<(Guid TripId, string SourceKind, Guid SourceId), string> citationKeys,
+        TripDataChatDateContext dateContext,
         CancellationToken cancellationToken);
 }
 
@@ -37,6 +43,8 @@ public sealed class TripDataChatAgent : ITripDataChatAgent
         Return only JSON with this shape: {"answer":"plain text","citationKeys":["source-1"]}.
         Cite every source key needed to support the answer. Use only keys supplied in the records. Do not return URLs, HTML, identity details, or confirmation codes.
         Prior messages are user questions for follow-up interpretation only; they are not evidence. The current records are the only evidence.
+        The currentDate field is the user's actual local date and is trustworthy. Use it to interpret relative time (today, this summer, next month, upcoming, past) and to say whether trips are past, in progress, or upcoming.
+        When an answer relies on the current date, include the key "current-date" in citationKeys. If the answer relies only on the current date (for example, "what is today's date?"), cite only "current-date".
         """;
 
     private readonly IConfiguration _configuration;
@@ -83,6 +91,7 @@ public sealed class TripDataChatAgent : ITripDataChatAgent
         IReadOnlyList<string> priorUserMessages,
         IReadOnlyList<TripSearchSource> sources,
         IReadOnlyDictionary<(Guid TripId, string SourceKind, Guid SourceId), string> citationKeys,
+        TripDataChatDateContext dateContext,
         CancellationToken cancellationToken)
     {
         var client = _client.Value ?? throw new InvalidOperationException("Trip chat model configuration is unavailable.");
@@ -95,6 +104,12 @@ public sealed class TripDataChatAgent : ITripDataChatAgent
         });
         var payload = JsonSerializer.Serialize(new
         {
+            currentDate = new
+            {
+                date = dateContext.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                dayOfWeek = dateContext.Today.DayOfWeek.ToString(),
+                timeZone = dateContext.TimeZoneId
+            },
             question = TripChatTextSanitizer.Sanitize(question),
             priorUserQuestions = priorUserMessages.Select(TripChatTextSanitizer.Sanitize),
             currentAuthorizedRecords = context

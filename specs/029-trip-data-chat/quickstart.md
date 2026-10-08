@@ -23,7 +23,7 @@ dotnet user-secrets set "TripChat:EmbeddingDimensions" "1536" --project src/Trip
 
 Non-secret defaults are `TripChat:MaxMessageLength=2000`, `TripChat:MaxPriorUserTurns=6`, `TripChat:RetrievalTopK=12`, `TripChat:RateLimitPerMinute=10`, `TripChat:IndexBatchSize=100`, and `TripChat:TargetP95Milliseconds=8000`.
 
-For azd deployment, set the matching environment values `TRIP_CHAT_ENDPOINT`, `TRIP_CHAT_CHAT_DEPLOYMENT_NAME`, `TRIP_CHAT_EMBEDDING_DEPLOYMENT_NAME`, `TRIP_CHAT_EMBEDDING_DIMENSIONS`, `TRIP_CHAT_RESOURCE_ID`, `TRIP_CHAT_MAX_MESSAGE_LENGTH`, `TRIP_CHAT_MAX_PRIOR_USER_TURNS`, `TRIP_CHAT_RETRIEVAL_TOP_K`, `TRIP_CHAT_RATE_LIMIT_PER_MINUTE`, `TRIP_CHAT_INDEX_BATCH_SIZE`, and `TRIP_CHAT_TARGET_P95_MILLISECONDS`. `TRIP_CHAT_RESOURCE_ID` is the existing Foundry/Azure AI account ARM ID used only to scope the API identity's inference role; no Foundry resource is provisioned by this feature.
+For azd deployment, set the matching environment values `TRIP_CHAT_ENDPOINT`, `TRIP_CHAT_CHAT_DEPLOYMENT_NAME`, `TRIP_CHAT_EMBEDDING_DEPLOYMENT_NAME`, `TRIP_CHAT_EMBEDDING_DIMENSIONS`, `TRIP_CHAT_MAX_MESSAGE_LENGTH`, `TRIP_CHAT_MAX_PRIOR_USER_TURNS`, `TRIP_CHAT_RETRIEVAL_TOP_K`, `TRIP_CHAT_RATE_LIMIT_PER_MINUTE`, `TRIP_CHAT_INDEX_BATCH_SIZE`, and `TRIP_CHAT_TARGET_P95_MILLISECONDS`. The API identity's inference role is scoped by `AZURE_OPENAI_RESOURCE_ID` (the existing `aif-shared-acc` account ARM ID); no Foundry resource is provisioned by this feature.
 
 Start the existing Aspire AppHost using the workspace's `watch (Aspire hot reload)` task or:
 
@@ -85,4 +85,4 @@ Guided run in a real browser against the local AppHost, signed in as the owner o
 | 8 | Content-free telemetry | Covered by `TripDataChatOperationalTests`; not inspected manually. |
 | — | Dark theme | Pass. Panel, text, and activator use the dark `--tp-*` palette. |
 
-Managed-identity access in Azure is configured (shared `acc-aoai` account, `TRIP_CHAT_*` repository variables) and is exercised by the first release.
+Managed-identity access in Azure is configured (shared `aif-shared-acc` account, `TRIP_CHAT_*` repository variables) and is exercised by the first release.

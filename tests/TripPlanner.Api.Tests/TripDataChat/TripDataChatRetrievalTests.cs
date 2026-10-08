@@ -21,6 +21,7 @@ public sealed class TripDataChatRetrievalTests
             new TripDataChatRequest("When is my hotel?", ["Which trip has a hotel?"]),
             "caller-user-id",
             "caller@example.test",
+            Today,
             default);
 
         Assert.False(result.IsUnavailable);
@@ -43,9 +44,44 @@ public sealed class TripDataChatRetrievalTests
         var model = new FakeAgent { CitationKeys = ["source-1", "inaccessible-source"] };
         var handler = new TripDataChatHandler(new TripSearchRetrievalService(repository, model), model);
 
-        var result = await handler.AskAsync(new TripDataChatRequest("Compare my trips"), "caller", null, default);
+        var result = await handler.AskAsync(new TripDataChatRequest("Compare my trips"), "caller", null, Today, default);
 
         Assert.Equal(TripDataChatStatus.InsufficientData, result.Response!.Status);
+        Assert.Empty(result.Response.Citations);
+    }
+
+    [Fact]
+    public async Task CurrentDateCitationIsAcceptedAndPassedToModel()
+    {
+        var repository = new FakeRepository
+        {
+            Candidates = [new TripSearchCandidate(Guid.NewGuid(), "trip", Guid.NewGuid(), 0.1)],
+            Sources = [Source("Hawaii July 11 to July 27, 2026")]
+        };
+        var model = new FakeAgent { CitationKeys = [TripDataChatDateContext.CitationKey, "source-1"] };
+        var handler = new TripDataChatHandler(new TripSearchRetrievalService(repository, model), model);
+
+        var result = await handler.AskAsync(new TripDataChatRequest("Did I go to Hawaii this summer?"), "caller", null, Today, default);
+
+        Assert.Equal(TripDataChatStatus.Answered, result.Response!.Status);
+        Assert.Single(result.Response.Citations);
+        Assert.Equal(Today, model.DateContext);
+    }
+
+    [Fact]
+    public async Task DateOnlyAnswerIsAnsweredWithoutRecordCitations()
+    {
+        var repository = new FakeRepository
+        {
+            Candidates = [new TripSearchCandidate(Guid.NewGuid(), "trip", Guid.NewGuid(), 0.1)],
+            Sources = [Source("Any trip")]
+        };
+        var model = new FakeAgent { CitationKeys = [TripDataChatDateContext.CitationKey] };
+        var handler = new TripDataChatHandler(new TripSearchRetrievalService(repository, model), model);
+
+        var result = await handler.AskAsync(new TripDataChatRequest("What is today's date?"), "caller", null, Today, default);
+
+        Assert.Equal(TripDataChatStatus.Answered, result.Response!.Status);
         Assert.Empty(result.Response.Citations);
     }
 
@@ -56,12 +92,14 @@ public sealed class TripDataChatRetrievalTests
         var model = new FakeAgent();
         var handler = new TripDataChatHandler(new TripSearchRetrievalService(repository, model), model);
 
-        var result = await handler.AskAsync(new TripDataChatRequest("Where am I going?"), "caller", null, default);
+        var result = await handler.AskAsync(new TripDataChatRequest("Where am I going?"), "caller", null, Today, default);
 
         Assert.Equal(TripDataChatStatus.NoAccessibleTripData, result.Response!.Status);
         Assert.Equal(0, model.EmbedCalls);
         Assert.Equal(0, model.GenerateCalls);
     }
+
+    private static readonly TripDataChatDateContext Today = new(new DateOnly(2026, 10, 8), "America/Los_Angeles");
 
     private static TripSearchSource Source(string searchText)
     {
@@ -83,6 +121,7 @@ public sealed class TripDataChatRetrievalTests
         public IReadOnlyList<string> CitationKeys { get; init; } = ["source-1"];
         public int EmbedCalls { get; private set; }
         public int GenerateCalls { get; private set; }
+        public TripDataChatDateContext? DateContext { get; private set; }
 
         public Task<string> EmbedAsync(string text, CancellationToken cancellationToken)
         {
@@ -96,9 +135,11 @@ public sealed class TripDataChatRetrievalTests
             IReadOnlyList<string> priorUserMessages,
             IReadOnlyList<TripSearchSource> sources,
             IReadOnlyDictionary<(Guid TripId, string SourceKind, Guid SourceId), string> citationKeys,
+            TripDataChatDateContext dateContext,
             CancellationToken cancellationToken)
         {
             GenerateCalls++;
+            DateContext = dateContext;
             Sources = sources;
             return Task.FromResult<TripDataChatGeneration?>(new("Grounded answer", CitationKeys));
         }

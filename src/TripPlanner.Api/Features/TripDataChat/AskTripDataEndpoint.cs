@@ -2,8 +2,11 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
+using TripPlanner.Api.Features.Timezones;
 using TripPlanner.Api.Security;
+using TripPlanner.Contracts.Common;
 using TripPlanner.Contracts.TripDataChat;
+using TripPlanner.Database.UserProfiles;
 
 namespace TripPlanner.Api.Features.TripDataChat;
 
@@ -13,6 +16,9 @@ public static class AskTripDataEndpoint
         TripDataChatRequest request,
         ICurrentUser currentUser,
         TripDataChatHandler handler,
+        IUserProfileRepository profiles,
+        ITimezoneIdValidator timezones,
+        IClock clock,
         IConfiguration configuration,
         HttpContext httpContext,
         CancellationToken cancellationToken)
@@ -32,7 +38,13 @@ public static class AskTripDataEndpoint
 
         try
         {
-            var result = await handler.AskAsync(request, currentUser.UserId, currentUser.Email, cancellationToken);
+            var profile = await profiles.GetAsync(currentUser.UserId, cancellationToken);
+            var timeZone = (string.IsNullOrWhiteSpace(profile?.TimeZoneId) ? null : timezones.FindTimeZone(profile.TimeZoneId))
+                ?? TimeZoneInfo.Utc;
+            var dateContext = new TripDataChatDateContext(
+                DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.UtcNow, timeZone).DateTime),
+                timeZone == TimeZoneInfo.Utc ? "UTC" : profile!.TimeZoneId.Trim());
+            var result = await handler.AskAsync(request, currentUser.UserId, currentUser.Email, dateContext, cancellationToken);
             if (result.IsUnavailable)
             {
                 return TypedResults.Json(
