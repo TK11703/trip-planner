@@ -102,7 +102,8 @@ function Get-EnvironmentResourceName {
         '--query', '{items: [].{name: name, tags: tags}}', '-o', 'json')
     if ($null -eq $result) { return $null }
 
-    return , @($result.items | Where-Object { $_.tags -and $_.tags.'azd-env-name' -eq $EnvironmentName } | ForEach-Object { $_.name })
+    # Other workloads' resources may carry tags without azd-env-name; strict mode throws on a missing property.
+    return , @($result.items | Where-Object { $_.tags -and $_.tags.PSObject.Properties['azd-env-name'] -and $_.tags.'azd-env-name' -eq $EnvironmentName } | ForEach-Object { $_.name })
 }
 
 function Test-FirstRelease {
@@ -861,7 +862,7 @@ function Test-Security {
     $externalApps = @(Invoke-AzCommand -Argument @(
             'containerapp', 'list', '--resource-group', $ResourceGroup,
             '--query', '[?properties.configuration.ingress.external==`true`].{name:name,tags:tags}', '-o', 'json') |
-        Where-Object { $_ -and $_.tags -and $_.tags.'azd-env-name' -eq $EnvironmentName } |
+        Where-Object { $_ -and $_.tags -and $_.tags.PSObject.Properties['azd-env-name'] -and $_.tags.'azd-env-name' -eq $EnvironmentName } |
         ForEach-Object { $_.name })
 
     $expectedExternal = @("ca-web-$EnvironmentName", "ca-api-$EnvironmentName")
