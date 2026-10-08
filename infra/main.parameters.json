@@ -56,26 +56,20 @@
     "azureOpenAiEndpoint": {
       "value": "${AZURE_OPENAI_ENDPOINT}"
     },
-    "azureOpenAiDeploymentName": {
-      "value": "${AZURE_OPENAI_DEPLOYMENT_NAME}"
-    },
     "azureOpenAiResourceId": {
       "value": "${AZURE_OPENAI_RESOURCE_ID}"
     },
-    "tripChatResourceId": {
-      "value": "${TRIP_CHAT_RESOURCE_ID}"
+    "azureOpenAiChatDeploymentName": {
+      "value": "${AZURE_OPENAI_CHAT_DEPLOYMENT_NAME}"
     },
-    "tripChatEndpoint": {
-      "value": "${TRIP_CHAT_ENDPOINT}"
+    "azureOpenAiMailDeploymentName": {
+      "value": "${AZURE_OPENAI_MAIL_DEPLOYMENT_NAME}"
     },
-    "tripChatChatDeploymentName": {
-      "value": "${TRIP_CHAT_CHAT_DEPLOYMENT_NAME}"
-    },
-    "tripChatEmbeddingDeploymentName": {
-      "value": "${TRIP_CHAT_EMBEDDING_DEPLOYMENT_NAME}"
+    "azureOpenAiEmbeddingDeploymentName": {
+      "value": "${AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME}"
     },
     "tripChatEmbeddingDimensions": {
-      "value": "${TRIP_CHAT_EMBEDDING_DIMENSIONS=1536}"
+      "value": "${CHAT_EMBEDDING_DIMENSIONS=1536}"
     },
     "tripChatMaxMessageLength": {
       "value": "${TRIP_CHAT_MAX_MESSAGE_LENGTH=2000}"

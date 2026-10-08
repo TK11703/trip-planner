@@ -508,13 +508,14 @@ fresh azd environment on every run, so set these as **repository variables** —
 
 | Variable | Example | Notes |
 | --- | --- | --- |
-| `TRIP_CHAT_ENDPOINT` | `https://<account>.openai.azure.com/` | Account endpoint. |
-| `TRIP_CHAT_CHAT_DEPLOYMENT_NAME` | `gpt-4.1` | Chat model deployment name. |
-| `TRIP_CHAT_EMBEDDING_DEPLOYMENT_NAME` | `text-embedding-3-large` | Embedding deployment name. |
-| `TRIP_CHAT_EMBEDDING_DIMENSIONS` | `3072` | Must match the embedding model (`1536` for `text-embedding-3-small`). Changing it re-embeds every record. |
-| `TRIP_CHAT_RESOURCE_ID` | `/subscriptions/…/accounts/<account>` | Scopes the API identity's inference role; `infra/rbac.bicep` skips it when it equals `AZURE_OPENAI_RESOURCE_ID`. |
+| `AZURE_OPENAI_ENDPOINT` | `https://<account>.openai.azure.com/` | Account endpoint, shared with email ingestion. |
+| `AZURE_OPENAI_RESOURCE_ID` | `/subscriptions/…/accounts/<account>` | Scopes the API identity's inference role. |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT_NAME` | `gpt-4.1` | Trip chat model deployment name. Defaults to `gpt-4o`. |
+| `AZURE_OPENAI_MAIL_DEPLOYMENT_NAME` | `gpt-4.1` | Email ingestion model deployment name. Defaults to the chat deployment. |
+| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME` | `text-embedding-3-large` | Embedding deployment name. |
+| `CHAT_EMBEDDING_DIMENSIONS` | `3072` | Must match the embedding model (`1536` for `text-embedding-3-small`). Changing it re-embeds every record. |
 
-With any of the first three unset, chat is disabled rather than broken: the endpoint
+With the endpoint or embedding deployment unset, chat is disabled rather than broken: the endpoint
 returns a retryable `503`, indexing does nothing, and readiness is unaffected.
 
 ### Post-deployment verification
@@ -793,8 +794,8 @@ app replacement. Deleting and recreating one changes its object id and requires 
 | `api` crashes on `017_trip_search_documents.sql` with `extension "vector" is not allow-listed` | `azure.extensions` does not list `vector` | Allow-list it as in §2.0 *Existing servers*. |
 | `api` crashes on `017_trip_search_documents.sql` with `Because vector isn't a trusted extension, only members of "azure_pg_admin" are allowed to use CREATE EXTENSION vector` | `vector` was never created in `tripplanner`. Azure checks this even for `CREATE EXTENSION IF NOT EXISTS`, which is why `017` only issues the statement when the extension is missing | Create it as the Entra administrator (§2.0 *Existing servers*, step 2), then restart the failed revision. |
 | Entra admin login fails with `password authentication failed for user "<you>"` | Supplied the email or full UPN instead of the stored (truncated) role name, or a password instead of an access token | Read the stored name with `microsoft-entra-admin list` and use `az account get-access-token --resource-type oss-rdbms` as the password (§2.0 step 2). |
-| Trip chat always answers *temporarily unavailable* | `TRIP_CHAT_*` repository variables are unset, so chat is disabled | Set them (§2.2) and redeploy. |
-| Trip chat fails with a `401`/`403` from the model account | API identity lacks the inference role on the chat account | Confirm `TRIP_CHAT_RESOURCE_ID` is set and re-run `azd provision`. Locally, a `401` usually means `DefaultAzureCredential` picked a tool signed into another tenant; the AppHost pins `AzureCliCredential` for this reason. |
+| Trip chat always answers *temporarily unavailable* | `AZURE_OPENAI_*` repository variables are unset, so chat is disabled | Set them (§2.2) and redeploy. |
+| Trip chat fails with a `401`/`403` from the model account | API identity lacks the inference role on the chat account | Confirm `AZURE_OPENAI_RESOURCE_ID` is set and re-run `azd provision`. Locally, a `401` usually means `DefaultAzureCredential` picked a tool signed into another tenant; the AppHost pins `AzureCliCredential` for this reason. |
 | `web` is `Unhealthy` with `api-reachability` timing out after ~5s | `services__api__https__0` points at the bare app name instead of the API's ingress FQDN | The bare name is not covered by the ingress certificate, so the TLS handshake never completes. `infra/web.bicep` must pass `api.outputs.fqdn`. |
 | Database calls start failing ~1 hour after a long idle period | Entra access token expired and was not refreshed | The connection factory refreshes at 45 minutes. If this recurs, confirm `AZURE_CLIENT_ID` on `api` names the API identity so `DefaultAzureCredential` resolves the right one. |
 

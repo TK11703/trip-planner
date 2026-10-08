@@ -70,26 +70,20 @@ param entraApiScope string = ''
 @description('Release identifier (commit SHA) recorded against migrations and telemetry.')
 param releaseId string = ''
 
-@description('Azure OpenAI endpoint used by email ingestion parsing.')
+@description('Azure OpenAI endpoint used by email ingestion parsing and trip chat.')
 param azureOpenAiEndpoint string
-
-@description('Azure OpenAI chat deployment name.')
-param azureOpenAiDeploymentName string = ''
 
 @description('Resource id of the Azure OpenAI account, used to scope the inference role assignment.')
 param azureOpenAiResourceId string = ''
 
-@description('Existing Foundry/Azure AI account resource id used to scope the chat inference role. Empty disables chat inference.')
-param tripChatResourceId string = ''
+@description('Azure OpenAI chat deployment name.')
+param azureOpenAiChatDeploymentName string = ''
 
-@description('Existing Foundry project endpoint for trip chat. Empty disables trip chat.')
-param tripChatEndpoint string = ''
+@description('Azure OpenAI deployment used by email ingestion parsing. Empty uses the chat deployment.')
+param azureOpenAiMailDeploymentName string = ''
 
-@description('Existing chat model deployment name.')
-param tripChatChatDeploymentName string = ''
-
-@description('Existing embedding model deployment name.')
-param tripChatEmbeddingDeploymentName string = ''
+@description('Azure OpenAI embedding deployment name. Empty disables trip chat.')
+param azureOpenAiEmbeddingDeploymentName string = ''
 
 @minValue(1)
 param tripChatEmbeddingDimensions int = 1536
@@ -136,7 +130,8 @@ var postgresConnectionString = 'Host=${postgres.outputs.fqdn};Port=5432;Database
 // azd substitutes an empty string for unset environment variables, which would otherwise
 // win over the parameter default.
 var effectiveApiScope = empty(entraApiScope) ? '${entraApiAudience}/access_as_user' : entraApiScope
-var effectiveOpenAiDeployment = empty(azureOpenAiDeploymentName) ? 'gpt-4o' : azureOpenAiDeploymentName
+var effectiveOpenAiChatDeployment = empty(azureOpenAiChatDeploymentName) ? 'gpt-4o' : azureOpenAiChatDeploymentName
+var effectiveOpenAiMailDeployment = empty(azureOpenAiMailDeploymentName) ? effectiveOpenAiChatDeployment : azureOpenAiMailDeploymentName
 var emailRelayOn = toLower(emailRelayEnabled) == 'true'
 var emailRelayWorkflowName = 'logic-${environmentName}-email-relay'
 var emailRelayConnectionName = 'con-${environmentName}-outlook'
@@ -199,7 +194,6 @@ module rbac 'rbac.bicep' = {
     storageAccountName: storage.outputs.name
     dataProtectionContainerName: storage.outputs.dataProtectionContainerName
     azureOpenAiResourceId: azureOpenAiResourceId
-    tripChatResourceId: tripChatResourceId
     azureMapsResourceId: azureMapsResourceId
     webPrincipalId: identity.outputs.web.principalId
     apiPrincipalId: identity.outputs.api.principalId
@@ -236,10 +230,9 @@ module api 'api.bicep' = {
     entraApiClientId: entraApiClientId
     entraApiAudience: entraApiAudience
     azureOpenAiEndpoint: azureOpenAiEndpoint
-    azureOpenAiDeploymentName: effectiveOpenAiDeployment
-    tripChatEndpoint: tripChatEndpoint
-    tripChatChatDeploymentName: tripChatChatDeploymentName
-    tripChatEmbeddingDeploymentName: tripChatEmbeddingDeploymentName
+    azureOpenAiChatDeploymentName: effectiveOpenAiChatDeployment
+    azureOpenAiMailDeploymentName: effectiveOpenAiMailDeployment
+    azureOpenAiEmbeddingDeploymentName: azureOpenAiEmbeddingDeploymentName
     tripChatEmbeddingDimensions: tripChatEmbeddingDimensions
     tripChatMaxMessageLength: tripChatMaxMessageLength
     tripChatMaxPriorUserTurns: tripChatMaxPriorUserTurns
@@ -316,7 +309,8 @@ output AZURE_KEY_VAULT_ENDPOINT string = keyVault.outputs.uri
 output AZURE_STORAGE_ACCOUNT_NAME string = storage.outputs.name
 output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = logAnalytics.id
 output AZURE_OPENAI_ENDPOINT string = azureOpenAiEndpoint
-output AZURE_OPENAI_DEPLOYMENT_NAME string = effectiveOpenAiDeployment
+output AZURE_OPENAI_CHAT_DEPLOYMENT_NAME string = effectiveOpenAiChatDeployment
+output AZURE_OPENAI_MAIL_DEPLOYMENT_NAME string = effectiveOpenAiMailDeployment
 output SERVICE_WEB_NAME string = web.outputs.name
 output SERVICE_WEB_URI string = web.outputs.url
 output SERVICE_API_NAME string = api.outputs.name

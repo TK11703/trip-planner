@@ -36,13 +36,12 @@ param entraApiClientId string
 param entraApiAudience string
 
 param azureOpenAiEndpoint string
-param azureOpenAiDeploymentName string
+param azureOpenAiChatDeploymentName string
+param azureOpenAiMailDeploymentName string
 
-@description('Existing Foundry project endpoint used for trip chat. Empty disables chat.')
-param tripChatEndpoint string = ''
+@description('Embedding deployment used by trip chat. Empty disables chat.')
+param azureOpenAiEmbeddingDeploymentName string = ''
 
-param tripChatChatDeploymentName string = ''
-param tripChatEmbeddingDeploymentName string = ''
 param tripChatEmbeddingDimensions int = 1536
 param tripChatMaxMessageLength int = 2000
 param tripChatMaxPriorUserTurns int = 6
@@ -116,19 +115,19 @@ var baseEnv = [
   }
   {
     name: 'AzureOpenAI__DeploymentName'
-    value: azureOpenAiDeploymentName
+    value: azureOpenAiMailDeploymentName
   }
   {
     name: 'TripChat__Endpoint'
-    value: tripChatEndpoint
+    value: azureOpenAiEndpoint
   }
   {
     name: 'TripChat__ChatDeploymentName'
-    value: tripChatChatDeploymentName
+    value: azureOpenAiChatDeploymentName
   }
   {
     name: 'TripChat__EmbeddingDeploymentName'
-    value: tripChatEmbeddingDeploymentName
+    value: azureOpenAiEmbeddingDeploymentName
   }
   {
     name: 'TripChat__EmbeddingDimensions'
