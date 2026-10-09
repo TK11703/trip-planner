@@ -44,6 +44,8 @@ public sealed class TripDataChatAgent : ITripDataChatAgent
         Cite every source key needed to support the answer. Use only keys supplied in the records. Do not return URLs, HTML, identity details, or confirmation codes.
         Prior messages are user questions for follow-up interpretation only; they are not evidence. The current records are the only evidence.
         The currentDate field is the user's actual local date and is trustworthy. Use it to interpret relative time (today, this summer, next month, upcoming, past) and to say whether trips are past, in progress, or upcoming.
+        Resolve relative periods only with currentDate.date and its precomputed ranges (mostRecentSummer, nextSummer, thisYear, nextYear); never assume the records' year is the current or upcoming one.
+        Before answering, compare each relevant record's dates with that range. A trip whose dates fall before currentDate.date is already completed and must not be described as upcoming or as planning for a future period; if none of the user's trips fall in the period asked about, say so and mention the nearest trip with its dates.
         When an answer relies on the current date, include the key "current-date" in citationKeys. If the answer relies only on the current date (for example, "what is today's date?"), cite only "current-date".
         """;
 
@@ -108,6 +110,10 @@ public sealed class TripDataChatAgent : ITripDataChatAgent
             {
                 date = dateContext.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 dayOfWeek = dateContext.Today.DayOfWeek.ToString(),
+                thisYear = dateContext.Today.Year,
+                nextYear = dateContext.Today.Year + 1,
+                mostRecentSummer = SummerRange(dateContext.Today, upcoming: false),
+                nextSummer = SummerRange(dateContext.Today, upcoming: true),
                 timeZone = dateContext.TimeZoneId
             },
             question = TripChatTextSanitizer.Sanitize(question),
@@ -131,6 +137,16 @@ public sealed class TripDataChatAgent : ITripDataChatAgent
         {
             return null;
         }
+    }
+
+    // Northern-hemisphere summer (June 1 - August 31): the latest one started on/before today, or the first starting after today.
+    private static string SummerRange(DateOnly today, bool upcoming)
+    {
+        var startedThisYear = today >= new DateOnly(today.Year, 6, 1);
+        var year = upcoming
+            ? (startedThisYear ? today.Year + 1 : today.Year)
+            : (startedThisYear ? today.Year : today.Year - 1);
+        return $"{year}-06-01 to {year}-08-31";
     }
 
     private int PositiveSetting(string name, int fallback)
