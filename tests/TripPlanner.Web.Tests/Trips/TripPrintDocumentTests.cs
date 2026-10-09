@@ -32,7 +32,7 @@ public class TripPrintDocumentTests : BunitContext
         var dividers = cut.FindAll("tr.tp-itinerary-leg .tp-itinerary-leg-title");
         Assert.Equal(new[] { "Arrival", "Departure" }, dividers.Select(d => d.TextContent.Trim()).ToArray());
         // Divider spans all item columns.
-        Assert.Equal("7", cut.Find("tr.tp-itinerary-leg th").GetAttribute("colspan"));
+        Assert.Equal("6", cut.Find("tr.tp-itinerary-leg th").GetAttribute("colspan"));
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class TripPrintDocumentTests : BunitContext
     }
 
     [Fact]
-    public void PrintTypeColumnUsesInlineIconsWithAccessibleTypeNames()
+    public void PrintTitleColumnUsesInlineIconsBeforeTitlesWithAccessibleTypeNames()
     {
         var trip = TripFixtures.Populated();
         trip = trip with
@@ -55,6 +55,7 @@ public class TripPrintDocumentTests : BunitContext
         };
         var cut = Render(trip);
 
+        Assert.DoesNotContain(cut.FindAll("thead th"), header => header.TextContent.Trim() == "Type");
         var icons = cut.FindAll("tr.tp-itinerary-item td:first-child svg");
         Assert.Equal(trip.TrackedItems.Count, icons.Count);
         Assert.All(icons, icon =>
@@ -63,6 +64,8 @@ public class TripPrintDocumentTests : BunitContext
             Assert.False(icon.HasAttribute("aria-hidden"));
             Assert.Equal("Reservation", icon.QuerySelector("title")!.TextContent);
             Assert.NotNull(icon.QuerySelector("path"));
+            Assert.Equal(icon, icon.ParentElement!.Children[0]);
+            Assert.Equal("SPAN", icon.ParentElement.Children[1].TagName);
         });
     }
 
@@ -114,11 +117,11 @@ public class TripPrintDocumentTests : BunitContext
 
         // The "Walk" item has no location, end, confirmation, cost, or notes.
         var walkRow = cut.FindAll("tr.tp-itinerary-item")
-            .First(r => r.QuerySelectorAll("td")[1].TextContent.Trim() == "Walk");
+            .First(r => r.QuerySelector(".tp-itinerary-item-title > span")!.TextContent.Trim() == "Walk");
         var cells = walkRow.QuerySelectorAll("td");
-        Assert.Equal(string.Empty, cells[2].TextContent.Trim()); // Location
-        Assert.Equal(string.Empty, cells[4].TextContent.Trim()); // End
-        Assert.Equal(string.Empty, cells[6].TextContent.Trim()); // Est. Cost
+        Assert.Equal(string.Empty, cells[1].TextContent.Trim()); // Location
+        Assert.Equal(string.Empty, cells[3].TextContent.Trim()); // End
+        Assert.Equal(string.Empty, cells[5].TextContent.Trim()); // Est. Cost
     }
 
     [Fact]

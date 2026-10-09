@@ -1052,13 +1052,22 @@ body {
     white-space: nowrap;
 }
 
-.tp-itinerary-table thead th:nth-child(1) { min-width: 3.5rem; }
-.tp-itinerary-table thead th:nth-child(2) { min-width: 12rem; }
-.tp-itinerary-table thead th:nth-child(3) { min-width: 11rem; }
+.tp-itinerary-table thead th:nth-child(1) { min-width: 12rem; }
+.tp-itinerary-table thead th:nth-child(2) { min-width: 11rem; }
+.tp-itinerary-table thead th:nth-child(3),
 .tp-itinerary-table thead th:nth-child(4),
 .tp-itinerary-table thead th:nth-child(5) { min-width: 9rem; }
-.tp-itinerary-table thead th:nth-child(6) { min-width: 9rem; }
-.tp-itinerary-table thead th:nth-child(7) { min-width: 7rem; }
+.tp-itinerary-table thead th:nth-child(6) { min-width: 7rem; }
+
+.tp-itinerary-item-title {
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+}
+
+.tp-itinerary-item-title .tp-item-icon {
+    flex-shrink: 0;
+}
 
 .tp-itinerary-leg > th {
     background: color-mix(in srgb, var(--bs-primary) 9%, var(--bs-body-bg));

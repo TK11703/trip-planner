@@ -35,8 +35,9 @@ tests/
 ## Itinerary tables
 
 The trip details table and printable itinerary display each item's type as its
-associated icon. Icons include an accessible type name (for example, Reservation
-or Activity) and a hover title rather than visible type text.
+associated icon immediately before the item title, with no separate Type column.
+Icons include an accessible type name (for example, Reservation or Activity) and
+a hover title rather than visible type text.
 
 ## Prerequisites
 

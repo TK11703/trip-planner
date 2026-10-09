@@ -10,7 +10,7 @@ namespace TripPlanner.Web.Tests.Trips;
 public class TripItineraryTableTests : BunitContext
 {
     [Fact]
-    public void RendersCaptionAndSevenColumnHeaders()
+    public void RendersCaptionAndSixColumnHeaders()
     {
         var cut = Render(TripFixtures.Representative());
 
@@ -18,7 +18,7 @@ public class TripItineraryTableTests : BunitContext
         Assert.Equal("Itinerary", caption.TextContent.Trim());
         Assert.Contains("visually-hidden", caption.ClassList);
         Assert.Equal(
-            new[] { "Type", "Title", "Location", "Start", "End", "Confirmation", "Est. Cost" },
+            new[] { "Title", "Location", "Start", "End", "Confirmation", "Est. Cost" },
             cut.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray());
     }
 
@@ -30,15 +30,18 @@ public class TripItineraryTableTests : BunitContext
         Assert.Equal(
             new[] { "Arrival", "Free day", "Departure", "Unassigned" },
             cut.FindAll("tr.tp-itinerary-leg .tp-itinerary-leg-title").Select(title => title.TextContent.Trim()).ToArray());
-        Assert.All(cut.FindAll("tr.tp-itinerary-leg th"), header => Assert.Equal("7", header.GetAttribute("colspan")));
+        Assert.All(cut.FindAll("tr.tp-itinerary-leg th"), header => Assert.Equal("6", header.GetAttribute("colspan")));
+        Assert.All(cut.FindAll("tr.tp-itinerary-leg-empty td"), cell => Assert.Equal("6", cell.GetAttribute("colspan")));
         Assert.Equal(
             new[] { "Walk", "Dinner", "Pack", "Review transfer" },
-            cut.FindAll("tr.tp-itinerary-item").Select(row => row.QuerySelectorAll("td")[1].TextContent.Trim()).ToArray());
+            cut.FindAll(".tp-itinerary-item-title > span").Select(title => title.TextContent.Trim()).ToArray());
         Assert.Contains("No items for this leg.", cut.Markup, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void TypeColumnRendersMatchingLabeledIconsForAssignedAndUnassignedItems()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TitleCellRendersMatchingLabeledIconsBeforeAssignedAndUnassignedItemTitles(bool interactive)
     {
         var trip = TripFixtures.Representative();
         var types = new[] { "reservation", "activity", "reminder", "event" };
@@ -46,12 +49,21 @@ public class TripItineraryTableTests : BunitContext
         {
             TrackedItems = trip.TrackedItems.Select((item, index) => item with { ItemType = types[index] }).ToArray()
         };
-        var cut = Render(trip);
+        var cut = Render<TripItineraryTable>(parameters =>
+        {
+            parameters.Add(component => component.Model, TripPrintFormatting.BuildItineraryTable(trip));
+            if (interactive)
+            {
+                parameters.Add(component => component.OnEditItem, _ => { });
+            }
+        });
 
         foreach (var row in cut.FindAll("tr.tp-itinerary-item"))
         {
             var cells = row.QuerySelectorAll("td");
-            var item = trip.TrackedItems.Single(item => item.Title == cells[1].TextContent.Trim());
+            Assert.Equal(6, cells.Length);
+            var title = cells[0].QuerySelector(".tp-itinerary-item-title")!;
+            var item = trip.TrackedItems.Single(item => item.Title == title.Children[1].TextContent.Trim());
             var expectedLabel = System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(item.ItemType);
             var icon = cells[0].QuerySelector("svg")!;
             var expectedIcon = Render<TrackedItemIcon>(p => p
@@ -62,7 +74,8 @@ public class TripItineraryTableTests : BunitContext
             Assert.False(icon.HasAttribute("aria-hidden"));
             Assert.Equal(expectedLabel, icon.QuerySelector("title")!.TextContent);
             Assert.Equal(expectedIcon.Find("svg").InnerHtml, icon.InnerHtml);
-            Assert.Single(cells[0].Children);
+            Assert.Equal(icon, title.Children[0]);
+            Assert.Equal(interactive ? "BUTTON" : "SPAN", title.Children[1].TagName);
         }
         Assert.Equal(4, cut.FindAll("tr.tp-itinerary-item svg").Count);
     }

@@ -30,7 +30,6 @@ else
             <caption class="visually-hidden">Itinerary</caption>
             <thead>
                 <tr>
-                    <th scope="col">Type</th>
                     <th scope="col">Title</th>
                     <th scope="col">Location</th>
                     <th scope="col">Start</th>
@@ -114,7 +113,7 @@ else
     [Parameter] public EventCallback OnAddLeg { get; set; }
     [Parameter] public EventCallback<Guid?> OnAddItem { get; set; }
 
-    private const int ColumnCount = 7;
+    private const int ColumnCount = 6;
 
     public static string EditLegActionId(Guid tripLegId) => $"tp-table-edit-leg-{tripLegId}";
     public static string EditItemActionId(Guid trackedItemId) => $"tp-table-edit-item-{trackedItemId}";
@@ -123,16 +122,18 @@ else
     private RenderFragment RenderItemRow(ItineraryItemRow item) => __builder =>
     {
         <tr class="tp-itinerary-item">
-            <td><TrackedItemIcon Type="@item.TypeText" Label="@item.TypeText" /></td>
             <td>
-                @if (OnEditItem.HasDelegate)
-                {
-                    <button id="@EditItemActionId(item.TrackedItemId)" type="button" class="tp-itinerary-title-action" aria-label="Edit item @item.Title" @onclick="() => OnEditItem.InvokeAsync(item.TrackedItemId)">@item.Title</button>
-                }
-                else
-                {
-                    <span>@item.Title</span>
-                }
+                <span class="tp-itinerary-item-title">
+                    <TrackedItemIcon Type="@item.TypeText" Label="@item.TypeText" />
+                    @if (OnEditItem.HasDelegate)
+                    {
+                        <button id="@EditItemActionId(item.TrackedItemId)" type="button" class="tp-itinerary-title-action" aria-label="Edit item @item.Title" @onclick="() => OnEditItem.InvokeAsync(item.TrackedItemId)">@item.Title</button>
+                    }
+                    else
+                    {
+                        <span>@item.Title</span>
+                    }
+                </span>
             </td>
             <td>@item.Location</td>
             <td>@item.StartText</td>
