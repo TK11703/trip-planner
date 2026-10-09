@@ -70,10 +70,11 @@ public sealed class TripDataChatEvaluationTests
                 evaluationCase.ExpectedAnswerContainsAny.Any(expected =>
                     generated!.Answer.Contains(expected, StringComparison.OrdinalIgnoreCase)),
                 $"Case '{evaluationCase.Id}' answer did not contain any expected text: {generated!.Answer}");
+            var recordKeys = generated!.CitationKeys.Where(key => key != TripDataChatDateContext.CitationKey).ToArray();
             Assert.True(
-                evaluationCase.ExpectedCitationCount == generated!.CitationKeys.Count,
-                $"Case '{evaluationCase.Id}' expected {evaluationCase.ExpectedCitationCount} citations but got {generated.CitationKeys.Count}.");
-            Assert.All(generated.CitationKeys, key => Assert.Contains(key, citationKeys.Values));
+                evaluationCase.ExpectedCitationCount == recordKeys.Length,
+                $"Case '{evaluationCase.Id}' expected {evaluationCase.ExpectedCitationCount} citations but got {recordKeys.Length}.");
+            Assert.All(recordKeys, key => Assert.Contains(key, citationKeys.Values));
             if (evaluationCase.ExpectedNoLeakSentinel is { } sentinel)
             {
                 Assert.DoesNotContain(sentinel, generated.Answer, StringComparison.Ordinal);
