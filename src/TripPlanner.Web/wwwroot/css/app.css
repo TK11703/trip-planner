@@ -1052,7 +1052,7 @@ body {
     white-space: nowrap;
 }
 
-.tp-itinerary-table thead th:nth-child(1) { min-width: 7rem; }
+.tp-itinerary-table thead th:nth-child(1) { min-width: 3.5rem; }
 .tp-itinerary-table thead th:nth-child(2) { min-width: 12rem; }
 .tp-itinerary-table thead th:nth-child(3) { min-width: 11rem; }
 .tp-itinerary-table thead th:nth-child(4),
