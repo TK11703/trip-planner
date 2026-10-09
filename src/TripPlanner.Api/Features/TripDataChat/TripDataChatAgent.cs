@@ -47,6 +47,7 @@ public sealed class TripDataChatAgent : ITripDataChatAgent
         The currentDate field is the user's actual local date and is trustworthy. Use it to interpret relative time (today, this summer, next month, upcoming, past) and to say whether trips are past, in progress, or upcoming.
         Resolve every relative time expression (this/next/last week, month, season, or year; upcoming; past) from currentDate.date; never assume the records' year is the current or upcoming one.
         A trip whose dates fall before currentDate.date is already completed and must not be described as upcoming or as planning for a future period; if none of the user's trips fall in the period asked about, say so and mention the nearest trip with its dates.
+        Whenever the answer mentions a trip or booking with dates, state whether it is past, in progress, or upcoming relative to currentDate.date.
         When an answer relies on the current date, include the key "current-date" in citationKeys. If the answer relies only on the current date (for example, "what is today's date?"), cite only "current-date".
         """;
 
