@@ -3,7 +3,12 @@
    always rendered for unknown or missing types so no entry is ever left without an icon. *@
 
 <svg class="tp-item-icon @CssClass" viewBox="0 0 16 16" width="1em" height="1em"
-     fill="currentColor" aria-hidden="true" focusable="false" role="img">
+     fill="currentColor" aria-hidden="@(string.IsNullOrWhiteSpace(Label) ? "true" : null)"
+     aria-label="@Label" focusable="false" role="img">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <title>@Label</title>
+    }
     @switch (Normalized)
     {
         case "event":
@@ -38,6 +43,9 @@
 
     /// <summary>Optional extra CSS classes for sizing/spacing in context (timeline vs. form).</summary>
     [Parameter] public string? CssClass { get; set; }
+
+    /// <summary>Optional accessible name and tooltip; omitted for decorative icons.</summary>
+    [Parameter] public string? Label { get; set; }
 
     private string Normalized => (Type ?? string.Empty).Trim().ToLowerInvariant();
 }

@@ -32,6 +32,12 @@ tests/
   TripPlanner.E2E.Tests/        # Playwright end-to-end (run against AppHost)
 ```
 
+## Itinerary tables
+
+The trip details table and printable itinerary display each item's type as its
+associated icon. Icons include an accessible type name (for example, Reservation
+or Activity) and a hover title rather than visible type text.
+
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)

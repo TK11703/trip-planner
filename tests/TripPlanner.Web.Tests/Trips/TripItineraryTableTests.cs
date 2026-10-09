@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Bunit;
+using TripPlanner.Web.Components.Shared;
 using TripPlanner.Web.Components.Trips;
 using TripPlanner.Web.Features.Trips;
 using Xunit;
@@ -34,6 +35,36 @@ public class TripItineraryTableTests : BunitContext
             new[] { "Walk", "Dinner", "Pack", "Review transfer" },
             cut.FindAll("tr.tp-itinerary-item").Select(row => row.QuerySelectorAll("td")[1].TextContent.Trim()).ToArray());
         Assert.Contains("No items for this leg.", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TypeColumnRendersMatchingLabeledIconsForAssignedAndUnassignedItems()
+    {
+        var trip = TripFixtures.Representative();
+        var types = new[] { "reservation", "activity", "reminder", "event" };
+        trip = trip with
+        {
+            TrackedItems = trip.TrackedItems.Select((item, index) => item with { ItemType = types[index] }).ToArray()
+        };
+        var cut = Render(trip);
+
+        foreach (var row in cut.FindAll("tr.tp-itinerary-item"))
+        {
+            var cells = row.QuerySelectorAll("td");
+            var item = trip.TrackedItems.Single(item => item.Title == cells[1].TextContent.Trim());
+            var expectedLabel = System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(item.ItemType);
+            var icon = cells[0].QuerySelector("svg")!;
+            var expectedIcon = Render<TrackedItemIcon>(p => p
+                .Add(x => x.Type, item.ItemType)
+                .Add(x => x.Label, expectedLabel));
+
+            Assert.Equal(expectedLabel, icon.GetAttribute("aria-label"));
+            Assert.False(icon.HasAttribute("aria-hidden"));
+            Assert.Equal(expectedLabel, icon.QuerySelector("title")!.TextContent);
+            Assert.Equal(expectedIcon.Find("svg").InnerHtml, icon.InnerHtml);
+            Assert.Single(cells[0].Children);
+        }
+        Assert.Equal(4, cut.FindAll("tr.tp-itinerary-item svg").Count);
     }
 
     [Fact]

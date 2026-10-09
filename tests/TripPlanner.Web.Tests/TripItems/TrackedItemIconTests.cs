@@ -44,6 +44,31 @@ public class TrackedItemIconTests : BunitContext
     }
 
     [Fact]
+    public void LabeledIcon_ExposesItsTypeToAssistiveTechnologyAndAsATooltip()
+    {
+        var cut = Render<TrackedItemIcon>(p => p
+            .Add(x => x.Type, "reservation")
+            .Add(x => x.Label, "Reservation"));
+
+        var icon = cut.Find("svg");
+        Assert.Equal("img", icon.GetAttribute("role"));
+        Assert.Equal("Reservation", icon.GetAttribute("aria-label"));
+        Assert.False(icon.HasAttribute("aria-hidden"));
+        Assert.Equal("Reservation", icon.QuerySelector("title")!.TextContent);
+    }
+
+    [Fact]
+    public void UnlabeledIcon_RemainsDecorative()
+    {
+        var cut = Render<TrackedItemIcon>(p => p.Add(x => x.Type, "activity"));
+
+        var icon = cut.Find("svg");
+        Assert.Equal("true", icon.GetAttribute("aria-hidden"));
+        Assert.False(icon.HasAttribute("aria-label"));
+        Assert.Empty(cut.FindAll("title"));
+    }
+
+    [Fact]
     public void Type_IsCaseInsensitive()
     {
         var lower = Render<TrackedItemIcon>(p => p.Add(x => x.Type, "reminder")).Find("svg").InnerHtml;

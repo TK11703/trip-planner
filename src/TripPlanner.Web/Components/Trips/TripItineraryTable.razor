@@ -123,7 +123,7 @@ else
     private RenderFragment RenderItemRow(ItineraryItemRow item) => __builder =>
     {
         <tr class="tp-itinerary-item">
-            <td>@item.TypeText</td>
+            <td><TrackedItemIcon Type="@item.TypeText" Label="@item.TypeText" /></td>
             <td>
                 @if (OnEditItem.HasDelegate)
                 {

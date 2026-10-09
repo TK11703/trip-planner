@@ -46,6 +46,27 @@ public class TripPrintDocumentTests : BunitContext
     }
 
     [Fact]
+    public void PrintTypeColumnUsesInlineIconsWithAccessibleTypeNames()
+    {
+        var trip = TripFixtures.Populated();
+        trip = trip with
+        {
+            TrackedItems = trip.TrackedItems.Select(item => item with { ItemType = "reservation" }).ToArray()
+        };
+        var cut = Render(trip);
+
+        var icons = cut.FindAll("tr.tp-itinerary-item td:first-child svg");
+        Assert.Equal(trip.TrackedItems.Count, icons.Count);
+        Assert.All(icons, icon =>
+        {
+            Assert.Equal("Reservation", icon.GetAttribute("aria-label"));
+            Assert.False(icon.HasAttribute("aria-hidden"));
+            Assert.Equal("Reservation", icon.QuerySelector("title")!.TextContent);
+            Assert.NotNull(icon.QuerySelector("path"));
+        });
+    }
+
+    [Fact]
     public void PrintableModelMatchesNeutralTableProjection()
     {
         var trip = TripFixtures.Representative();
