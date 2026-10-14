@@ -7,16 +7,10 @@
 @inject ITripApiClient TripApi
 @inject IEmailIngestionApiClient EmailIngestionApi
 
-<div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="draftEditTitle">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title h5" id="draftEditTitle">Edit parsed item</h2>
-                <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAsync"></button>
-            </div>
+<section class="draft-edit-page" aria-label="Edit parsed item">
             <EditForm Model="_model" OnValidSubmit="SaveAsync" FormName="@($"draft-edit-{Draft.ParsedItemDraftId}")">
                 <DataAnnotationsValidator />
-                <div class="modal-body">
+                <div class="card-body">
                     @if (_reRecognizing)
                     {
                         <div class="alert alert-info py-2 small" role="status" data-testid="draft-re-recognizing">
@@ -229,15 +223,14 @@
                         <ValidationMessage For="@(() => _model.Notes)" />
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="CloseAsync" disabled="@_saving">Cancel</button>
-                    <button type="submit" class="btn btn-primary" disabled="@_saving">Save</button>
+                <div class="card-footer entry-form-footer">
+                    <div class="entry-form-actions d-flex flex-wrap justify-content-start gap-3 w-100">
+                        <button type="submit" class="btn btn-primary" disabled="@_saving">Save</button>
+                        <button type="button" class="btn btn-secondary" @onclick="CloseAsync" disabled="@_saving">Cancel</button>
+                    </div>
                 </div>
             </EditForm>
-        </div>
-    </div>
-</div>
-<div class="modal-backdrop show"></div>
+</section>
 
 @code {
     private sealed class DraftModel : IValidatableObject
@@ -367,6 +360,7 @@
     [Parameter, EditorRequired] public ParsedItemDraftDto Draft { get; set; } = default!;
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public EventCallback OnSaved { get; set; }
+    [Parameter] public EventCallback<bool> OnSubmittingChanged { get; set; }
 
     private DraftModel _model = new();
     private IReadOnlyList<TripSummary> _trips = Array.Empty<TripSummary>();
@@ -466,7 +460,7 @@
 
         _model = new DraftModel
         {
-            TripId = Draft.TripId,
+            TripId = Draft.TripId ?? Draft.Placement?.SuggestedTripId,
             TripLegId = Draft.TripLegId,
             Outcome = Draft.ProposedOutcome,
             TransportationMode = Draft.TransportationMode,
@@ -639,10 +633,16 @@
     {
         _saving = true;
         _error = null;
-
-        await CallApiAsync(SaveDraftAsync, message => _error = message);
-
-        _saving = false;
+        await OnSubmittingChanged.InvokeAsync(true);
+        try
+        {
+            await CallApiAsync(SaveDraftAsync, message => _error = message);
+        }
+        finally
+        {
+            _saving = false;
+            await OnSubmittingChanged.InvokeAsync(false);
+        }
     }
 
     private async Task SaveDraftAsync()

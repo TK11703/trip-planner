@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using TripPlanner.Contracts.EmailIngestion
+@using TripPlanner.Web.Features.EntryPages
 @using TripPlanner.Web.Components.EmailIngestion
 @using TripPlanner.Web.Features.EmailIngestion
 @inject IEmailIngestionApiClient EmailIngestionApi
@@ -35,7 +36,7 @@
         <ul class="list-unstyled">
             @foreach (var draft in _drafts)
             {
-                <li class="card mb-3">
+                <li id="draft-@draft.ParsedItemDraftId" class="card mb-3">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start gap-3">
                             <div class="flex-grow-1">
@@ -170,11 +171,7 @@
                                         disabled="@(_isBusy || !CanConfirm(draft))">
                                     Confirm
                                 </button>
-                                <button class="btn btn-sm btn-outline-secondary"
-                                    @onclick="() => _editing = WithSuggestedTrip(draft)"
-                                        disabled="@_isBusy">
-                                    Edit
-                                </button>
+                                <a class="btn btn-sm btn-outline-secondary" href="@DraftHref(draft)">Edit</a>
                                 <button class="btn btn-sm btn-outline-danger"
                                         @onclick="() => DiscardAsync(draft.ParsedItemDraftId)"
                                         disabled="@_isBusy">
@@ -189,19 +186,11 @@
     }
 </section>
 
-@if (_editing is { } editing)
-{
-    <DraftEditModal Draft="editing" OnClose="() => _editing = null" OnSaved="LoadAsync" />
-}
-
 @code {
     private bool _isLoading = true;
     private bool _isBusy;
     private string? _loadError;
     private List<ParsedItemDraftDto> _drafts = new();
-
-    // The draft currently open in the edit modal, if any.
-    private ParsedItemDraftDto? _editing;
 
     // Per-draft refusal messages, keyed by draft so each one stays next to the card it belongs to.
     private readonly Dictionary<Guid, string> _errors = new();
@@ -263,10 +252,9 @@
         return placement.Candidates.FirstOrDefault(c => c.TripLegId == legId);
     }
 
-    private static ParsedItemDraftDto WithSuggestedTrip(ParsedItemDraftDto draft)
-        => draft.TripId is null && draft.Placement?.SuggestedTripId is { } tripId
-            ? draft with { TripId = tripId }
-            : draft;
+    private static string DraftHref(ParsedItemDraftDto draft)
+        => EntryPageUrls.DraftEdit(draft.ParsedItemDraftId, "/inbox/drafts")
+            + (draft.TripId is null && draft.Placement?.SuggestedTripId is not null ? "&suggestedTrip=true" : string.Empty);
 
     // A leg is optional — an item confirmed without one waits in the timeline's unassigned area.
     // A trip is not: an item has to belong somewhere (FR-011).

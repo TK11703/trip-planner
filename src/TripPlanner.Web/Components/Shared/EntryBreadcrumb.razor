@@ -1,0 +1,26 @@
+@using TripPlanner.Web.Features.EntryPages
+
+@if (Items is { Count: > 0 })
+{
+    <nav class="entry-breadcrumb" aria-label="Breadcrumb">
+        <ol class="breadcrumb">
+            @foreach (var item in Items)
+            {
+                <li class="breadcrumb-item @(item.IsCurrent ? "active" : null)" aria-current="@(item.IsCurrent ? "page" : null)">
+                    @if (!item.IsCurrent && !string.IsNullOrWhiteSpace(item.Href))
+                    {
+                        <a href="@item.Href">@item.Label</a>
+                    }
+                    else
+                    {
+                        <span>@item.Label</span>
+                    }
+                </li>
+            }
+        </ol>
+    </nav>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<BreadcrumbItem> Items { get; set; } = Array.Empty<BreadcrumbItem>();
+}

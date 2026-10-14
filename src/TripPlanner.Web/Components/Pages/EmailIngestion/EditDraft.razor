@@ -1,0 +1,51 @@
+@page "/inbox/drafts/{DraftId:guid}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits ApiComponentBase
+@using TripPlanner.Contracts.EmailIngestion
+@using TripPlanner.Web.Features.EntryPages
+@using TripPlanner.Web.Features.EmailIngestion
+@using TripPlanner.Web.Components.EmailIngestion
+@inject IEmailIngestionApiClient EmailApi
+@inject NavigationManager Nav
+
+<PageTitle>Edit draft</PageTitle>
+<EntryNavigationGuard IsDirty="_isDirty" IsDirtyChanged="SetDirty" IsSubmitting="_isSubmitting">
+<EntryPageShell Title="Edit draft" Context="Review imported travel details before adding them to your itinerary." Icon="draft" Breadcrumbs="Breadcrumbs" LoadState="_state" ErrorMessage="@_error" SafeBackHref="@Destination">
+    @if (_draft is not null && _state == EntryPageShell.EntryLoadState.Ready)
+    {
+        <DraftEditForm @key="DraftId" Draft="_draft" OnClose="Cancel" OnSaved="Saved" OnSubmittingChanged="SetSubmitting" />
+    }
+</EntryPageShell>
+</EntryNavigationGuard>
+
+@code {
+    private bool _isDirty;
+    private bool _isSubmitting;
+    private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
+    private Task SetSubmitting(bool value) { _isSubmitting = value; return Task.CompletedTask; }
+    [Parameter] public Guid DraftId { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery(Name = "suggestedTrip")] public bool SuggestedTrip { get; set; }
+    private ParsedItemDraftDto? _draft;
+    private string? _error;
+    private EntryPageShell.EntryLoadState _state = EntryPageShell.EntryLoadState.Loading;
+    private string Destination => EntryPageUrls.NormalizeReturnUrl(ReturnUrl, "/inbox/drafts");
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs => [new("Home", "/"), new("Inbox", "/inbox/drafts"), new("Drafts", "/inbox/drafts"), new(_draft?.Title ?? $"Draft {DraftId.ToString("N")[..8]}", $"/inbox/drafts#draft-{DraftId:D}"), new("Edit draft", IsCurrent: true)];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _state = EntryPageShell.EntryLoadState.Loading; _draft = null; _error = null;
+        await CallApiAsync(async () =>
+        {
+            var drafts = await EmailApi.GetDraftsAsync();
+            _draft = drafts.FirstOrDefault(draft => draft.ParsedItemDraftId == DraftId);
+            if (_draft is null) { _state = EntryPageShell.EntryLoadState.MissingOrDenied; return; }
+            if (SuggestedTrip && _draft.TripId is null && _draft.Placement?.SuggestedTripId is { } tripId) _draft = _draft with { TripId = tripId };
+            _state = EntryPageShell.EntryLoadState.Ready;
+        }, message => { _error = message; _state = EntryPageShell.EntryLoadState.Error; });
+        if (IsReauthenticating) _state = EntryPageShell.EntryLoadState.Loading;
+    }
+    private void Cancel() => Nav.NavigateTo(Destination);
+    private Task Saved() { _isDirty = false; _isSubmitting = false; return Task.CompletedTask; }
+}

@@ -1,0 +1,4 @@
+.entry-breadcrumb { min-width:0; }
+.entry-breadcrumb ol { padding-left:0; }
+.entry-breadcrumb li { max-width:100%; }
+@media(max-width:575.98px) { .entry-breadcrumb .breadcrumb { font-size:.9rem; } .entry-breadcrumb .breadcrumb-item { white-space:normal; } }

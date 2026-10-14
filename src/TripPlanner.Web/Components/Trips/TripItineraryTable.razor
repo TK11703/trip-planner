@@ -1,20 +1,21 @@
 @using TripPlanner.Web.Features.Trips
+@using TripPlanner.Web.Features.EntryPages
 
 @if (!Model.HasContent)
 {
     @* Items need a leg to hang off, so the empty table offers only the leg action. *@
-    @if (OnAddLeg.HasDelegate)
+    @if (CanEdit || OnAddLeg.HasDelegate)
     {
         <div class="border-dashed rounded p-4 text-center text-secondary">
             No trip legs yet. Add a trip leg to start building your itinerary, then relate items to it.
-            <button id="tp-table-add-leg"
-                    type="button"
-                    class="ttl-leg-add"
-                    title="Add a trip leg"
-                    aria-label="Add leg"
-                    @onclick="OnAddLeg">
-                <span aria-hidden="true">+</span> Add leg
-            </button>
+            @if (CanEdit && TripId != Guid.Empty)
+            {
+                <a id="tp-table-add-leg" class="ttl-leg-add" title="Add a trip leg" aria-label="Add leg" href="@EntryPageUrls.LegCreate(TripId, ReturnUrl)"><span aria-hidden="true">+</span> Add leg</a>
+            }
+            else
+            {
+                <button id="tp-table-add-leg" type="button" class="ttl-leg-add" aria-label="Add leg" @onclick="OnAddLeg"><span aria-hidden="true">+</span> Add leg</button>
+            }
         </div>
     }
     else
@@ -41,9 +42,13 @@ else
             <tbody>
                 @foreach (var leg in Model.Legs)
                 {
-                    <tr class="tp-itinerary-leg">
+                    <tr id="leg-@leg.TripLegId" class="tp-itinerary-leg">
                         <th scope="rowgroup" colspan="@ColumnCount">
-                            @if (OnEditLeg.HasDelegate)
+                            @if (CanEdit && TripId != Guid.Empty)
+                            {
+                                <a id="@EditLegActionId(leg.TripLegId)" class="tp-itinerary-leg-title tp-itinerary-title-action" aria-label="Edit leg @leg.Title" href="@EntryPageUrls.LegEdit(TripId, leg.TripLegId, ReturnUrl)">@leg.Title</a>
+                            }
+                            else if (OnEditLeg.HasDelegate)
                             {
                                 <button id="@EditLegActionId(leg.TripLegId)" type="button" class="tp-itinerary-leg-title tp-itinerary-title-action" aria-label="Edit leg @leg.Title" @onclick="() => OnEditLeg.InvokeAsync(leg.TripLegId)">@leg.Title</button>
                             }
@@ -68,7 +73,11 @@ else
                             {
                                 <span class="tp-itinerary-leg-cost">@leg.TravelCostText</span>
                             }
-                            @if (leg.CanContainItems && OnAddItem.HasDelegate)
+                            @if (leg.CanContainItems && CanEdit && TripId != Guid.Empty)
+                            {
+                                <a id="@AddItemActionId(leg.TripLegId)" class="ttl-leg-add tp-itinerary-row-add" title="Add an item to @leg.Title" aria-label="Add item to @leg.Title" href="@EntryPageUrls.ItemCreate(TripId, leg.TripLegId, returnUrl: ReturnUrl)"><span aria-hidden="true">+</span> Add item</a>
+                            }
+                            else if (leg.CanContainItems && OnAddItem.HasDelegate)
                             {
                                 <button id="@AddItemActionId(leg.TripLegId)" type="button" class="ttl-leg-add tp-itinerary-row-add" title="Add an item to @leg.Title" aria-label="Add item to @leg.Title" @onclick="() => OnAddItem.InvokeAsync(leg.TripLegId)"><span aria-hidden="true">+</span> Add item</button>
                             }
@@ -91,7 +100,7 @@ else
 
                 @if (Model.UnassignedItems.Count > 0)
                 {
-                    <tr class="tp-itinerary-leg">
+                    <tr id="unassigned-items" class="tp-itinerary-leg">
                         <th scope="rowgroup" colspan="@ColumnCount">
                             <span class="tp-itinerary-leg-title">Unassigned</span>
                         </th>
@@ -108,6 +117,9 @@ else
 
 @code {
     [Parameter, EditorRequired] public ItineraryTableModel Model { get; set; } = default!;
+    [Parameter] public Guid TripId { get; set; }
+    [Parameter] public string? ReturnUrl { get; set; }
+    [Parameter] public bool CanEdit { get; set; }
     [Parameter] public EventCallback<Guid> OnEditLeg { get; set; }
     [Parameter] public EventCallback<Guid> OnEditItem { get; set; }
     [Parameter] public EventCallback OnAddLeg { get; set; }
@@ -121,11 +133,15 @@ else
 
     private RenderFragment RenderItemRow(ItineraryItemRow item) => __builder =>
     {
-        <tr class="tp-itinerary-item">
+        <tr id="item-@item.TrackedItemId" class="tp-itinerary-item">
             <td>
                 <span class="tp-itinerary-item-title">
                     <TrackedItemIcon Type="@item.TypeText" Label="@item.TypeText" />
-                    @if (OnEditItem.HasDelegate)
+                    @if (CanEdit && TripId != Guid.Empty)
+                    {
+                        <a id="@EditItemActionId(item.TrackedItemId)" class="tp-itinerary-title-action" aria-label="Edit item @item.Title" href="@EntryPageUrls.ItemEdit(TripId, item.TrackedItemId, ReturnUrl)">@item.Title</a>
+                    }
+                    else if (OnEditItem.HasDelegate)
                     {
                         <button id="@EditItemActionId(item.TrackedItemId)" type="button" class="tp-itinerary-title-action" aria-label="Edit item @item.Title" @onclick="() => OnEditItem.InvokeAsync(item.TrackedItemId)">@item.Title</button>
                     }

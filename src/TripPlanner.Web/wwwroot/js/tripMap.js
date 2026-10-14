@@ -61,13 +61,12 @@ function buildPopup(point, dotNetRef) {
         container.appendChild(sub);
     }
 
-    if (dotNetRef) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'btn btn-sm btn-link p-0 mt-1';
-        button.textContent = 'Open item';
-        button.addEventListener('click', () => dotNetRef.invokeMethodAsync('OnMarkerActivated', point.trackedItemId));
-        container.appendChild(button);
+    if (point.editUrl) {
+        const link = document.createElement('a');
+        link.className = 'btn btn-sm btn-link p-0 mt-1';
+        link.href = point.editUrl;
+        link.textContent = 'Open item';
+        container.appendChild(link);
     }
 
     return container;

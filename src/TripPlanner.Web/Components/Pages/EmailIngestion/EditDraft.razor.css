@@ -1,0 +1,3 @@
+.draft-edit-page { max-width: 64rem; }
+.draft-edit-page :is(input, select, textarea, button) { min-height: 44px; }
+.draft-edit-page textarea { min-height: 7rem; }

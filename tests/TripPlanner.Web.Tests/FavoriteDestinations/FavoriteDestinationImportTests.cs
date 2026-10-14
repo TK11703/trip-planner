@@ -12,6 +12,36 @@ namespace TripPlanner.Web.Tests.FavoriteDestinations;
 
 public sealed class FavoriteDestinationImportTests : BunitContext
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FooterActions_PlaceImportFirstAndDiscardOnTheRight(bool review)
+    {
+        var api = new ImportFavoriteDestinationApiClient();
+        if (review)
+        {
+            api.OpenImports.Add(Job(FavoriteDestinationImportStatus.NeedsReview));
+        }
+        var cancelled = 0;
+        var cut = RenderImport(api, onCancel: () => cancelled++);
+
+        cut.WaitForAssertion(() =>
+        {
+            var actions = cut.Find(".entry-form-actions");
+            Assert.Contains("justify-content-start", actions.ClassList);
+            Assert.Equal(
+                review ? ["favorite-import-finish", "favorite-import-cancel", "favorite-import-discard"] : new[] { "favorite-import-submit", "favorite-import-cancel" },
+                actions.Children.Select(button => button.Id));
+            Assert.Contains("btn-primary", actions.Children[0].ClassList);
+            if (review)
+            {
+                Assert.Contains("ms-auto", actions.Children[^1].ClassList);
+            }
+        });
+        cut.Find("#favorite-import-cancel").Click();
+        Assert.Equal(1, cancelled);
+    }
+
     [Fact]
     public async Task Import_ShowsRowErrorsAndDoesNotReportSuccess()
     {
@@ -183,14 +213,20 @@ public sealed class FavoriteDestinationImportTests : BunitContext
     private static FavoriteDestinationImportResponse Queued(FavoriteDestinationImportJobDto job)
         => new(job, Array.Empty<FavoriteDestinationImportIssue>());
 
-    private IRenderedComponent<FavoriteDestinationImport> RenderImport(ImportFavoriteDestinationApiClient api, Action? onImported = null)
+    private IRenderedComponent<FavoriteDestinationImport> RenderImport(ImportFavoriteDestinationApiClient api, Action? onImported = null, Action? onCancel = null)
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton<IFavoriteDestinationApiClient>(api);
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
-        return Render<FavoriteDestinationImport>(parameters => parameters
-            .Add(component => component.PollInterval, TimeSpan.FromMilliseconds(10))
-            .Add(component => component.OnImported, () => onImported?.Invoke()));
+        return Render<FavoriteDestinationImport>(parameters =>
+        {
+            parameters.Add(component => component.PollInterval, TimeSpan.FromMilliseconds(10));
+            parameters.Add(component => component.OnImported, () => onImported?.Invoke());
+            if (onCancel is not null)
+            {
+                parameters.Add(component => component.OnCancel, onCancel);
+            }
+        });
     }
 
     private static Task SelectFileAsync(IRenderedComponent<FavoriteDestinationImport> cut, string name, string content)

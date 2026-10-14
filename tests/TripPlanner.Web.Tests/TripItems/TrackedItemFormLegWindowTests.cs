@@ -83,7 +83,7 @@ public class TrackedItemFormLegWindowTests : BunitContext
             .Add(x => x.InitialTripLegId, leg.TripLegId)
             .Add(x => x.InitialStartsAt, new DateTime(2026, 9, 5, 14, 0, 0)));
 
-        cut.Find(".col-7 input").Change("Louvre tour");
+        cut.Find("#item-name").Change("Louvre tour");
         cut.FindAll("input[type=datetime-local]")[0].Change("2026-09-20T09:00");
         cut.Find("form").Submit();
 
@@ -113,7 +113,7 @@ public class TrackedItemFormLegWindowTests : BunitContext
             .Add(x => x.TripId, Guid.NewGuid())
             .Add(x => x.Legs, Array.Empty<TripPlanner.Contracts.Trips.TripLegDto>()));
 
-        cut.Find(".col-7 input").Change("Museum pass");
+        cut.Find("#item-name").Change("Museum pass");
         cut.FindAll("input[type=datetime-local]")[0].Change("2026-09-20T09:00");
         cut.Find("form").Submit();
 

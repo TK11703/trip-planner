@@ -52,13 +52,13 @@ public class TripSharingComponentTests : BunitContext
     }
 
     [Fact]
-    public void ShareModal_ListsCurrentMembers()
+    public void ShareForm_ListsCurrentMembers()
     {
         var member = new TripShareMember("user-x", "Alex Doe", "alex@example.com", TripAccessLevel.Viewer, DateTimeOffset.UtcNow);
         var client = new StubShareApiClient { Members = new[] { member } };
         Services.AddSingleton<ITripApiClient>(client);
 
-        var cut = Render<ShareTripModal>(parameters => parameters
+        var cut = Render<TripSharingForm>(parameters => parameters
             .Add(p => p.TripId, Guid.NewGuid()));
 
         cut.WaitForAssertion(() =>

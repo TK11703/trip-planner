@@ -36,7 +36,7 @@ public class TrackedItemFormLocationValidationTests : BunitContext
     public void SymbolsOnlyLocation_IsRejected()
     {
         var cut = RenderCreate(Leg());
-        cut.Find(".col-7 input").Change("Museum visit");
+        cut.Find("#item-name").Change("Museum visit");
         cut.Find("#item-location").Change("!!!");
 
         cut.Find("form").Submit();
@@ -48,7 +48,7 @@ public class TrackedItemFormLocationValidationTests : BunitContext
     public void OverlongLocation_IsRejected()
     {
         var cut = RenderCreate(Leg());
-        cut.Find(".col-7 input").Change("Museum visit");
+        cut.Find("#item-name").Change("Museum visit");
         cut.Find("#item-location").Change(new string('a', 201));
 
         cut.Find("form").Submit();
@@ -60,7 +60,7 @@ public class TrackedItemFormLocationValidationTests : BunitContext
     public void ValidAddress_IsAccepted()
     {
         var cut = RenderCreate(Leg());
-        cut.Find(".col-7 input").Change("Museum visit");
+        cut.Find("#item-name").Change("Museum visit");
         cut.Find("#item-location").Change("Louvre Museum, Paris");
 
         cut.Find("form").Submit();
@@ -73,7 +73,7 @@ public class TrackedItemFormLocationValidationTests : BunitContext
     public void EmptyLocation_IsAllowed()
     {
         var cut = RenderCreate(Leg());
-        cut.Find(".col-7 input").Change("Museum visit");
+        cut.Find("#item-name").Change("Museum visit");
         // Leave location empty.
 
         cut.Find("form").Submit();

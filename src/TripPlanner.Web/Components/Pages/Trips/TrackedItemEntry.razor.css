@@ -1,0 +1,8 @@
+/* Keep item-entry controls comfortable on narrow screens and preserve visible keyboard focus. */
+.tracked-item-entry ::deep .entry-page-shell .form-control,
+.tracked-item-entry ::deep .entry-page-shell .form-select,
+.tracked-item-entry ::deep .entry-page-shell .btn { min-height: 2.75rem; }
+.tracked-item-entry ::deep .entry-page-shell :focus-visible { outline: 3px solid var(--bs-primary); outline-offset: 2px; }
+@media (max-width: 575.98px) {
+    .tracked-item-entry ::deep .entry-page-actions { width: 100%; }
+}

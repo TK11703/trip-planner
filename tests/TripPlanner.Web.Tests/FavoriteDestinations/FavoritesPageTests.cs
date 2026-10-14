@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Contracts.FavoriteDestinations;
 using TripPlanner.Web.Features.FavoriteDestinations;
+using FavoriteEntryPage = TripPlanner.Web.Components.Pages.FavoriteDestinations.FavoriteEntry;
 using TripPlanner.Web.Tests.Auth;
 using FavoritesPage = TripPlanner.Web.Components.Pages.Favorites;
 
@@ -23,17 +24,73 @@ public sealed class FavoritesPageTests : BunitContext
         var cut = Render<FavoritesPage>();
 
         cut.WaitForAssertion(() => Assert.Contains("No favorite destinations yet", cut.Markup));
-        cut.Find("#favorite-add").Click();
+        Assert.Equal("/favorites/new?returnUrl=%2Ffavorites", cut.Find("#favorite-add").GetAttribute("href"));
+        Assert.Equal("/favorites/new?returnUrl=%2Ffavorites", cut.Find("#favorite-add-empty").GetAttribute("href"));
+    }
 
-        Assert.NotNull(cut.Find("#favorite-form"));
+    [Fact]
+    public void CreateEntry_LoadsInsideCardWithoutAnErrorBanner()
+    {
+        var cut = Render<FavoriteEntryPage>();
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find(".entry-form-card #favorite-form > .card-body")));
+        Assert.Equal("Add a favorite", cut.Find(".entry-page-heading h1").TextContent);
+        Assert.Equal("submit", cut.Find(".card-footer .entry-form-actions").Children[0].GetAttribute("type"));
+        Assert.Equal(["Save", "Cancel"], cut.FindAll(".card-footer button").Select(button => button.TextContent.Trim()));
+        Assert.Equal("Add a favorite", cut.Find("h1").TextContent);
+        Assert.Equal("Keep a destination handy to use when planning your trips.", cut.Find(".entry-page-subtitle").TextContent);
+        Assert.NotNull(cut.Find("header.entry-page-heading + .entry-form-card"));
+        Assert.Empty(cut.FindAll(".entry-form-card > .card-header"));
+        Assert.Empty(cut.FindAll("[role='alert']"));
+        Assert.Empty(cut.FindAll(".validation-message"));
+    }
+
+    [Fact]
+    public void EditEntry_EndsBreadcrumbAtFavoriteAndLoadsWithoutAnErrorBanner()
+    {
+        var favorite = Favorite("Museum Island", "Berlin", "Berlin", "Germany", null);
+        Services.AddSingleton<IFavoriteDestinationApiClient>(new RecordingFavoriteDestinationApiClient([favorite]));
+        var cut = Render<FavoriteEntryPage>(parameters => parameters.Add(page => page.FavoriteId, favorite.FavoriteDestinationId));
+
+        cut.WaitForAssertion(() => Assert.Equal("Museum Island", cut.Find("#favorite-name").GetAttribute("value")));
+        Assert.Equal(["Home", "Favorites", "Museum Island"], cut.FindAll(".breadcrumb-item").Select(item => item.TextContent.Trim()));
+        Assert.Equal("Museum Island", cut.Find("[aria-current='page']").TextContent);
+        Assert.Equal("Edit this favorite", cut.Find("h1").TextContent);
+        Assert.NotNull(cut.Find(".entry-form-card #favorite-form > .card-body"));
+        Assert.Equal(["Save", "Cancel", "Delete"], cut.FindAll(".card-footer button").Select(button => button.TextContent.Trim()));
+        Assert.Equal(["Save this favorite destination", "Cancel without saving this favorite", "Confirm deletion of this favorite"], cut.FindAll(".card-footer button").Select(button => button.GetAttribute("title")));
+        Assert.Contains("ms-auto", cut.Find("#favorite-delete").ClassList);
+        Assert.All(cut.FindAll(".card-footer button"), button => Assert.NotNull(button.QuerySelector("svg")));
+        Assert.Equal("Keep a destination handy to use when planning your trips.", cut.Find(".entry-page-subtitle").TextContent);
+        Assert.Equal("favorite", cut.FindComponent<TripPlanner.Web.Components.Shared.EntryPageShell>().Instance.Icon);
+        Assert.Empty(cut.FindAll("[role='alert']"));
+        Assert.Empty(cut.FindAll(".validation-message"));
+    }
+
+    [Fact]
+    public void CreateEntry_ShowsActualSaveErrorAndRetainsEnteredValues()
+    {
+        var client = new RecordingFavoriteDestinationApiClient { CreateErrorMessage = "The favorite could not be saved. Try again." };
+        Services.AddSingleton<IFavoriteDestinationApiClient>(client);
+        var cut = Render<FavoriteEntryPage>();
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("#favorite-form")));
+        Assert.Empty(cut.FindAll("[role='alert']"));
+
+        cut.Find("#favorite-name").Change("Museum Island");
+        cut.Find("#favorite-address").Change("Berlin");
+        cut.Find("#favorite-form").Submit();
+
+        cut.WaitForAssertion(() => Assert.Equal(client.CreateErrorMessage, cut.Find("[role='alert']").TextContent));
+        Assert.Equal("Museum Island", cut.Find("#favorite-name").GetAttribute("value"));
+        Assert.Equal("Berlin", cut.Find("#favorite-address").GetAttribute("value"));
+        Assert.False(cut.Find("button[type='submit']").HasAttribute("disabled"));
     }
 
     [Fact]
     public void CreateForm_IdentifiesMissingNameAndAddress()
     {
-        var cut = Render<FavoritesPage>();
-        cut.WaitForAssertion(() => Assert.Contains("No favorite destinations yet", cut.Markup));
-        cut.Find("#favorite-add").Click();
+        var cut = Render<FavoriteEntryPage>();
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("#favorite-form")));
         cut.Find("#favorite-form").Submit();
 
         Assert.Contains("Name is required.", cut.Markup);
@@ -55,13 +112,9 @@ public sealed class FavoritesPageTests : BunitContext
         var cells = cut.FindAll(".favorites-table tbody tr > *").Skip(1).Select(cell => cell.TextContent.Trim()).Where(text => text.Length > 0).ToArray();
         Assert.Equal(["Museum Island", "Bodestraße 1, Berlin", "Berlin", "Germany"], cells);
         Assert.Empty(cut.FindAll(".modal"));
-
-        cut.Find($"[data-testid='favorite-edit-{favorite.FavoriteDestinationId}']").Click();
-
-        Assert.Equal("Edit favorite", cut.Find(".modal .modal-title").TextContent);
-        Assert.Equal("Allow a full afternoon\n\nSource: Travel guide", cut.Find(".modal #favorite-notes").GetAttribute("value"));
-        cut.Find("#favorite-cancel").Click();
-        Assert.Empty(cut.FindAll(".modal"));
+        var edit = cut.Find($"[data-testid='favorite-edit-{favorite.FavoriteDestinationId}']");
+        Assert.Equal($"/favorites/{favorite.FavoriteDestinationId:D}/edit?returnUrl=%2Ffavorites", edit.GetAttribute("href"));
+        Assert.Empty(cut.FindAll("#favorite-form"));
     }
 
     [Fact]
@@ -70,15 +123,8 @@ public sealed class FavoritesPageTests : BunitContext
         var cut = Render<FavoritesPage>();
         cut.WaitForAssertion(() => Assert.Contains("No favorite destinations yet", cut.Markup));
         Assert.Empty(cut.FindAll(".favorite-import"));
-        Assert.Equal("true", cut.Find("#favorite-tab-list").GetAttribute("aria-selected"));
-
-        cut.Find("#favorite-tab-import").Click();
-
-        Assert.Equal("true", cut.Find("#favorite-tab-import").GetAttribute("aria-selected"));
-        Assert.NotNull(cut.Find("#favorite-import-submit"));
-        Assert.Empty(cut.FindAll("#favorite-search"));
-        cut.Find("#favorite-import-cancel").Click();
-        Assert.Empty(cut.FindAll(".favorite-import"));
+        Assert.Equal("/favorites", cut.Find("#favorite-tab-list").GetAttribute("href"));
+        Assert.Equal("/favorites/import?returnUrl=%2Ffavorites", cut.Find("#favorite-tab-import").GetAttribute("href"));
         Assert.NotNull(cut.Find("#favorite-search"));
     }
 
@@ -98,9 +144,9 @@ public sealed class FavoritesPageTests : BunitContext
 
         var cut = Render<FavoritesPage>();
 
-        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid='favorite-import-ambiguity-1']")));
-        Assert.Equal("true", cut.Find("#favorite-tab-import").GetAttribute("aria-selected"));
-        Assert.StartsWith("1", cut.Find("[data-testid='favorite-import-badge']").TextContent);
+        cut.WaitForAssertion(() => Assert.StartsWith("1", cut.Find("[data-testid='favorite-import-badge']").TextContent));
+        Assert.Equal($"/favorites/import/{client.OpenImports[0].ImportId:D}?returnUrl=%2Ffavorites", cut.Find("#favorite-tab-import").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid='favorite-import-ambiguity-1']"));
     }
 
     [Fact]
@@ -115,7 +161,7 @@ public sealed class FavoritesPageTests : BunitContext
         var cut = Render<FavoritesPage>(parameters => parameters.Add(page => page.ImportPollInterval, TimeSpan.FromMilliseconds(20)));
 
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid='favorite-import-processing']")));
-        cut.Find("#favorite-tab-list").Click();
+        Assert.Equal($"/favorites/import/{processing.ImportId:D}?returnUrl=%2Ffavorites", cut.Find("#favorite-tab-import").GetAttribute("href"));
         Assert.NotNull(cut.Find("[data-testid='favorite-import-processing']"));
         client.OpenImports[0] = processing with { Status = FavoriteDestinationImportStatus.Completed, ImportedCount = 2 };
 
@@ -142,7 +188,8 @@ public sealed class FavoritesPageTests : BunitContext
         Assert.DoesNotContain(googleUrl, cut.Find(".favorites-table tbody").TextContent);
         Assert.Equal("Rue de Rivoli, Paris", cut.Find($"[data-testid='favorite-map-{matched.FavoriteDestinationId}']").TextContent.Trim());
         Assert.Equal("javascript:alert(1)", cut.Find($"[data-testid='favorite-map-{unsafeLink.FavoriteDestinationId}']").TextContent.Trim());
-        Assert.Empty(cut.FindAll(".favorites-table tbody a"));
+        Assert.All(cut.FindAll(".favorites-table tbody a"), anchor => Assert.StartsWith("/favorites/", anchor.GetAttribute("href")));
+        Assert.False(link.HasAttribute("href"));
 
         link.Click();
 
@@ -156,19 +203,17 @@ public sealed class FavoritesPageTests : BunitContext
         var existing = Favorite("Museum Island", "Bodestraße 1, Berlin", "Berlin", "Germany", null);
         var client = new RecordingFavoriteDestinationApiClient(duplicates: [existing]);
         Services.AddSingleton<IFavoriteDestinationApiClient>(client);
-        var cut = Render<FavoritesPage>();
-        cut.WaitForAssertion(() => Assert.Contains("No favorite destinations yet", cut.Markup));
-        cut.Find("#favorite-add").Click();
+        var cut = Render<FavoriteEntryPage>();
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("#favorite-form")));
         cut.Find("#favorite-name").Change("Museum Island");
         cut.Find("#favorite-address").Change("Bodestraße 1, Berlin");
         cut.Find("#favorite-form").Submit();
 
         cut.WaitForAssertion(() => Assert.Contains("possible duplicate", cut.Markup, StringComparison.OrdinalIgnoreCase));
         Assert.Equal(1, client.CreateCallCount);
-        cut.Find("#favorite-confirm-duplicate").Click();
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Save separately", StringComparison.Ordinal)).Click();
 
-        cut.WaitForAssertion(() => Assert.Contains("Favorite destination saved", cut.Markup));
-        Assert.Equal(2, client.CreateCallCount);
+        cut.WaitForAssertion(() => Assert.Equal(2, client.CreateCallCount));
         Assert.True(client.LastCreateRequest!.ConfirmPossibleDuplicate);
     }
 
@@ -195,6 +240,7 @@ internal sealed class RecordingFavoriteDestinationApiClient : IFavoriteDestinati
     }
 
     public int CreateCallCount { get; private set; }
+    public string? CreateErrorMessage { get; init; }
     public CreateFavoriteDestinationRequest? LastCreateRequest { get; private set; }
 
     public Task<IReadOnlyList<FavoriteDestinationDto>> GetAsync(string? search = null, CancellationToken ct = default)
@@ -204,6 +250,10 @@ internal sealed class RecordingFavoriteDestinationApiClient : IFavoriteDestinati
     {
         CreateCallCount++;
         LastCreateRequest = request;
+        if (CreateErrorMessage is not null)
+        {
+            return Task.FromResult(new FavoriteDestinationMutationResult(null, null, CreateErrorMessage));
+        }
         if (_duplicates.Count > 0 && !request.ConfirmPossibleDuplicate)
         {
             return Task.FromResult(new FavoriteDestinationMutationResult(null, new FavoriteDestinationDuplicateWarning(_duplicates), null));

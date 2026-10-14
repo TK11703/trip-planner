@@ -22,8 +22,8 @@ else if (_trip is null)
 else
 {
     <div class="tp-print-actions d-print-none d-flex flex-wrap gap-2 mb-3">
-        <button type="button" class="btn btn-primary" @onclick="PrintAsync">Print</button>
-        <a class="btn btn-outline-secondary" href="@BackHref">Back to trip</a>
+        <a class="btn btn-outline-secondary" href="@BackHref"><ActionIcon Name="back" CssClass="me-1 align-text-bottom" />Back</a>
+        <button type="button" class="btn btn-primary" @onclick="PrintAsync"><ActionIcon Name="print" CssClass="me-1 align-text-bottom" />Print</button>
     </div>
 
     <TripPrintDocument Trip="_printable!" />

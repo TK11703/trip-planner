@@ -39,6 +39,39 @@ public class TripLegFormTests : BunitContext
             .Add(x => x.Leg, leg)
             .Add(x => x.CanEditContent, canEditContent));
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FormRows_UseTripFormVerticalSpacing(bool isEdit)
+    {
+        var cut = isEdit ? RenderEdit(TripLegModeTestData.TravelLeg(TransportationModes.Car)) : RenderCreate();
+
+        Assert.All(cut.Find("form > .card-body").Children, section => Assert.Contains("mb-3", section.ClassList));
+        Assert.All(cut.FindAll("form .row"), row => Assert.Contains("gy-3", row.ClassList));
+        Assert.Contains("mb-3", cut.Find("#leg-start").Closest(".row")!.ClassList);
+    }
+
+    [Fact]
+    public void Dates_ArePairedWithTheirOwnTimezones()
+    {
+        var cut = RenderCreate();
+
+        var card = cut.Find("#leg-schedule.card.bg-body-tertiary");
+        Assert.Equal("group", card.GetAttribute("role"));
+        Assert.Equal("Schedule", card.GetAttribute("aria-label"));
+        Assert.Empty(card.QuerySelectorAll(".card-header, .card-footer, legend"));
+        Assert.Equal(2, card.QuerySelectorAll(".card-body > .row").Length);
+
+        foreach (var boundary in new[] { "start", "end" })
+        {
+            var input = cut.Find($"#leg-{boundary}");
+            var row = input.Closest(".row")!;
+            Assert.NotNull(row.QuerySelector($"#leg-{boundary}-timezone"));
+            Assert.Null(row.QuerySelector($"#leg-{(boundary == "start" ? "end" : "start")}"));
+            Assert.Contains("col-md-6", input.ParentElement!.ClassList);
+        }
+    }
+
     [Fact]
     public void ChangingStart_SetsEndToOneHourLater()
     {
@@ -128,12 +161,23 @@ public class TripLegFormTests : BunitContext
     {
         var cut = RenderCreate();
 
-        var values = cut.FindAll("#leg-transportation-mode option")
+        var values = cut.FindAll("#leg-transportation-mode input[type=radio]")
             .Select(o => o.GetAttribute("value") ?? string.Empty)
-            .Where(v => v.Length > 0)
             .ToArray();
 
         Assert.Equal(TransportationModes.All, values);
+        Assert.Empty(cut.FindAll("#leg-transportation-mode input:checked"));
+        Assert.Single(cut.FindAll("#leg-transportation-mode input").Select(input => input.GetAttribute("name")).Distinct());
+        Assert.Contains("col-md-9", cut.Find("#leg-transportation-mode").ParentElement!.ClassList);
+        Assert.DoesNotContain("w-100", cut.Find(".leg-travel-modes").ClassList);
+        foreach (var mode in TransportationModes.All)
+        {
+            var label = cut.Find($"label[for='leg-mode-{mode}']");
+            Assert.Equal(TransportationModes.Label(mode), label.TextContent.Trim());
+            Assert.Contains("btn-outline-primary", label.ClassList);
+            Assert.Equal("true", label.QuerySelector("svg")!.GetAttribute("aria-hidden"));
+        }
+        Assert.Equal(TransportationModes.All.Count, cut.FindAll("#leg-transportation-mode svg").Select(icon => icon.InnerHtml).Distinct().Count());
     }
 
     [Fact]
@@ -158,6 +202,10 @@ public class TripLegFormTests : BunitContext
         Assert.NotNull(cut.Find("#leg-travel-cost"));
         Assert.NotNull(cut.Find("#leg-confirmation-code"));
         Assert.Contains("(optional)", cut.Markup, StringComparison.Ordinal);
+        var row = cut.Find("#leg-confirmation-code").Closest(".row")!;
+        Assert.Equal(
+            ["leg-confirmation-code", "leg-travel-cost"],
+            row.QuerySelectorAll("input").Select(input => input.Id));
     }
 
     [Theory]
@@ -169,7 +217,7 @@ public class TripLegFormTests : BunitContext
     {
         var cut = RenderCreate();
 
-        cut.Find("#leg-transportation-mode").Change(mode);
+        cut.Find($"#leg-mode-{mode}").Change(mode);
 
         Assert.NotNull(cut.Find("[data-testid=leg-item-restriction]"));
     }
@@ -179,7 +227,7 @@ public class TripLegFormTests : BunitContext
     {
         var cut = RenderCreate();
 
-        cut.Find("#leg-transportation-mode").Change(TransportationModes.Car);
+        cut.Find($"#leg-mode-{TransportationModes.Car}").Change(TransportationModes.Car);
 
         Assert.Empty(cut.FindAll("[data-testid=leg-item-restriction]"));
     }
@@ -203,7 +251,7 @@ public class TripLegFormTests : BunitContext
         var cut = RenderCreate();
 
         cut.Find("#leg-title").Change("Getting there");
-        cut.Find("#leg-transportation-mode").Change(mode);
+        cut.Find($"#leg-mode-{mode}").Change(mode);
         cut.Find("#leg-origin").Change("Paris");
         cut.Find("#leg-destination").Change("Chicago");
         cut.Find("form").Submit();
@@ -220,7 +268,7 @@ public class TripLegFormTests : BunitContext
         var cut = RenderCreate();
 
         cut.Find("#leg-title").Change("Getting there");
-        cut.Find("#leg-transportation-mode").Change(TransportationModes.Flight);
+        cut.Find($"#leg-mode-{TransportationModes.Flight}").Change(TransportationModes.Flight);
         cut.Find("#leg-origin").Change("Paris");
         cut.Find("#leg-destination").Change("Chicago");
         cut.Find("#leg-travel-cost").Change("412.50");
@@ -239,7 +287,7 @@ public class TripLegFormTests : BunitContext
         var cut = RenderCreate();
 
         cut.Find("#leg-title").Change("Getting there");
-        cut.Find("#leg-transportation-mode").Change(TransportationModes.Boat);
+        cut.Find($"#leg-mode-{TransportationModes.Boat}").Change(TransportationModes.Boat);
         cut.Find("#leg-origin").Change("Paris");
         cut.Find("#leg-destination").Change("Chicago");
         cut.Find("form").Submit();
@@ -287,7 +335,7 @@ public class TripLegFormTests : BunitContext
         var cut = RenderCreate();
 
         cut.Find("#leg-title").Change("Getting there");
-        cut.Find("#leg-transportation-mode").Change(TransportationModes.Train);
+        cut.Find($"#leg-mode-{TransportationModes.Train}").Change(TransportationModes.Train);
         cut.Find("#leg-origin").Change("Paris");
         cut.Find("#leg-destination").Change("Chicago");
         cut.Find("#leg-travel-cost").Change("-5");
@@ -311,7 +359,7 @@ public class TripLegFormTests : BunitContext
 
         var cut = RenderEdit(leg);
 
-        Assert.Equal(mode, cut.Find("#leg-transportation-mode").GetAttribute("value"));
+        Assert.Equal(mode, cut.Find("#leg-transportation-mode input:checked").GetAttribute("value"));
         Assert.Equal("250.75", cut.Find("#leg-travel-cost").GetAttribute("value"));
         Assert.Equal("QQ-77", cut.Find("#leg-confirmation-code").GetAttribute("value"));
     }
@@ -368,13 +416,27 @@ public class TripLegFormTests : BunitContext
         var leg = TripLegModeTestData.TravelLeg(TransportationModes.Car, travelCost: 45.25m, confirmationCode: "RENT-9");
         var cut = RenderEdit(leg);
 
-        cut.Find("#leg-transportation-mode").Change(TransportationModes.Train);
+        cut.Find($"#leg-mode-{TransportationModes.Train}").Change(TransportationModes.Train);
         cut.Find("form").Submit();
 
         var request = Assert.Single(_api.Updated);
         Assert.Equal(TransportationModes.Train, request.TransportationMode);
         Assert.Equal(45.25m, request.TravelCost);
         Assert.Equal("RENT-9", request.ConfirmationCode);
+    }
+
+    [Fact]
+    public void Save_ReportsTheInFlightMutationAndAlwaysReleasesTheGuard()
+    {
+        var submitting = new List<bool>();
+        var cut = Render<TripLegForm>(parameters => parameters
+            .Add(component => component.TripId, Guid.NewGuid())
+            .Add(component => component.Leg, TripLegModeTestData.StayLeg())
+            .Add(component => component.OnSubmittingChanged, value => submitting.Add(value)));
+
+        cut.Find("form").Submit();
+
+        Assert.Equal(new[] { true, false }, submitting);
     }
 
     /// <summary>A refused save keeps the traveler's edits on screen alongside the reason.</summary>
@@ -387,33 +449,35 @@ public class TripLegFormTests : BunitContext
         var leg = TripLegModeTestData.TravelLeg(TransportationModes.Car);
         var cut = RenderEdit(leg);
 
-        cut.Find("#leg-transportation-mode").Change(TransportationModes.Flight);
+        cut.Find($"#leg-mode-{TransportationModes.Flight}").Change(TransportationModes.Flight);
         cut.Find("form").Submit();
 
         Assert.Contains(reason, cut.Markup, StringComparison.Ordinal);
-        Assert.Equal(TransportationModes.Flight, cut.Find("#leg-transportation-mode").GetAttribute("value"));
+        Assert.Equal(TransportationModes.Flight, cut.Find("#leg-transportation-mode input:checked").GetAttribute("value"));
         Assert.NotNull(cut.Find("[data-testid=leg-item-restriction]"));
     }
 
     // --- Removing a leg ---
 
-    /// <summary>Save leads the left action group, with the de-emphasized Delete beside it.</summary>
     [Fact]
-    public void SaveLeadsTheLeftActionGroupWithDeleteBesideIt()
+    public void CardFooter_PlacesSaveFirstAndDeleteOnTheRight()
     {
         var cut = RenderEdit(TripLegModeTestData.StayLeg());
 
-        var actions = cut.Find(".tp-modal-actions-start").Children;
+        var actions = cut.Find(".card-footer .entry-form-actions").Children;
         Assert.Equal(2, actions.Length);
-        Assert.Equal("submit", actions[0].GetAttribute("type"));
         Assert.Equal("leg-delete", actions[1].Id);
-        Assert.Contains("btn-sm", actions[1].ClassList);
+        Assert.Contains("btn-outline-danger", actions[1].ClassList);
+        Assert.Contains("ms-auto", actions[1].ClassList);
+        Assert.DoesNotContain("btn-sm", actions[1].ClassList);
+        Assert.Equal("submit", actions[0].GetAttribute("type"));
+        Assert.Equal(["Save", "Delete"], actions.Select(button => button.TextContent.Trim()));
+        Assert.Equal(["Save changes to this trip leg", "Confirm deletion of this trip leg"], actions.Select(button => button.GetAttribute("title")));
         Assert.All(actions, button => Assert.NotNull(button.QuerySelector("svg")));
     }
 
-    /// <summary>Cancel is opt-in: it only appears when a host (the modal) supplies a way to dismiss.</summary>
     [Fact]
-    public void CancelSitsInTheRightActionGroupOnlyWhenTheHostHandlesIt()
+    public void CardFooter_PlacesCancelAfterSaveOnlyWhenTheHostHandlesIt()
     {
         Assert.Empty(RenderEdit(TripLegModeTestData.StayLeg()).FindAll("#leg-cancel"));
 
@@ -425,11 +489,11 @@ public class TripLegFormTests : BunitContext
             .Add(x => x.CanEditContent, true)
             .Add(x => x.OnCancel, () => cancelled++));
 
-        var cancel = cut.Find(".tp-modal-actions-end #leg-cancel");
+        var cancel = cut.Find(".card-footer #leg-cancel");
         cancel.Click();
 
         Assert.Equal(1, cancelled);
-        Assert.Empty(cut.FindAll(".tp-modal-actions-end [type=submit]"));
+        Assert.Equal(["", "leg-cancel", "leg-delete"], cut.Find(".card-footer .entry-form-actions").Children.Select(button => button.Id));
     }
 
     [Fact]
@@ -458,6 +522,11 @@ public class TripLegFormTests : BunitContext
         cut.Find("#leg-delete").Click();
 
         Assert.NotNull(cut.Find("[data-testid=leg-delete-confirm]"));
+        Assert.Contains("Are you sure you want to delete this leg", cut.Find("[role='dialog']").TextContent);
+        Assert.Empty(cut.FindAll(".card-footer [data-testid=leg-delete-confirm]"));
+        Assert.NotNull(cut.Find(".modal-backdrop"));
+        Assert.Equal("Delete", cut.Find("#leg-delete-confirm").TextContent.Trim());
+        Assert.Equal("Permanently delete this trip leg", cut.Find("#leg-delete-confirm").GetAttribute("title"));
         Assert.Empty(_api.DeletedLegs);
     }
 

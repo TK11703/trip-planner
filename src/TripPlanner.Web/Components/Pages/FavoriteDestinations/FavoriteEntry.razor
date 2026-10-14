@@ -1,0 +1,133 @@
+@page "/favorites/new"
+@page "/favorites/{FavoriteId:guid}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits ApiComponentBase
+@using TripPlanner.Contracts.FavoriteDestinations
+@using TripPlanner.Web.Components.Favorites
+@using TripPlanner.Web.Features.FavoriteDestinations
+@using TripPlanner.Web.Features.EntryPages
+@inject IFavoriteDestinationApiClient FavoriteApi
+@inject NavigationManager Nav
+
+<PageTitle>@Title</PageTitle>
+<EntryNavigationGuard IsDirty="_isDirty" IsDirtyChanged="SetDirty" IsSubmitting="_isSubmitting">
+<EntryPageShell Title="@Title" Context="Keep a destination handy to use when planning your trips." Icon="favorite" Breadcrumbs="Breadcrumbs" LoadState="_state" ErrorMessage="@_error" SafeBackHref="/favorites">
+    @if (_state == EntryPageShell.EntryLoadState.Ready)
+    {
+        <FavoriteDestinationForm @key="FormKey" Favorite="_favorite" OnCreate="CreateAsync" OnUpdate="UpdateAsync" OnCancel="CancelAsync" OnDelete="RequestDelete" IsSaving="_saving" ErrorMessage="@_error">
+            @if (_duplicateWarning is not null)
+            {
+                <div class="alert alert-warning mt-3 mb-0" role="alert"><p>This may be a possible duplicate. Save it as a separate favorite?</p><ul>@foreach (var match in _duplicateWarning.Matches){<li>@match.Name, @match.Address</li>}</ul><button type="button" class="btn btn-sm btn-warning me-2" disabled="@_saving" @onclick="ConfirmDuplicateAsync">Save separately</button><button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_saving" @onclick="ClearDuplicate">Cancel</button></div>
+            }
+        </FavoriteDestinationForm>
+    }
+</EntryPageShell>
+</EntryNavigationGuard>
+
+@if (_deleteConfirm)
+{
+    <div class="modal d-block" role="dialog" aria-modal="true" aria-labelledby="favorite-delete-title"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 class="modal-title h5" id="favorite-delete-title">Delete favorite</h2><button class="btn-close" aria-label="Close" @onclick="() => _deleteConfirm = false"></button></div><div class="modal-body">Remove <strong>@_favorite?.Name</strong> from your favorites? Existing trip items will not change.</div><div class="modal-footer"><button class="btn btn-outline-secondary" @onclick="() => _deleteConfirm = false">Cancel</button><button class="btn btn-danger" disabled="@_saving" @onclick="DeleteAsync">Delete favorite</button></div></div></div></div><div class="modal-backdrop show"></div>
+}
+
+@code {
+    private bool _isDirty;
+    private bool _isSubmitting;
+    private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
+    private Task SetSubmitting(bool value) { _isSubmitting = value; return Task.CompletedTask; }
+    [Parameter] public Guid? FavoriteId { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+    private FavoriteDestinationDto? _favorite;
+    private FavoriteDestinationDuplicateWarning? _duplicateWarning;
+    private CreateFavoriteDestinationRequest? _pendingCreate;
+    private UpdateFavoriteDestinationRequest? _pendingUpdate;
+    private bool _saving;
+    private bool _deleteConfirm;
+    private string? _error;
+    private EntryPageShell.EntryLoadState _state = EntryPageShell.EntryLoadState.Loading;
+    private bool IsEdit => FavoriteId.HasValue;
+    private string Title => IsEdit ? "Edit this favorite" : "Add a favorite";
+    private string FormKey => FavoriteId?.ToString("D") ?? "new";
+    private string Destination => EntryPageUrls.NormalizeReturnUrl(ReturnUrl, EntryPageUrls.Favorites(Search));
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs => _favorite is null
+        ? [new("Home", "/"), new("Favorites", EntryPageUrls.Favorites(Search)), new("Add favorite", IsCurrent: true)]
+        : [new("Home", "/"), new("Favorites", EntryPageUrls.Favorites(Search)), new(_favorite.Name, IsCurrent: true)];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _state = EntryPageShell.EntryLoadState.Loading; _favorite = null; _error = null;
+        if (!FavoriteId.HasValue) { _state = EntryPageShell.EntryLoadState.Ready; return; }
+        await CallApiAsync(async () =>
+        {
+            var favorites = await FavoriteApi.GetAsync();
+            _favorite = favorites.FirstOrDefault(item => item.FavoriteDestinationId == FavoriteId.Value);
+            _state = _favorite is null ? EntryPageShell.EntryLoadState.MissingOrDenied : EntryPageShell.EntryLoadState.Ready;
+        }, message => { _error = message; _state = EntryPageShell.EntryLoadState.Error; });
+        if (IsReauthenticating) _state = EntryPageShell.EntryLoadState.Loading;
+    }
+
+    private async Task CreateAsync(CreateFavoriteDestinationRequest request) { _pendingCreate = request; await SaveCreateAsync(request); }
+    private async Task SaveCreateAsync(CreateFavoriteDestinationRequest request)
+    {
+        _saving = true; _isSubmitting = true; _error = null;
+        try
+        {
+            await CallApiAsync(async () =>
+            {
+                var result = await FavoriteApi.CreateAsync(request);
+                if (result.DuplicateWarning is not null) { _duplicateWarning = result.DuplicateWarning; _pendingCreate = request; _pendingUpdate = null; return; }
+                if (!result.Succeeded) { _error = result.ErrorMessage ?? "The favorite destination could not be saved."; return; }
+                _isDirty = false;
+                _isSubmitting = false;
+                Nav.NavigateTo(Destination);
+            }, message => _error = message);
+        }
+        finally { _saving = false; _isSubmitting = false; }
+    }
+    private async Task UpdateAsync(UpdateFavoriteDestinationRequest request)
+    {
+        if (_favorite is null) return;
+        _saving = true; _isSubmitting = true; _error = null;
+        try
+        {
+            await CallApiAsync(async () =>
+            {
+                var result = await FavoriteApi.UpdateAsync(_favorite.FavoriteDestinationId, request);
+                if (result.DuplicateWarning is not null) { _duplicateWarning = result.DuplicateWarning; _pendingUpdate = request; _pendingCreate = null; return; }
+                if (!result.Succeeded) { _error = result.ErrorMessage ?? "The favorite destination could not be updated."; return; }
+                _isDirty = false;
+                _isSubmitting = false;
+                Nav.NavigateTo(Destination);
+            }, message => _error = message);
+        }
+        finally { _saving = false; _isSubmitting = false; }
+    }
+    private async Task ConfirmDuplicateAsync()
+    {
+        if (_pendingCreate is not null) await SaveCreateAsync(_pendingCreate with { ConfirmPossibleDuplicate = true });
+        else if (_pendingUpdate is not null && _favorite is not null) await UpdateAsync(_pendingUpdate with { ConfirmPossibleDuplicate = true });
+    }
+    private void ClearDuplicate() { _duplicateWarning = null; _pendingCreate = null; _pendingUpdate = null; }
+    private void CancelAsync() => Nav.NavigateTo(Destination);
+    private void RequestDelete() => _deleteConfirm = true;
+    private async Task DeleteAsync()
+    {
+        if (_favorite is null) return;
+        _saving = true; _isSubmitting = true;
+        try
+        {
+            await CallApiAsync(async () =>
+            {
+                if (await FavoriteApi.DeleteAsync(_favorite.FavoriteDestinationId))
+                {
+                    _isDirty = false;
+                    _isSubmitting = false;
+                    Nav.NavigateTo(Destination);
+                }
+                else _error = "The favorite could not be removed. Refresh and try again.";
+            }, message => _error = message);
+        }
+        finally { _saving = false; _isSubmitting = false; }
+    }
+}

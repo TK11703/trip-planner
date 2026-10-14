@@ -1,0 +1,303 @@
+metadata:
+  generated: '2026-10-13'
+  source_plan: specs/031-mobile-entry-pages/plan.md
+  target_tasks: specs/031-mobile-entry-pages/plan.md#implementation-steps-and-coarse-task-breakdown
+summary:
+  total_plan_items: 11
+  covered_plan_items: 11
+  missing_plan_items: 0
+  coverage_percentage: 100.0
+  total_tasks_generated: 16
+  orphan_tasks: 0
+phases:
+- phase_id: Phase-1
+  phase_name: Implementation phase 1
+  items:
+  - item_id: '1.1'
+    description: Routable origin context and link contracts
+    tasks:
+    - task_id: T001
+      description: Add route/query builders and allowlisted return validation in `src/TripPlanner.Web/Features/EntryPages/EntryPageUrls.cs`;
+        cover malformed URLs, nested edit returns, fragment IDs and cold-load defaults.
+    - task_id: T002
+      description: Bind/restorably serialize parent origin state in `src/TripPlanner.Web/Components/Pages/Trips/TripDetails.razor`,
+        `Trips/TripsIndex.razor` and `Pages/Favorites.razor`; add stable record anchors
+        in `Components/Trips/TripItineraryTable.razor`, `Components/Timeline/TripTimeline.razor`
+        and `Pages/EmailIngestion/InboxDrafts.razor` (all component paths under Web).
+    notes: ''
+  - item_id: '1.2'
+    description: Full breadcrumb / entry shell / dirty guard
+    tasks:
+    - task_id: T003
+      description: Add `src/TripPlanner.Web/Features/EntryPages/BreadcrumbItem.cs`
+        and `Components/Shared/{EntryBreadcrumb,EntryPageShell}.razor` with semantic
+        full trails, loading/missing-or-denied/error states and responsive actions;
+        preserve existing TripsBreadcrumb callers.
+    - task_id: T004
+      description: Add `src/TripPlanner.Web/Components/Shared/EntryNavigationGuard.razor`;
+        integrate EditContext/manual dirty notifications in reused form components,
+        confirmed-discard logic and success/in-flight state; prevent failed saves
+        from navigating.
+    notes: ''
+- phase_id: Phase-2
+  phase_name: Implementation phase 2
+  items:
+  - item_id: '2.1'
+    description: Page wrappers preserving itinerary defaults and rules
+    tasks:
+    - task_id: T005
+      description: Add `src/TripPlanner.Web/Components/Pages/Trips/TripLegEntry.razor`
+        for new/edit routes, authorized parameter-aware loading, breadcrumbs and `TripLegForm`
+        integration.
+    - task_id: T006
+      description: Add `src/TripPlanner.Web/Components/Pages/Trips/TrackedItemEntry.razor`
+        for new/edit routes with actual leg hierarchy, validated placement/time hints
+        and `TrackedItemForm` integration.
+    notes: ''
+  - item_id: '2.2'
+    description: Replace every leg/item launcher, reduce parent complexity
+    tasks:
+    - task_id: T007
+      description: Replace leg/item entry launchers in `src/TripPlanner.Web/Components/Pages/Trips/TripDetails.razor`,
+        `Components/Trips/TripItineraryTable.razor`, `Components/Timeline/TripTimeline.razor`
+        and `Components/Trips/TripMapModal.razor`; remove migrated modal models, HTML
+        and callbacks rather than leave unreachable duplicate logic.
+    notes: ''
+- phase_id: Phase-3
+  phase_name: Implementation phase 3
+  items:
+  - item_id: '3.1'
+    description: Trip form routes and origin-aware navigation
+    tasks:
+    - task_id: T008
+      description: Update `src/TripPlanner.Web/Components/Pages/Trips/NewTrip.razor`,
+        add `EditTrip.razor`, and change create/edit hrefs in `TripsIndex.razor`,
+        `TripDetails.razor`, `Components/Pages/Home.razor` and `Components/Trips/NoTripsEmptyState.razor`
+        as applicable; preserve all real entry affordances and fields.
+    notes: ''
+- phase_id: Phase-4
+  phase_name: Implementation phase 4
+  items:
+  - item_id: '4.1'
+    description: Dedicated favorite record pages
+    tasks:
+    - task_id: T009
+      description: Add `src/TripPlanner.Web/Components/Pages/FavoriteDestinations/FavoriteEntry.razor`,
+        reuse `Components/Favorites/FavoriteDestinationForm.razor`, and replace embedded
+        form launchers in `Components/Pages/Favorites.razor` with context-bearing
+        anchors.
+    notes: ''
+  - item_id: '4.2'
+    description: Upload and resumable persisted import review
+    tasks:
+    - task_id: T010
+      description: Add `src/TripPlanner.Web/Components/Pages/FavoriteDestinations/FavoriteImport.razor`
+        with upload and ImportId routes; adapt `Components/Favorites/FavoriteDestinationImport.razor`
+        parameter-aware job loading and dirty selection tracking; replace import tab
+        launcher/state in `Components/Pages/Favorites.razor`.
+    notes: ''
+- phase_id: Phase-5
+  phase_name: Implementation phase 5
+  items:
+  - item_id: '5.1'
+    description: Extract draft editor into a routable page
+    tasks:
+    - task_id: T011
+      description: Extract `src/TripPlanner.Web/Components/EmailIngestion/DraftEditForm.razor`
+        from `DraftEditModal.razor`, add `Components/Pages/EmailIngestion/EditDraft.razor`,
+        and change edit anchors/remove modal state in `InboxDrafts.razor`; retain
+        separate Confirm/Discard behavior.
+    notes: ''
+- phase_id: Phase-6
+  phase_name: Implementation phase 6
+  items:
+  - item_id: '6.1'
+    description: Dedicated sharing management page
+    tasks:
+    - task_id: T012
+      description: Extract `src/TripPlanner.Web/Components/Trips/TripSharingForm.razor`,
+        add `Components/Pages/Trips/TripSharing.razor`, and change TripDetails share
+        action to a real anchor; remove `ShareTripModal.razor` after callers/tests
+        migrate.
+    notes: ''
+- phase_id: Phase-7
+  phase_name: Implementation phase 7
+  items:
+  - item_id: '7.1'
+    description: Automated contract/parity evidence
+    tasks:
+    - task_id: T013
+      description: Add `tests/TripPlanner.Web.Tests/EntryPages/{EntryPageUrlsTests,EntryBreadcrumbTests,EntryPageLifecycleTests}.cs`
+        and update existing Trips/TripItems/FavoriteDestinations/EmailIngestion/TripSharing
+        suites for href, permissions, inline errors, dirty-state, initialization and
+        mutation parity.
+    - task_id: T014
+      description: Add executable flows in `tests/TripPlanner.E2E.Tests/MobileEntryPages/MobileEntryPageFlowTests.cs`
+        for all contracted routes, mobile/desktop, new tabs, Back/reload/origin restoration,
+        duplicate-submit guard, dirty decline/accept, denied/deleted records and retained
+        overlays.
+    notes: ''
+  - item_id: '7.2'
+    description: Mobile usability and clean extraction
+    tasks:
+    - task_id: T015
+      description: Apply scoped CSS/layout fixes to new entry components and reused
+        forms under `src/TripPlanner.Web/Components`; verify full wrapping trails,
+        44px targets, no 360px overflow, error focus and reachable actions with physical
+        mobile keyboard.
+    - task_id: T016
+      description: Execute `specs/031-mobile-entry-pages/quickstart.md` validation
+        scenarios, audit entry-page code/HTML extraction, and record route/parity
+        evidence and SC-002/SC-003 usability measurements in `specs/031-mobile-entry-pages/validation.md`
+        during implementation.
+    notes: ''
+missing_plan_items: []
+orphan_tasks: []
+upstream_trace:
+- plan_item: '1.1'
+  source_requirements:
+  - FR-003
+  - FR-004
+  - FR-008
+  tasks:
+  - T001
+  - T002
+- plan_item: '1.2'
+  source_requirements:
+  - FR-002
+  - FR-005
+  - FR-006
+  - FR-007
+  - FR-010
+  - FR-012
+  tasks:
+  - T003
+  - T004
+- plan_item: '2.1'
+  source_requirements:
+  - FR-001
+  - FR-002
+  - FR-003
+  - FR-004
+  - FR-005
+  - FR-008
+  - FR-009
+  - FR-012
+  tasks:
+  - T005
+  - T006
+- plan_item: '2.2'
+  source_requirements:
+  - FR-001
+  - FR-004
+  - FR-009
+  - FR-010
+  - FR-011
+  tasks:
+  - T007
+- plan_item: '3.1'
+  source_requirements:
+  - FR-001
+  - FR-002
+  - FR-003
+  - FR-004
+  - FR-005
+  - FR-006
+  - FR-007
+  - FR-008
+  - FR-009
+  - FR-010
+  - FR-012
+  tasks:
+  - T008
+- plan_item: '4.1'
+  source_requirements:
+  - FR-001
+  - FR-002
+  - FR-003
+  - FR-004
+  - FR-005
+  - FR-006
+  - FR-007
+  - FR-008
+  - FR-009
+  - FR-010
+  - FR-012
+  tasks:
+  - T009
+- plan_item: '4.2'
+  source_requirements:
+  - FR-001
+  - FR-002
+  - FR-003
+  - FR-004
+  - FR-005
+  - FR-006
+  - FR-007
+  - FR-008
+  - FR-009
+  - FR-010
+  - FR-012
+  tasks:
+  - T010
+- plan_item: '5.1'
+  source_requirements:
+  - FR-001
+  - FR-002
+  - FR-003
+  - FR-004
+  - FR-005
+  - FR-006
+  - FR-007
+  - FR-008
+  - FR-009
+  - FR-010
+  - FR-012
+  tasks:
+  - T011
+- plan_item: '6.1'
+  source_requirements:
+  - FR-001
+  - FR-002
+  - FR-003
+  - FR-004
+  - FR-005
+  - FR-006
+  - FR-007
+  - FR-008
+  - FR-009
+  - FR-010
+  - FR-012
+  tasks:
+  - T012
+- plan_item: '7.1'
+  source_requirements:
+  - FR-001
+  - FR-002
+  - FR-003
+  - FR-004
+  - FR-005
+  - FR-006
+  - FR-007
+  - FR-008
+  - FR-009
+  - FR-010
+  - FR-011
+  - FR-012
+  tasks:
+  - T013
+  - T014
+- plan_item: '7.2'
+  source_requirements:
+  - FR-001
+  - FR-007
+  - FR-009
+  - FR-010
+  - FR-011
+  tasks:
+  - T015
+  - T016
+validation:
+  passed: true
+  errors: []
+  warnings: []

@@ -2,14 +2,8 @@
 @inject ITripApiClient TripApi
 @implements IDisposable
 
-<div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title h5" id="shareModalTitle">Share trip</h2>
-                <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAsync"></button>
-            </div>
-            <div class="modal-body">
+<section class="share-trip-page" aria-label="Share trip">
+            <div class="card-body">
                 @if (_error is not null)
                 {
                     <div class="alert alert-danger" role="alert">@_error</div>
@@ -21,7 +15,7 @@
                         <label class="form-label" for="shareSearch">Search for a user or enter an email address</label>
                         <div class="input-group">
                             <input id="shareSearch" class="form-control" type="search" placeholder="Name or email address"
-                                   @bind="_searchTerm" @bind:event="oninput" @onkeydown="OnSearchKeyDownAsync" disabled="@_busy" />
+                                   @bind="_searchTerm" @bind:event="oninput" @onkeydown="OnSearchKeyDownAsync" @oninput:stopPropagation="true" disabled="@_busy" />
                             <button type="button" class="btn btn-outline-secondary" @onclick="RunSearchAsync" disabled="@(_busy || _searching)">Search</button>
                         </div>
                         <div class="form-text">Press Enter or select Search. Choose each person's permission, then select Share. You can also invite someone outside the directory by their email.</div>
@@ -148,18 +142,19 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" @onclick="CloseAsync" disabled="@_busy">Done</button>
+            <div class="card-footer entry-form-footer">
+                <div class="entry-form-actions d-flex flex-wrap justify-content-end gap-3 w-100">
+                <button type="button" id="share-return" class="btn btn-outline-secondary" title="Return to the trip; sharing changes are saved automatically" aria-label="Return to the trip" @onclick="CloseAsync" disabled="@_busy"><ActionIcon Name="back" CssClass="me-1 align-text-bottom" />Return</button>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
-<div class="modal-backdrop show"></div>
+</section>
 
 @code {
     [Parameter] public Guid TripId { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<bool> OnSubmittingChanged { get; set; }
+    [Parameter] public EventCallback<bool> OnPendingChangesChanged { get; set; }
 
     private readonly List<TripShareMember> _members = new();
     private readonly List<DirectoryUserResult> _results = new();
@@ -176,11 +171,12 @@
     private TripAccessLevel LevelFor(string userId)
         => _newLevels.TryGetValue(userId, out var level) ? level : TripAccessLevel.Viewer;
 
-    private void SetLevelFor(string userId, ChangeEventArgs e)
+    private async Task SetLevelFor(string userId, ChangeEventArgs e)
     {
         if (Enum.TryParse<TripAccessLevel>(e.Value?.ToString(), out var level))
         {
             _newLevels[userId] = level;
+            await OnPendingChangesChanged.InvokeAsync(_newLevels.Count > 0);
         }
     }
 
@@ -289,21 +285,28 @@
     {
         _busy = true;
         _error = null;
-
-        await CallApiAsync(
-            async () =>
-            {
-                await TripApi.UpsertShareAsync(TripId, new UpsertTripShareRequest(user.UserId, user.DisplayName, user.Email ?? user.UserPrincipalName, LevelFor(user.UserId)));
-                _results.RemoveAll(r => r.UserId == user.UserId);
-                _newLevels.Remove(user.UserId);
-                _searchTerm = string.Empty;
-                _searchAttempted = false;
-                await LoadMembersAsync();
-                await OnChanged.InvokeAsync();
-            },
-            message => _error = message);
-
-        _busy = false;
+        await OnSubmittingChanged.InvokeAsync(true);
+        try
+        {
+            await CallApiAsync(
+                async () =>
+                {
+                    await TripApi.UpsertShareAsync(TripId, new UpsertTripShareRequest(user.UserId, user.DisplayName, user.Email ?? user.UserPrincipalName, LevelFor(user.UserId)));
+                    _results.RemoveAll(r => r.UserId == user.UserId);
+                    _newLevels.Remove(user.UserId);
+                    _searchTerm = string.Empty;
+                    _searchAttempted = false;
+                    await LoadMembersAsync();
+                    await OnChanged.InvokeAsync();
+                    await OnPendingChangesChanged.InvokeAsync(_newLevels.Count > 0);
+                },
+                message => _error = message);
+        }
+        finally
+        {
+            _busy = false;
+            await OnSubmittingChanged.InvokeAsync(false);
+        }
     }
 
     private async Task OnChangeLevelAsync(TripShareMember member, ChangeEventArgs e)
@@ -314,34 +317,48 @@
         }
         _busy = true;
         _error = null;
-
-        await CallApiAsync(
-            async () =>
-            {
-                await TripApi.UpdateShareAccessAsync(TripId, member.UserId, new UpdateTripShareAccessRequest(level));
-                await LoadMembersAsync();
-                await OnChanged.InvokeAsync();
-            },
-            message => _error = message);
-
-        _busy = false;
+        await OnSubmittingChanged.InvokeAsync(true);
+        try
+        {
+            await CallApiAsync(
+                async () =>
+                {
+                    await TripApi.UpdateShareAccessAsync(TripId, member.UserId, new UpdateTripShareAccessRequest(level));
+                    await LoadMembersAsync();
+                    await OnChanged.InvokeAsync();
+                    await OnPendingChangesChanged.InvokeAsync(_newLevels.Count > 0);
+                },
+                message => _error = message);
+        }
+        finally
+        {
+            _busy = false;
+            await OnSubmittingChanged.InvokeAsync(false);
+        }
     }
 
     private async Task RemoveAsync(TripShareMember member)
     {
         _busy = true;
         _error = null;
-
-        await CallApiAsync(
-            async () =>
-            {
-                await TripApi.RemoveShareAsync(TripId, member.UserId);
-                await LoadMembersAsync();
-                await OnChanged.InvokeAsync();
-            },
-            message => _error = message);
-
-        _busy = false;
+        await OnSubmittingChanged.InvokeAsync(true);
+        try
+        {
+            await CallApiAsync(
+                async () =>
+                {
+                    await TripApi.RemoveShareAsync(TripId, member.UserId);
+                    await LoadMembersAsync();
+                    await OnChanged.InvokeAsync();
+                    await OnPendingChangesChanged.InvokeAsync(_newLevels.Count > 0);
+                },
+                message => _error = message);
+        }
+        finally
+        {
+            _busy = false;
+            await OnSubmittingChanged.InvokeAsync(false);
+        }
     }
 
     private async Task CloseAsync() => await OnClose.InvokeAsync();

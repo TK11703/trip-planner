@@ -1,0 +1,74 @@
+@inject IJSRuntime JS
+
+<NavigationLock OnBeforeInternalNavigation="BeforeInternalNavigation" ConfirmExternalNavigation="ConfirmExternalNavigation" />
+<CascadingValue Value="this" IsFixed="true">
+    <div class="entry-navigation-guard" @oninput="OnInput" @onchange="OnChange">
+        @ChildContent
+    </div>
+</CascadingValue>
+
+@code {
+    private bool _localDirty;
+    private bool _previousParameterDirty;
+
+    [Parameter] public bool IsDirty { get; set; }
+    [Parameter] public EventCallback<bool> IsDirtyChanged { get; set; }
+    [Parameter] public bool IsSubmitting { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    public bool HasUnsavedChanges => IsDirty || _localDirty;
+    public bool ConfirmExternalNavigation => HasUnsavedChanges || IsSubmitting;
+
+    protected override void OnParametersSet()
+    {
+        // Synchronize only when the parent parameter actually changes. A standalone custom
+        // notification can cause a render before the parent has adopted the new value.
+        if (IsDirty != _previousParameterDirty)
+        {
+            _localDirty = IsDirty;
+            _previousParameterDirty = IsDirty;
+        }
+    }
+
+    // Exposed through the cascading value for custom controls that update without a native
+    // input/change event. Initialization code should not call this; only user changes do.
+    public Task MarkDirtyAsync() => SetDirtyAsync(true);
+    public Task MarkCleanAsync() => SetDirtyAsync(false);
+
+    public async Task<bool> CanNavigateAwayAsync()
+    {
+        // Do not let Back, a breadcrumb, or another link race an in-flight mutation. A successful
+        // save clears dirty and submitting state before its deliberate return navigation.
+        if (IsSubmitting)
+        {
+            return false;
+        }
+
+        if (!HasUnsavedChanges)
+        {
+            return true;
+        }
+
+        return await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Leave this page and discard them?");
+    }
+
+    private Task OnInput(ChangeEventArgs _) => MarkDirtyAsync();
+    private Task OnChange(ChangeEventArgs _) => MarkDirtyAsync();
+
+    private async Task SetDirtyAsync(bool value)
+    {
+        _localDirty = value;
+        if (IsDirtyChanged.HasDelegate)
+        {
+            await IsDirtyChanged.InvokeAsync(value);
+        }
+    }
+
+    private async Task BeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (!await CanNavigateAwayAsync())
+        {
+            context.PreventNavigation();
+        }
+    }
+}

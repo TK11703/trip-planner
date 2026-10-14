@@ -37,10 +37,10 @@ public sealed class TrackedItemFavoritePrefillTests : BunitContext
 
         Assert.Equal("Museum Island", cut.Find("#item-favorite").GetAttribute("value"));
         Assert.Empty(cut.FindAll("#item-favorite-options"));
-        Assert.Equal("Museum Island", cut.Find(".col-7 input").GetAttribute("value"));
+        Assert.Equal("Museum Island", cut.Find("#item-name").GetAttribute("value"));
         Assert.Equal("Bodestraße 1, Berlin", cut.Find("#item-location").GetAttribute("value"));
         Assert.Equal("Allow an afternoon", cut.Find("#item-notes").GetAttribute("value"));
-        Assert.Equal("activity", cut.Find(".col-5 select").GetAttribute("value"));
+        Assert.Equal("activity", cut.Find("#item-type").GetAttribute("value"));
         Assert.Equal(leg.TripLegId.ToString(), cut.Find("#item-leg").GetAttribute("value"));
         Assert.Equal(startsAt.ToString("yyyy-MM-ddTHH:mm:ss"), cut.Find("#item-start").GetAttribute("value"));
         Assert.Equal("Coordinated Universal Time (UTC)", cut.Find("#item-start-timezone").GetAttribute("value"));

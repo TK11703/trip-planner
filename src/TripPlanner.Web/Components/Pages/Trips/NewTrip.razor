@@ -1,28 +1,40 @@
 @page "/trips/new"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using TripPlanner.Web.Features.EntryPages
 @inject ITripApiClient TripApi
 @inject NavigationManager Nav
 
+<div class="new-trip-entry">
 <PageTitle>Create trip</PageTitle>
-
-<TripsBreadcrumb Current="Create trip" />
-
-<h1 class="mb-3">Create trip</h1>
-
-<TripForm Model="_model" CancelHref="/" OnSubmit="HandleSubmitAsync" />
+<EntryNavigationGuard IsDirty="_isDirty" IsDirtyChanged="SetDirty" IsSubmitting="_isSubmitting">
+<EntryPageShell Title="Create trip" Context="Give your next adventure a name and set your travel dates." Icon="trip" Breadcrumbs="Breadcrumbs" SafeBackHref="@Destination">
+    <TripForm Model="_model" CancelHref="@Destination" OnSubmit="HandleSubmitAsync" />
+</EntryPageShell>
+</EntryNavigationGuard>
+</div>
 
 @code {
+    private bool _isDirty;
+    private bool _isSubmitting;
+    private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
     private TripPlanner.Web.Components.Trips.TripForm.TripFormModel _model = new();
+    private bool HasExplicitReturn => !string.IsNullOrEmpty(ReturnUrl);
+    private string Destination => EntryPageUrls.NormalizeReturnUrl(ReturnUrl, "/trips");
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs => [new("Home", "/"), new("Trips", "/trips"), new("Create trip", IsCurrent: true)];
 
     private async Task HandleSubmitAsync(TripPlanner.Web.Components.Trips.TripForm.TripFormModel model)
     {
-        var request = new CreateTripRequest(
-            model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
-            DateOnly.FromDateTime(model.StartDate),
-            DateOnly.FromDateTime(model.EndDate));
-        var created = await TripApi.CreateAsync(request);
-        Nav.NavigateTo($"/trips/{created.TripId}");
+        var request = new CreateTripRequest(model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), DateOnly.FromDateTime(model.StartDate), DateOnly.FromDateTime(model.EndDate));
+        _isSubmitting = true;
+        try
+        {
+            var created = await TripApi.CreateAsync(request);
+            _isDirty = false;
+            _isSubmitting = false;
+            Nav.NavigateTo(HasExplicitReturn ? Destination : $"/trips/{created.TripId:D}");
+        }
+        finally { _isSubmitting = false; }
     }
 }

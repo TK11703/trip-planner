@@ -1,4 +1,5 @@
 @using TripPlanner.Contracts.Trips
+@using TripPlanner.Web.Features.EntryPages
 @inject ITripApiClient TripApi
 @inject IJSRuntime JS
 @implements IAsyncDisposable
@@ -33,6 +34,7 @@
 
 @code {
     [Parameter] public Guid TripId { get; set; }
+    [Parameter] public string? ReturnUrl { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public EventCallback<Guid> OnOpenItem { get; set; }
 
@@ -76,6 +78,7 @@
         {
             trackedItemId = l.TrackedItemId,
             title = l.Title,
+            editUrl = EntryPageUrls.ItemEdit(TripId, l.TrackedItemId, ReturnUrl),
             location = l.Location,
             latitude = l.Latitude,
             longitude = l.Longitude

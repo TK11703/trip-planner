@@ -1,0 +1,77 @@
+@page "/trips/{TripId:guid}/legs/new"
+@page "/trips/{TripId:guid}/legs/{LegId:guid}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits ApiComponentBase
+@using TripPlanner.Web.Features.EntryPages
+@inject ITripApiClient TripApi
+@inject NavigationManager Nav
+
+<div class="trip-leg-entry">
+<PageTitle>@Title</PageTitle>
+<EntryNavigationGuard IsDirty="_isDirty" IsDirtyChanged="SetDirty" IsSubmitting="_isSubmitting">
+<EntryPageShell Title="@Title" Context="Plan the travel or stay that connects your itinerary." Icon="leg" Breadcrumbs="Breadcrumbs" LoadState="_state" ErrorMessage="@_loadError" SafeBackHref="@TripHref">
+    @if (_trip is not null && _state == EntryPageShell.EntryLoadState.Ready)
+    {
+        <TripLegForm @key="FormKey" TripId="@TripId" Leg="_leg" TripStartDate="_trip.StartDate" TripEndDate="_trip.EndDate" CanEditContent="true" OnSaved="SavedAsync" OnCancel="CancelAsync" OnSubmittingChanged="SetSubmitting" />
+    }
+</EntryPageShell>
+</EntryNavigationGuard>
+</div>
+
+@code {
+    private bool _isDirty;
+    private bool _isSubmitting;
+    private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
+    private Task SetSubmitting(bool value) { _isSubmitting = value; return Task.CompletedTask; }
+    [Parameter] public Guid TripId { get; set; }
+    [Parameter] public Guid? LegId { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+
+    private TripDetail? _trip;
+    private TripLegDto? _leg;
+    private EntryPageShell.EntryLoadState _state = EntryPageShell.EntryLoadState.Loading;
+    private string? _loadError;
+    private bool IsEdit => LegId.HasValue;
+    private string Title => IsEdit ? "Edit this leg" : "Create a leg";
+    private string TripHref => $"/trips/{TripId:D}";
+    private string FormKey => $"{TripId:D}:{LegId:D}";
+    private string Destination => EntryPageUrls.NormalizeReturnUrl(ReturnUrl, TripHref);
+
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs
+    {
+        get
+        {
+            var items = new List<BreadcrumbItem> { new("Home", "/"), new("Trips", "/trips") };
+            if (_trip is not null)
+            {
+                items.Add(new(_trip.Name, TripHref));
+            }
+            items.Add(new(IsEdit ? _leg?.Title ?? "Leg" : "New Leg", IsCurrent: true));
+            return items;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _state = EntryPageShell.EntryLoadState.Loading;
+        _trip = null; _leg = null; _loadError = null;
+        await CallApiAsync(async () =>
+        {
+            var trip = await TripApi.GetDetailAsync(TripId);
+            if (trip is null) { _state = EntryPageShell.EntryLoadState.MissingOrDenied; return; }
+            if (!trip.IsOwner && trip.AccessLevel != TripAccessLevel.Collaborator) { _state = EntryPageShell.EntryLoadState.MissingOrDenied; return; }
+            _trip = trip;
+            if (LegId is { } id)
+            {
+                _leg = trip.Legs.FirstOrDefault(leg => leg.TripLegId == id && leg.TripId == TripId);
+                if (_leg is null) { _state = EntryPageShell.EntryLoadState.MissingOrDenied; return; }
+            }
+            _state = EntryPageShell.EntryLoadState.Ready;
+        }, error => { _loadError = error; _state = EntryPageShell.EntryLoadState.Error; });
+        if (IsReauthenticating) _state = EntryPageShell.EntryLoadState.Loading;
+    }
+
+    private void SavedAsync() { _isDirty = false; _isSubmitting = false; Nav.NavigateTo(Destination); }
+    private void CancelAsync() => Nav.NavigateTo(Destination);
+}

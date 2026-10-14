@@ -1,0 +1,288 @@
+metadata:
+  generated: '2026-10-13'
+  source_spec: specs/031-mobile-entry-pages/spec.md
+  target_plan: specs/031-mobile-entry-pages/plan.md
+summary:
+  total_requirements: 12
+  covered_requirements: 12
+  missing_requirements: 0
+  coverage_percentage: 100.0
+requirements:
+- req_id: FR-001
+  req_description: All listed entry workflows are dedicated pages
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '2.1'
+      description: Page wrappers preserving itinerary defaults and rules
+    - item_id: '2.2'
+      description: Replace every leg/item launcher, reduce parent complexity
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+    - item_id: '7.2'
+      description: Mobile usability and clean extraction
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-002
+  req_description: Title, context, Save/Cancel
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '1.2'
+      description: Full breadcrumb / entry shell / dirty guard
+    - item_id: '2.1'
+      description: Page wrappers preserving itinerary defaults and rules
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-003
+  req_description: Save/Cancel returns to origin or safe default
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '1.1'
+      description: Routable origin context and link contracts
+    - item_id: '2.1'
+      description: Page wrappers preserving itinerary defaults and rules
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-004
+  req_description: Stable direct/reload/back addresses
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '1.1'
+      description: Routable origin context and link contracts
+    - item_id: '2.1'
+      description: Page wrappers preserving itinerary defaults and rules
+    - item_id: '2.2'
+      description: Replace every leg/item launcher, reduce parent complexity
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-005
+  req_description: Inline validation preserves entered input
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '1.2'
+      description: Full breadcrumb / entry shell / dirty guard
+    - item_id: '2.1'
+      description: Page wrappers preserving itinerary defaults and rules
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-006
+  req_description: Warn before discarding unsaved changes
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '1.2'
+      description: Full breadcrumb / entry shell / dirty guard
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-007
+  req_description: Phone usability, no horizontal scroll
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '1.2'
+      description: Full breadcrumb / entry shell / dirty guard
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+    - item_id: '7.2'
+      description: Mobile usability and clean extraction
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-008
+  req_description: Enforce existing permissions
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '1.1'
+      description: Routable origin context and link contracts
+    - item_id: '2.1'
+      description: Page wrappers preserving itinerary defaults and rules
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-009
+  req_description: Preserve fields, validation, saved results
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '2.1'
+      description: Page wrappers preserving itinerary defaults and rules
+    - item_id: '2.2'
+      description: Replace every leg/item launcher, reduce parent complexity
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+    - item_id: '7.2'
+      description: Mobile usability and clean extraction
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-010
+  req_description: Same flow for all screen sizes
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '1.2'
+      description: Full breadcrumb / entry shell / dirty guard
+    - item_id: '2.2'
+      description: Replace every leg/item launcher, reduce parent complexity
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+    - item_id: '7.2'
+      description: Mobile usability and clean extraction
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-011
+  req_description: Keep delete/map/reconnect overlays
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '2.2'
+      description: Replace every leg/item launcher, reduce parent complexity
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+    - item_id: '7.2'
+      description: Mobile usability and clean extraction
+  notes: Spec uses FR IDs; preserved verbatim.
+- req_id: FR-012
+  req_description: Friendly missing/deleted state and way back
+  plan_mapping:
+    phase: Multiple
+    phase_name: Implementation phases
+    items:
+    - item_id: '1.2'
+      description: Full breadcrumb / entry shell / dirty guard
+    - item_id: '2.1'
+      description: Page wrappers preserving itinerary defaults and rules
+    - item_id: '3.1'
+      description: Trip form routes and origin-aware navigation
+    - item_id: '4.1'
+      description: Dedicated favorite record pages
+    - item_id: '4.2'
+      description: Upload and resumable persisted import review
+    - item_id: '5.1'
+      description: Extract draft editor into a routable page
+    - item_id: '6.1'
+      description: Dedicated sharing management page
+    - item_id: '7.1'
+      description: Automated contract/parity evidence
+  notes: Spec uses FR IDs; preserved verbatim.
+missing_requirements: []
+orphan_plan_items: []
+validation:
+  passed: true
+  errors: []
+  warnings: []

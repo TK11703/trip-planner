@@ -36,83 +36,89 @@ else if (_model is not null)
         <div class="alert alert-info" role="status">Complete your display name and email so Trip Planner can personalize your experience and send approved trip notifications.</div>
     }
 
-    <EditForm Model="_model" OnValidSubmit="SaveAsync" FormName="profile-form">
-        <DataAnnotationsValidator />
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label" for="firstName">First name</label>
-                <InputText id="firstName" class="form-control" @bind-Value="_model.FirstName" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="lastName">Last name</label>
-                <InputText id="lastName" class="form-control" @bind-Value="_model.LastName" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="displayName">Display name</label>
-                <InputText id="displayName" class="form-control" @bind-Value="_model.DisplayName" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="email">Email</label>
-                <InputText id="email" class="form-control" @bind-Value="_model.Email" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="timeZoneId">Default timezone</label>
-                <TimezoneSelect Id="timeZoneId" @bind-Value="_model.TimeZoneId" Placeholder="Select a timezone" />
-                <ValidationMessage For="@(() => _model.TimeZoneId)" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="mapProvider">Default map</label>
-                <InputSelect id="mapProvider" class="form-select" @bind-Value="_model.MapProvider">
-                    <option value="@MapProviders.Bing">Bing Maps</option>
-                    <option value="@MapProviders.Google">Google Maps</option>
-                </InputSelect>
-                <div class="form-text">Used when you open an item location on a map.</div>
-            </div>
-        </div>
-
-        <h2 class="h4 mt-4">Notifications</h2>
-        <p class="text-secondary">Choose how you want to be notified. Changes apply to future notifications only.</p>
-        <div class="row g-3">
-            @foreach (var category in _model.NotificationCategories)
-            {
+    <EditForm Model="_model" OnValidSubmit="SaveAsync" FormName="profile-form" class="card entry-form-card">
+        <div class="card-body">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
                 <div class="col-md-6">
-                    <fieldset class="notification-category h-100" aria-label="@category.DisplayName">
-                        <legend class="h6 mb-1">@category.DisplayName</legend>
-                        <div class="form-check">
-                            <InputCheckbox id="@($"notif-{category.Category}-inapp")" class="form-check-input" @bind-Value="category.InAppEnabled" />
-                            <label class="form-check-label" for="@($"notif-{category.Category}-inapp")">In-app</label>
-                        </div>
-                        <div class="form-check">
-                            <InputCheckbox id="@($"notif-{category.Category}-email")" class="form-check-input" @bind-Value="category.EmailEnabled" />
-                            <label class="form-check-label" for="@($"notif-{category.Category}-email")">Email</label>
-                        </div>
-                        <p class="small text-secondary mb-0" data-testid="@($"notif-{category.Category}-summary")">@DescribeCategoryState(category)</p>
-                    </fieldset>
+                    <label class="form-label" for="firstName">First name</label>
+                    <InputText id="firstName" class="form-control" @bind-Value="_model.FirstName" />
                 </div>
-            }
+                <div class="col-md-6">
+                    <label class="form-label" for="lastName">Last name</label>
+                    <InputText id="lastName" class="form-control" @bind-Value="_model.LastName" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="displayName">Display name</label>
+                    <InputText id="displayName" class="form-control" @bind-Value="_model.DisplayName" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="email">Email</label>
+                    <InputText id="email" class="form-control" @bind-Value="_model.Email" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="timeZoneId">Default timezone</label>
+                    <TimezoneSelect Id="timeZoneId" @bind-Value="_model.TimeZoneId" Placeholder="Select a timezone" />
+                    <ValidationMessage For="@(() => _model.TimeZoneId)" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="mapProvider">Default map</label>
+                    <InputSelect id="mapProvider" class="form-select" @bind-Value="_model.MapProvider">
+                        <option value="@MapProviders.Bing">Bing Maps</option>
+                        <option value="@MapProviders.Google">Google Maps</option>
+                    </InputSelect>
+                    <div class="form-text">Used when you open an item location on a map.</div>
+                </div>
+            </div>
+
+            <h2 class="h4 mt-4">Notifications</h2>
+            <p class="text-secondary">Choose how you want to be notified. Changes apply to future notifications only.</p>
+            <div class="row g-3">
+                @foreach (var category in _model.NotificationCategories)
+                {
+                    <div class="col-md-6">
+                        <fieldset class="notification-category h-100" aria-label="@category.DisplayName">
+                            <legend class="h6 mb-1">@category.DisplayName</legend>
+                            <div class="form-check">
+                                <InputCheckbox id="@($"notif-{category.Category}-inapp")" class="form-check-input" @bind-Value="category.InAppEnabled" />
+                                <label class="form-check-label" for="@($"notif-{category.Category}-inapp")">In-app</label>
+                            </div>
+                            <div class="form-check">
+                                <InputCheckbox id="@($"notif-{category.Category}-email")" class="form-check-input" @bind-Value="category.EmailEnabled" />
+                                <label class="form-check-label" for="@($"notif-{category.Category}-email")">Email</label>
+                            </div>
+                            <p class="small text-secondary mb-0" data-testid="@($"notif-{category.Category}-summary")">@DescribeCategoryState(category)</p>
+                        </fieldset>
+                    </div>
+                }
+            </div>
+
+            <h2 class="h4 mt-4">Personalization</h2>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="travelInterests">Travel interests</label>
+                    <InputText id="travelInterests" class="form-control" @bind-Value="_model.TravelInterests" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="homeAirport">Home airport</label>
+                    <InputText id="homeAirport" class="form-control" @bind-Value="_model.HomeAirport" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="preferredTravelStyle">Preferred travel style</label>
+                    <InputText id="preferredTravelStyle" class="form-control" @bind-Value="_model.PreferredTravelStyle" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="accessibilityNotes">Accessibility notes</label>
+                    <InputText id="accessibilityNotes" class="form-control" @bind-Value="_model.AccessibilityNotes" />
+                </div>
+            </div>
         </div>
 
-        <h2 class="h4 mt-4">Personalization</h2>
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label" for="travelInterests">Travel interests</label>
-                <InputText id="travelInterests" class="form-control" @bind-Value="_model.TravelInterests" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="homeAirport">Home airport</label>
-                <InputText id="homeAirport" class="form-control" @bind-Value="_model.HomeAirport" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="preferredTravelStyle">Preferred travel style</label>
-                <InputText id="preferredTravelStyle" class="form-control" @bind-Value="_model.PreferredTravelStyle" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="accessibilityNotes">Accessibility notes</label>
-                <InputText id="accessibilityNotes" class="form-control" @bind-Value="_model.AccessibilityNotes" />
+        <div class="card-footer entry-form-footer">
+            <div class="entry-form-actions">
+                <button class="btn btn-primary" type="submit" disabled="@_isSaving"><ActionIcon Name="save" CssClass="me-1 align-text-bottom" />@(_isSaving ? "Saving..." : "Save")</button>
             </div>
         </div>
-
-        <button class="btn btn-primary mt-4" type="submit" disabled="@_isSaving"><ActionIcon Name="save" CssClass="me-1 align-text-bottom" />@(_isSaving ? "Saving..." : "Save profile")</button>
     </EditForm>
 }
 </section>

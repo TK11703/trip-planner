@@ -5,6 +5,7 @@ using TripPlanner.Contracts.Errors;
 using TripPlanner.Contracts.TripItems;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Web.Components.Pages.EmailIngestion;
+using TripPlanner.Web.Components.EmailIngestion;
 using TripPlanner.Web.Features.EmailIngestion;
 using TripPlanner.Web.Features.InboxHistory;
 using TripPlanner.Web.Features.Timezones;
@@ -259,7 +260,7 @@ public class InboxReviewPageTests : BunitContext
             new DateTime(2026, 8, endDay, 23, 59, 0), "UTC", null, null, sortOrder,
             legKind, transportationMode);
 
-    private (IRenderedComponent<InboxDrafts> Cut, StubEmailIngestionApiClient Ingestion, StubTripApiClient Trips)
+    private (IRenderedComponent<DraftEditForm> Cut, StubEmailIngestionApiClient Ingestion, StubTripApiClient Trips)
         RenderQueueWithEditableTrips(ParsedItemDraftDto draft, params (TripSummary Summary, TripDetail Detail)[] trips)
     {
         var ingestion = new StubEmailIngestionApiClient([draft]);
@@ -273,30 +274,26 @@ public class InboxReviewPageTests : BunitContext
         Services.AddSingleton<ITripApiClient>(tripClient);
         Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
 
-        var cut = Render<InboxDrafts>();
+        var cut = Render<DraftEditForm>(parameters => parameters.Add(component => component.Draft, draft));
         cut.WaitForAssertion(() => Assert.Contains("Flight ABC123", cut.Markup, StringComparison.Ordinal));
         return (cut, ingestion, tripClient);
     }
 
-    private static void OpenEditModal(IRenderedComponent<InboxDrafts> cut)
-    {
-        cut.FindAll("button").Single(b => b.TextContent.Trim() == "Edit").Click();
-        cut.WaitForAssertion(() => Assert.Contains("Edit parsed item", cut.Markup, StringComparison.Ordinal));
-    }
-
     // FR-016: the traveler can reopen a draft and take the placement decision themselves.
     [Fact]
-    public void TheEditModalOpensFromADraft()
+    public void EditFormLoadsFromAnAuthorizedDraft()
     {
         var tripId = Guid.NewGuid();
         var draft = Draft(tripId, start: new DateTime(2026, 8, 12, 9, 30, 0));
         var (cut, _, _) = RenderQueueWithEditableTrips(draft,
             (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", Leg(tripId, "San Francisco", 11, 14))));
 
-        OpenEditModal(cut);
 
         Assert.Contains("Flight ABC123", cut.Find("#draft-title").GetAttribute("value")!, StringComparison.Ordinal);
         Assert.Contains("San Francisco", cut.Find("#draft-leg").InnerHtml, StringComparison.Ordinal);
+        var actions = cut.Find(".card-footer .entry-form-actions");
+        Assert.Contains("justify-content-start", actions.ClassList);
+        Assert.Equal(["Save", "Cancel"], actions.Children.Select(button => button.TextContent.Trim()));
     }
 
     // FR-018: a leg belonging to the trip the traveler just left would send the item somewhere
@@ -314,8 +311,7 @@ public class InboxReviewPageTests : BunitContext
             (Trip(westId, "West Coast"), Detail(westId, "West Coast", westLeg)),
             (Trip(eastId, "East Coast"), Detail(eastId, "East Coast", eastLeg)));
 
-        OpenEditModal(cut);
-        cut.WaitForAssertion(() => Assert.Equal(westLeg.TripLegId.ToString(), cut.Find("#draft-leg").GetAttribute("value")));
+                cut.WaitForAssertion(() => Assert.Equal(westLeg.TripLegId.ToString(), cut.Find("#draft-leg").GetAttribute("value")));
 
         cut.Find("#draft-trip").Change(eastId.ToString());
 
@@ -339,8 +335,7 @@ public class InboxReviewPageTests : BunitContext
         var (cut, _, _) = RenderQueueWithEditableTrips(draft,
             (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", leg)));
 
-        OpenEditModal(cut);
-        cut.Find("#draft-leg").Change(leg.TripLegId.ToString());
+                cut.Find("#draft-leg").Change(leg.TripLegId.ToString());
 
         cut.WaitForAssertion(() =>
         {
@@ -365,8 +360,7 @@ public class InboxReviewPageTests : BunitContext
         var (cut, _, _) = RenderQueueWithEditableTrips(Draft(),
             (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", leg)));
 
-        OpenEditModal(cut);
-        Assert.True(string.IsNullOrEmpty(cut.Find("#draft-start").GetAttribute("value")));
+                Assert.True(string.IsNullOrEmpty(cut.Find("#draft-start").GetAttribute("value")));
 
         cut.Find("#draft-trip").Change(tripId.ToString());
         cut.WaitForAssertion(() => Assert.Contains("San Francisco", cut.Find("#draft-leg").InnerHtml, StringComparison.Ordinal));
@@ -393,7 +387,6 @@ public class InboxReviewPageTests : BunitContext
             (Trip(ownedId, "West Coast"), Detail(ownedId, "West Coast", Leg(ownedId, "San Francisco", 11, 14))),
             (Trip(viewerId, "Someone Else's Trip", TripAccessLevel.Viewer), Detail(viewerId, "Someone Else's Trip")));
 
-        OpenEditModal(cut);
 
         var tripSelect = cut.Find("#draft-trip");
         Assert.Contains("West Coast", tripSelect.InnerHtml, StringComparison.Ordinal);
@@ -402,7 +395,7 @@ public class InboxReviewPageTests : BunitContext
 
     // FR-017: every parsed field is editable, and Save persists what the traveler entered.
     [Fact]
-    public void SavingTheModalPersistsTheEditedFields()
+    public void SavingTheEditFormPersistsTheEditedFields()
     {
         var tripId = Guid.NewGuid();
         var leg = Leg(tripId, "San Francisco", 11, 14);
@@ -410,8 +403,7 @@ public class InboxReviewPageTests : BunitContext
         var (cut, ingestion, _) = RenderQueueWithEditableTrips(draft,
             (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", leg)));
 
-        OpenEditModal(cut);
-        cut.Find("#draft-title").Change("Flight ABC123 (corrected)");
+                cut.Find("#draft-title").Change("Flight ABC123 (corrected)");
         cut.Find("#draft-leg").Change(leg.TripLegId.ToString());
         cut.Find("#draft-start-tz").Input("UTC");
         cut.Find(".tp-option-list button").Click();
@@ -425,7 +417,7 @@ public class InboxReviewPageTests : BunitContext
             Assert.Equal(leg.TripLegId, request.TripLegId);
             Assert.Equal("UTC", request.StartTimeZoneId);
         });
-        cut.WaitForAssertion(() => Assert.DoesNotContain("Edit parsed item", cut.Markup, StringComparison.Ordinal));
+        cut.WaitForAssertion(() => Assert.Contains("Edit parsed item", cut.Markup, StringComparison.Ordinal));
     }
 
     // FR-022: a refusal is shown against the input the API named, so the traveler can fix it
@@ -473,7 +465,6 @@ public class InboxReviewPageTests : BunitContext
         var (cut, _, _) = RenderQueueWithEditableTrips(draft,
             (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", stay, restricted)));
 
-        OpenEditModal(cut);
 
         var legSelect = cut.Find("#draft-leg");
         Assert.Contains("San Francisco", legSelect.InnerHtml, StringComparison.Ordinal);
@@ -490,7 +481,6 @@ public class InboxReviewPageTests : BunitContext
         var (cut, _, _) = RenderQueueWithEditableTrips(draft,
             (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", car)));
 
-        OpenEditModal(cut);
 
         Assert.Contains("Road trip", cut.Find("#draft-leg").InnerHtml, StringComparison.Ordinal);
     }
@@ -510,7 +500,6 @@ public class InboxReviewPageTests : BunitContext
         var (cut, ingestion, _) = RenderQueueWithEditableTrips(draft,
             (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", outbound, inbound)));
 
-        OpenEditModal(cut);
 
         var legValues = cut.FindAll("#draft-leg option").Select(o => o.GetAttribute("value") ?? string.Empty).ToArray();
         Assert.Equal(new[] { string.Empty }, legValues);

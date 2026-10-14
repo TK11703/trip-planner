@@ -5,6 +5,7 @@ using TripPlanner.Contracts.FavoriteDestinations;
 using TripPlanner.Web.Features.FavoriteDestinations;
 using TripPlanner.Web.Tests.Auth;
 using FavoritesPage = TripPlanner.Web.Components.Pages.Favorites;
+using FavoriteEntryPage = TripPlanner.Web.Components.Pages.FavoriteDestinations.FavoriteEntry;
 
 namespace TripPlanner.Web.Tests.FavoriteDestinations;
 
@@ -64,32 +65,29 @@ public sealed class FavoriteDestinationMaintenanceTests : BunitContext
     {
         var favorite = Favorite("Old name", "Old address", "Old city", "Old country", new string('n', 800));
         var api = new MaintenanceFavoriteDestinationApiClient([favorite]);
-        var cut = RenderPage(api);
-        cut.WaitForAssertion(() => Assert.Contains("Old name", cut.Markup));
-        Assert.DoesNotContain(new string('n', 800), cut.Markup);
-
-        cut.Find($"[data-testid='favorite-edit-{favorite.FavoriteDestinationId}']").Click();
+        Services.AddSingleton<IFavoriteDestinationApiClient>(api);
+        Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
+        var cut = Render<FavoriteEntryPage>(parameters => parameters.Add(page => page.FavoriteId, favorite.FavoriteDestinationId));
+        cut.WaitForAssertion(() => Assert.Equal("Old name", cut.Find("#favorite-name").GetAttribute("value")));
         Assert.Equal(new string('n', 800), cut.Find("#favorite-notes").GetAttribute("value"));
         Assert.Empty(cut.FindAll("#favorite-city"));
         Assert.Empty(cut.FindAll("#favorite-country"));
         Assert.Empty(cut.FindAll("#favorite-source"));
-        Assert.Contains("Old city Â· Old country Â· 38.65123, -77.25321", cut.Find("[data-testid='favorite-calculated-location']").TextContent);
+        Assert.Contains("Old city · Old country · 38.65123, -77.25321", cut.Find("[data-testid='favorite-calculated-location']").TextContent);
         cut.Find("#favorite-name").Change("Updated name");
         cut.Find("#favorite-notes").Change("Updated notes");
         cut.Find("#favorite-form").Submit();
-        cut.WaitForAssertion(() => Assert.Contains("Updated name", cut.Markup));
-        Assert.Equal("Updated notes", api.Favorites.Single().Notes);
+        cut.WaitForAssertion(() => Assert.Equal("Updated notes", api.Favorites.Single().Notes));
+        Assert.Equal("Updated name", api.Favorites.Single().Name);
         Assert.Empty(cut.FindAll(".modal"));
 
-        cut.Find($"[data-testid='favorite-edit-{favorite.FavoriteDestinationId}']").Click();
         cut.Find("#favorite-delete").Click();
-        Assert.Contains("favorite-delete-confirm", cut.Markup);
+        Assert.NotNull(cut.Find("#favorite-delete-title"));
         Assert.Equal(0, api.DeleteCallCount);
-        cut.Find("#favorite-delete-confirm-action").Click();
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Delete favorite").Click();
 
-        cut.WaitForAssertion(() => Assert.Contains("No favorite destinations yet", cut.Markup));
-        Assert.Empty(cut.FindAll(".modal"));
-        Assert.Equal(1, api.DeleteCallCount);
+        cut.WaitForAssertion(() => Assert.Equal(1, api.DeleteCallCount));
+        Assert.Empty(api.Favorites);
     }
 
     [Fact]

@@ -6,8 +6,8 @@
 @using TripPlanner.Web.Features.FavoriteDestinations
 @inject IFavoriteDestinationApiClient FavoriteApi
 
-<section class="card card-body favorite-import mb-3" aria-label="Import favorite destinations">
-    <h2 class="card-title h5">Import favorites</h2>
+<section class="favorite-import" aria-label="Import favorite destinations">
+    <div class="card-body">
     @if (_job is null)
     {
         <div>
@@ -128,7 +128,9 @@
     {
         <div class="alert alert-success mt-3 mb-0" role="status">@_successMessage</div>
     }
-    <div class="d-flex gap-2 mt-3">
+    </div>
+    <div class="card-footer entry-form-footer">
+    <div class="entry-form-actions d-flex flex-wrap justify-content-start gap-3 w-100">
         @if (_job is null)
         {
             <button id="favorite-import-submit" type="button" class="btn btn-primary" disabled="@(_selectedFile is null || _isImporting)" @onclick="ImportAsync">
@@ -141,14 +143,15 @@
                 @(_isImporting ? "Importing..." : "Finish import")
             </button>
         }
-        @if (_job is not null)
-        {
-            <button id="favorite-import-discard" type="button" class="btn btn-outline-danger" disabled="@_isImporting" @onclick="DiscardAsync">Discard import</button>
-        }
         @if (OnCancel.HasDelegate)
         {
             <button id="favorite-import-cancel" type="button" class="btn btn-outline-secondary" disabled="@_isImporting" @onclick="OnCancel">@(_job is null && _successMessage is null ? "Cancel" : "Close")</button>
         }
+        @if (_job is not null)
+        {
+            <button id="favorite-import-discard" type="button" class="btn btn-outline-danger ms-auto" disabled="@_isImporting" @onclick="DiscardAsync">Discard import</button>
+        }
+    </div>
     </div>
 </section>
 
@@ -183,12 +186,14 @@
     private bool _isImporting;
     private CancellationTokenSource? _pollCancellation;
 
+    [Parameter] public Guid? ImportId { get; set; }
     [Parameter] public EventCallback OnImported { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(2);
 
     // Raised with the current unfinished import (null when there is none) whenever it changes.
     [Parameter] public EventCallback<FavoriteDestinationImportJobDto?> OnImportChanged { get; set; }
+    [Parameter] public EventCallback<bool> OnSubmittingChanged { get; set; }
 
     private bool _initialized;
     private bool _hasReported;
@@ -215,19 +220,23 @@
                 ? _job.Ambiguities.Where(ambiguity => !_selections.ContainsKey(ambiguity.RowNumber))
                 : _job.Ambiguities;
 
-    // Resume the newest unfinished import, so leaving the page never strands one.
+    // Rehydrate a persisted import on cold load; otherwise resume the newest open job.
     protected override async Task OnInitializedAsync()
     {
-        await CallApiAsync(
-            async () =>
+        await CallApiAsync(async () =>
+        {
+            if (ImportId is { } id)
+            {
+                var job = await FavoriteApi.GetImportAsync(id);
+                if (job is null) _error = "This import is no longer available.";
+                else SetJob(job);
+            }
+            else
             {
                 var open = await FavoriteApi.GetOpenImportsAsync();
-                if (open.Count > 0)
-                {
-                    SetJob(open[0]);
-                }
-            },
-            message => _error = message);
+                if (open.Count > 0) SetJob(open[0]);
+            }
+        }, message => _error = message);
         _initialized = true;
     }
 
@@ -264,6 +273,7 @@
         }
 
         _isImporting = true;
+        await OnSubmittingChanged.InvokeAsync(true);
         _error = null;
         _successMessage = null;
         _uploadErrors = Array.Empty<FavoriteDestinationImportIssue>();
@@ -289,6 +299,7 @@
         finally
         {
             _isImporting = false;
+            await OnSubmittingChanged.InvokeAsync(false);
         }
     }
 
@@ -300,6 +311,7 @@
         }
 
         _isImporting = true;
+        await OnSubmittingChanged.InvokeAsync(true);
         _error = null;
         var request = new CompleteFavoriteDestinationImportRequest(
             _selections.Select(selection => new FavoriteDestinationImportSelection(selection.Key, selection.Value)).ToArray(),
@@ -324,6 +336,7 @@
             },
             message => _error = message);
         _isImporting = false;
+        await OnSubmittingChanged.InvokeAsync(false);
     }
 
     private async Task DiscardAsync()
@@ -334,6 +347,7 @@
         }
 
         _isImporting = true;
+        await OnSubmittingChanged.InvokeAsync(true);
         _error = null;
         await CallApiAsync(
             async () =>
@@ -349,6 +363,7 @@
             },
             message => _error = message);
         _isImporting = false;
+        await OnSubmittingChanged.InvokeAsync(false);
     }
 
     private void SetJob(FavoriteDestinationImportJobDto job)

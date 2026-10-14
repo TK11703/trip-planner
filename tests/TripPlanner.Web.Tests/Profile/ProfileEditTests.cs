@@ -20,6 +20,9 @@ public class ProfileEditTests : BunitContext
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
         var cut = Render<ProfilePage>();
 
+        Assert.Contains("entry-form-card", cut.Find("form").GetAttribute("class"));
+        var saveButton = Assert.Single(cut.FindAll("form > .card-footer.entry-form-footer > .entry-form-actions > button[type='submit']"));
+        Assert.Equal("Save", saveButton.TextContent.Trim());
         cut.Find("#displayName").Change("Avery Updated");
         cut.Find("#notif-TripSharing-email").Change(false);
         cut.Find("#travelInterests").Change("food markets");

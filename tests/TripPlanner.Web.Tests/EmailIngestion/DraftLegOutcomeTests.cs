@@ -4,6 +4,7 @@ using TripPlanner.Contracts.EmailIngestion;
 using TripPlanner.Contracts.TripItems;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Web.Components.Pages.EmailIngestion;
+using TripPlanner.Web.Components.EmailIngestion;
 using TripPlanner.Web.Features.EmailIngestion;
 using TripPlanner.Web.Features.Timezones;
 using TripPlanner.Web.Features.Trips;
@@ -76,6 +77,22 @@ public class DraftLegOutcomeTests : BunitContext
         return (cut, ingestion);
     }
 
+    private (IRenderedComponent<DraftEditForm> Cut, StubEmailIngestionApiClient Ingestion) RenderEditor(ParsedItemDraftDto draft)
+    {
+        var ingestion = new StubEmailIngestionApiClient([draft]);
+        var (summary, detail) = EditableTrip();
+        var tripClient = new StubTripApiClient([summary]);
+        tripClient.Details[TripId] = detail;
+
+        Services.AddSingleton<IEmailIngestionApiClient>(ingestion);
+        Services.AddSingleton<ITripApiClient>(tripClient);
+        Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
+
+        var cut = Render<DraftEditForm>(parameters => parameters.Add(component => component.Draft, draft));
+        cut.WaitForAssertion(() => Assert.Contains(draft.Title!, cut.Markup, StringComparison.Ordinal));
+        return (cut, ingestion);
+    }
+
     private static void OpenEditModal(IRenderedComponent<InboxDrafts> cut)
     {
         cut.FindAll("button").Single(b => b.TextContent.Trim() == "Edit").Click();
@@ -108,9 +125,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void EditingAProposedLegPreselectsItsSuggestedTrip()
     {
-        var (cut, _) = RenderQueue(LegDraft(unassigned: true, placement: SuggestedTripPlacement()));
-
-        OpenEditModal(cut);
+        var (cut, _) = RenderEditor(LegDraft(unassigned: true, placement: SuggestedTripPlacement()));
 
         cut.WaitForAssertion(() => Assert.Equal(TripId.ToString(), cut.Find("#draft-trip").GetAttribute("value")));
     }
@@ -132,8 +147,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void ALegDraftRendersTheRouteFieldsAndNotTheItemFields()
     {
-        var (cut, _) = RenderQueue(LegDraft());
-        OpenEditModal(cut);
+        var (cut, _) = RenderEditor(LegDraft());
 
         cut.WaitForAssertion(() =>
         {
@@ -152,8 +166,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void AnItemDraftRendersTheItemFieldsAndNotTheRouteFields()
     {
-        var (cut, _) = RenderQueue(ItemDraft());
-        OpenEditModal(cut);
+        var (cut, _) = RenderEditor(ItemDraft());
 
         cut.WaitForAssertion(() =>
         {
@@ -169,8 +182,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void TheTravelCostShowsTheRecognizedCurrencyAsALabel()
     {
-        var (cut, _) = RenderQueue(LegDraft());
-        OpenEditModal(cut);
+        var (cut, _) = RenderEditor(LegDraft());
 
         cut.WaitForAssertion(() =>
             Assert.Equal("USD", cut.Find("[data-testid=draft-travel-cost-currency]").TextContent.Trim()));
@@ -179,8 +191,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void SwitchingToItemNamesWhatWillNotCarryAcross()
     {
-        var (cut, _) = RenderQueue(LegDraft());
-        OpenEditModal(cut);
+        var (cut, _) = RenderEditor(LegDraft());
 
         cut.Find("#draft-outcome-item").Change(true);
 
@@ -197,8 +208,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void SwitchingToLegNamesWhatWillNotCarryAcross()
     {
-        var (cut, _) = RenderQueue(ItemDraft());
-        OpenEditModal(cut);
+        var (cut, _) = RenderEditor(ItemDraft());
 
         cut.Find("#draft-outcome-leg").Change(true);
 
@@ -217,8 +227,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void SwitchingToItemAndBackLeavesTheRouteIntact()
     {
-        var (cut, _) = RenderQueue(LegDraft());
-        OpenEditModal(cut);
+        var (cut, _) = RenderEditor(LegDraft());
 
         cut.Find("#draft-outcome-item").Change(true);
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("#draft-origin")));
@@ -237,8 +246,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void SavingALegDraftSendsTheRouteAndOutcome()
     {
-        var (cut, ingestion) = RenderQueue(LegDraft());
-        OpenEditModal(cut);
+        var (cut, ingestion) = RenderEditor(LegDraft());
 
         cut.FindAll("button").Single(b => b.TextContent.Trim() == "Save").Click();
 
@@ -260,8 +268,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void EveryMissingLegDetailIsNamedAtOnce()
     {
-        var (cut, ingestion) = RenderQueue(LegDraft(endZone: null, origin: null, destination: null, mode: null));
-        OpenEditModal(cut);
+        var (cut, ingestion) = RenderEditor(LegDraft(endZone: null, origin: null, destination: null, mode: null));
 
         cut.FindAll("button").Single(b => b.TextContent.Trim() == "Save").Click();
 
@@ -324,8 +331,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void AMissingEndZoneOffersASuggestionWithoutFillingTheField()
     {
-        var (cut, _) = RenderQueue(LegDraft(endZone: null));
-        OpenEditModal(cut);
+        var (cut, _) = RenderEditor(LegDraft(endZone: null));
 
         cut.WaitForAssertion(() =>
         {
@@ -341,8 +347,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void PressingUseThisFillsTheFieldAndRetiresTheSuggestion()
     {
-        var (cut, ingestion) = RenderQueue(LegDraft(endZone: null));
-        OpenEditModal(cut);
+        var (cut, ingestion) = RenderEditor(LegDraft(endZone: null));
 
         cut.WaitForAssertion(() => cut.Find("[data-testid=draft-suggestion-accept-endTimeZoneId]"));
         cut.Find("[data-testid=draft-suggestion-accept-endTimeZoneId]").Click();
@@ -362,8 +367,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void AnEndZoneAlreadyPresentIsNeverSecondGuessed()
     {
-        var (cut, ingestion) = RenderQueue(LegDraft(endZone: "America/New_York"));
-        OpenEditModal(cut);
+        var (cut, ingestion) = RenderEditor(LegDraft(endZone: "America/New_York"));
 
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("[data-testid=draft-suggestion-endTimeZoneId]")));
 
@@ -382,8 +386,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void NoSuggestionIsOfferedForAMissingEndDateTime()
     {
-        var (cut, ingestion) = RenderQueue(LegDraft(omitEnd: true, endZone: null));
-        OpenEditModal(cut);
+        var (cut, ingestion) = RenderEditor(LegDraft(omitEnd: true, endZone: null));
 
         // The end zone may be suggested; the end date/time never is.
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("[data-testid=draft-suggestion-endLocal]")));
@@ -398,8 +401,7 @@ public class DraftLegOutcomeTests : BunitContext
     [Fact]
     public void AnItemDraftIsOfferedNoEndZoneSuggestion()
     {
-        var (cut, _) = RenderQueue(ItemDraft());
-        OpenEditModal(cut);
+        var (cut, _) = RenderEditor(ItemDraft());
 
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("[data-testid=draft-suggestion-endTimeZoneId]")));
     }
@@ -414,7 +416,7 @@ public class DraftLegOutcomeTests : BunitContext
     public void OpeningAPendingDraftAsksForReRecognitionExactlyOnce()
     {
         var draft = ItemDraft() with { TransportRecognitionState = DraftRecognitionState.Pending };
-        var (cut, ingestion) = RenderQueue(draft);
+        var (queue, ingestion) = RenderQueue(draft);
 
         // Merely listing must not trigger it.
         Assert.Equal(0, ingestion.ReRecognizeCalls);
@@ -424,8 +426,7 @@ public class DraftLegOutcomeTests : BunitContext
             ParsedItemDraftId = draft.ParsedItemDraftId,
             TransportRecognitionState = DraftRecognitionState.Current
         };
-
-        OpenEditModal(cut);
+        var cut = Render<DraftEditForm>(parameters => parameters.Add(component => component.Draft, draft));
 
         cut.WaitForAssertion(() =>
         {
@@ -440,9 +441,7 @@ public class DraftLegOutcomeTests : BunitContext
     [InlineData(DraftRecognitionState.Unavailable)]
     public void ADraftThatIsAlreadySettledIsNotReRecognized(DraftRecognitionState state)
     {
-        var (cut, ingestion) = RenderQueue(LegDraft() with { TransportRecognitionState = state });
-
-        OpenEditModal(cut);
+        var (cut, ingestion) = RenderEditor(LegDraft() with { TransportRecognitionState = state });
 
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("#draft-origin")));
         Assert.Equal(0, ingestion.ReRecognizeCalls);
@@ -456,10 +455,9 @@ public class DraftLegOutcomeTests : BunitContext
     public void AFailedReRecognitionStillOpensTheDraft()
     {
         var draft = ItemDraft() with { TransportRecognitionState = DraftRecognitionState.Pending };
-        var (cut, ingestion) = RenderQueue(draft);
+        var (queue, ingestion) = RenderQueue(draft);
         ingestion.ReRecognizeResult = null;
-
-        OpenEditModal(cut);
+        var cut = Render<DraftEditForm>(parameters => parameters.Add(component => component.Draft, draft));
 
         cut.WaitForAssertion(() =>
         {
@@ -478,10 +476,9 @@ public class DraftLegOutcomeTests : BunitContext
     public void AThrowingReRecognitionStillOpensTheDraftIntact()
     {
         var draft = ItemDraft() with { TransportRecognitionState = DraftRecognitionState.Pending };
-        var (cut, ingestion) = RenderQueue(draft);
+        var (queue, ingestion) = RenderQueue(draft);
         ingestion.ReRecognizeThrows = new InvalidOperationException("provider exploded");
-
-        OpenEditModal(cut);
+        var cut = Render<DraftEditForm>(parameters => parameters.Add(component => component.Draft, draft));
 
         cut.WaitForAssertion(() =>
         {

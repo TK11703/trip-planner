@@ -6,6 +6,7 @@
 @using TripPlanner.Contracts.Common
 @using TripPlanner.Contracts.Timeline
 @using TripPlanner.Contracts.TripItems
+@using TripPlanner.Web.Features.EntryPages
 
 @if (_timeline is null)
 {
@@ -15,13 +16,7 @@ else if (_timeline.Legs.Count == 0 && _timeline.UnassignedItems.Count == 0)
 {
     <div class="border-dashed rounded p-4 text-center text-secondary">
         No trip legs yet. Add a trip leg to start building your timeline, then relate items to it.
-        <button type="button"
-                class="ttl-leg-add"
-                title="Add a trip leg"
-                aria-label="Add a trip leg"
-                @onclick="AddLegFromFooterAsync">
-            <span aria-hidden="true">+</span> Add leg
-        </button>
+        @if (CanEdit && TripId != Guid.Empty) { <a class="ttl-leg-add" title="Add a trip leg" aria-label="Add a trip leg" href="@EntryPageUrls.LegCreate(TripId, ReturnUrl)"><span aria-hidden="true">+</span> Add leg</a> } else if (OnAddLegRequested.HasDelegate) { <button type="button" class="ttl-leg-add" @onclick="AddLegFromFooterAsync"><span aria-hidden="true">+</span> Add leg</button> }
     </div>
 }
 else
@@ -67,8 +62,8 @@ else
                     var legLanes = AssignLanes(leg.Items);
                     var legLaneCount = LaneCount(legLanes);
                     var legRowHeight = Rem(LaneMinHeightRem(legLaneCount));
-                    <div class="ttl-leg-label" style="min-height:@(legRowHeight)rem" @onclick="() => SelectLegAsync(leg.TripLegId)" role="button" tabindex="0">
-                        <div class="fw-semibold">@leg.Title</div>
+                    <div id="leg-@leg.TripLegId" class="ttl-leg-label" style="min-height:@(legRowHeight)rem" @onclick="() => SelectLegAsync(leg.TripLegId)" role="@(OnLegSelected.HasDelegate ? "button" : null)" tabindex="@(OnLegSelected.HasDelegate ? "0" : null)">
+                        @if (CanEdit) { <a class="fw-semibold" href="@EntryPageUrls.LegEdit(TripId, leg.TripLegId, ReturnUrl)">@leg.Title</a> } else { <div class="fw-semibold">@leg.Title</div> }
                         @if (!string.IsNullOrWhiteSpace(leg.ModeLabel))
                         {
                             <div class="small text-secondary" data-testid="leg-mode">@leg.ModeLabel</div>
@@ -87,14 +82,14 @@ else
                                 <span class="ttl-leg-count @(leg.Items.Count == 0 ? "ttl-leg-count-empty" : null)">@ItemCountLabel(leg.Items.Count)</span>
                                 @if (CanEdit)
                                 {
-                                    <button type="button"
-                                            class="ttl-leg-add"
-                                            title="Add an item to @leg.Title"
-                                            aria-label="Add an item to @leg.Title"
-                                            @onclick="() => AddItemToLegAsync(leg)"
-                                            @onclick:stopPropagation="true">
-                                        <span aria-hidden="true">+</span> Add item
-                                    </button>
+                                    @if (OnLegSlotSelected.HasDelegate)
+                                    {
+                                        <button type="button" class="ttl-leg-add" title="Add an item to @leg.Title" aria-label="Add an item to @leg.Title" @onclick="() => AddItemToLegAsync(leg)" @onclick:stopPropagation="true"><span aria-hidden="true">+</span> Add item</button>
+                                    }
+                                    else
+                                    {
+                                        <a class="ttl-leg-add" title="Add an item to @leg.Title" aria-label="Add an item to @leg.Title" href="@LegItemHref(leg)" @onclick:stopPropagation="true"><span aria-hidden="true">+</span> Add item</a>
+                                    }
                                 }
                             </div>
                         }
@@ -121,15 +116,20 @@ else
                             DateTime? localEnd = item.EndLocal;
                             var span = ComputeSpan(localStart, localEnd);
                             var outside = item.StartsOutsideLeg || item.EndsOutsideLeg;
-                            <button type="button"
-                                    class="ttl-item @(outside ? "is-outside" : null)"
-                                    style="left:@(span.Left)px; width:@(span.Width)px; top:@(Rem(ItemTopRem(lane)))rem; --tp-item:@SwatchColor(item.DisplayColor)"
-                                    title="@ItemTooltip(item, localStart, localEnd, outside)"
-                                    @onclick="() => SelectItemAsync(item.TrackedItemId)"
-                                    @onclick:stopPropagation="true">
-                                <TrackedItemIcon Type="@item.ItemType" CssClass="ttl-item-type-icon" />
-                                <span class="ttl-item-title text-truncate">@item.Title</span>
-                            </button>
+                            @if (OnItemSelected.HasDelegate)
+                            {
+                                <button id="item-@item.TrackedItemId" type="button" class="ttl-item @(outside ? "is-outside" : null)" style="left:@(span.Left)px; width:@(span.Width)px; top:@(Rem(ItemTopRem(lane)))rem; --tp-item:@SwatchColor(item.DisplayColor)" title="@ItemTooltip(item, localStart, localEnd, outside)" @onclick="() => SelectItemAsync(item.TrackedItemId)">
+                                    <TrackedItemIcon Type="@item.ItemType" CssClass="ttl-item-type-icon" />
+                                    <span class="ttl-item-title text-truncate">@item.Title</span>
+                                </button>
+                            }
+                            else
+                            {
+                                <a id="item-@item.TrackedItemId" class="ttl-item @(outside ? "is-outside" : null)" style="left:@(span.Left)px; width:@(span.Width)px; top:@(Rem(ItemTopRem(lane)))rem; --tp-item:@SwatchColor(item.DisplayColor)" title="@ItemTooltip(item, localStart, localEnd, outside)" href="@EntryPageUrls.ItemEdit(TripId, item.TrackedItemId, ReturnUrl)">
+                                    <TrackedItemIcon Type="@item.ItemType" CssClass="ttl-item-type-icon" />
+                                    <span class="ttl-item-title text-truncate">@item.Title</span>
+                                </a>
+                            }
                         }
                     </div>
                 }
@@ -138,7 +138,7 @@ else
                 {
                     var unassignedLanes = AssignLanes(_timeline.UnassignedItems);
                     var unassignedRowHeight = Rem(LaneMinHeightRem(LaneCount(unassignedLanes)));
-                    <div class="ttl-leg-label ttl-leg-label-muted" style="min-height:@(unassignedRowHeight)rem">
+                    <div id="unassigned-items" class="ttl-leg-label ttl-leg-label-muted" style="min-height:@(unassignedRowHeight)rem">
                         <div class="fw-semibold text-truncate">Unassigned</div>
                         <div class="small text-secondary fst-italic">Needs a trip leg</div>
                     </div>
@@ -149,14 +149,13 @@ else
                             var localStart = item.StartLocal;
                             DateTime? localEnd = item.EndLocal;
                             var span = ComputeSpan(localStart, localEnd);
-                            <button type="button"
-                                    class="ttl-item is-outside"
-                                    style="left:@(span.Left)px; width:@(span.Width)px; top:@(Rem(ItemTopRem(lane)))rem; --tp-item:@SwatchColor(item.DisplayColor)"
-                                    title="Unassigned item — select to relate it to a trip leg"
-                                    @onclick="() => SelectItemAsync(item.TrackedItemId)">
+                            <a id="item-@item.TrackedItemId" class="ttl-item is-outside"
+                               style="left:@(span.Left)px; width:@(span.Width)px; top:@(Rem(ItemTopRem(lane)))rem; --tp-item:@SwatchColor(item.DisplayColor)"
+                               title="Unassigned item — open its entry page"
+                               href="@EntryPageUrls.ItemEdit(TripId, item.TrackedItemId, ReturnUrl)">
                                 <TrackedItemIcon Type="@item.ItemType" CssClass="ttl-item-type-icon" />
                                 <span class="ttl-item-title text-truncate">@item.Title</span>
-                            </button>
+                            </a>
                         }
                     </div>
                 }
@@ -164,13 +163,14 @@ else
                 @if (CanEdit)
                 {
                     <div class="ttl-leg-footer">
-                        <button type="button"
-                                class="ttl-leg-add ttl-leg-add-footer"
-                                title="Add a trip leg"
-                                aria-label="Add a trip leg"
-                                @onclick="AddLegFromFooterAsync">
-                            <span aria-hidden="true">+</span> Add leg
-                        </button>
+                        @if (OnAddLegRequested.HasDelegate)
+                        {
+                            <button type="button" class="ttl-leg-add ttl-leg-add-footer" title="Add a trip leg" aria-label="Add a trip leg" @onclick="AddLegFromFooterAsync"><span aria-hidden="true">+</span> Add leg</button>
+                        }
+                        else
+                        {
+                            <a class="ttl-leg-add ttl-leg-add-footer" title="Add a trip leg" aria-label="Add a trip leg" href="@EntryPageUrls.LegCreate(TripId, ReturnUrl)"><span aria-hidden="true">+</span> Add leg</a>
+                        }
                     </div>
                     <div class="ttl-footer-spacer" style="width:@(TrackWidthPx)px"></div>
                 }
@@ -182,6 +182,8 @@ else
 @code {
     [Parameter] public Guid TripId { get; set; }
     [Parameter] public bool CanEdit { get; set; } = true;
+    [Parameter] public string? ReturnUrl { get; set; }
+    [Parameter] public DateOnly? InitialDate { get; set; }
     [Parameter] public EventCallback<Guid> OnLegSelected { get; set; }
     [Parameter] public EventCallback<Guid> OnItemSelected { get; set; }
     [Parameter] public EventCallback<TimelineSlotSelection> OnLegSlotSelected { get; set; }
@@ -212,6 +214,7 @@ else
     private int _days;
     private ElementReference _scrollEl;
     private bool _disposed;
+    private bool _initialScrollPending;
     private DotNetObjectReference<TripTimeline>? _selfRef;
 
     private bool HasGrid => _timeline is not null && (_timeline.Legs.Count > 0 || _timeline.UnassignedItems.Count > 0);
@@ -219,6 +222,15 @@ else
     private int TrackWidthPx => _days * SlotsPerDay * SlotWidthPx;
 
     protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_timeline is not null && InitialDate != _appliedInitialDate && InitialDate is { } requestedDate)
+        {
+            _appliedInitialDate = InitialDate;
+            await ScrollToDateAsync(requestedDate);
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -230,6 +242,11 @@ else
         {
             _selfRef ??= DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("tripTimeline.init", _scrollEl, _selfRef);
+            if (_initialScrollPending && _currentDate is { } initialDate)
+            {
+                _initialScrollPending = false;
+                await JS.InvokeVoidAsync("tripTimeline.scrollToDate", _scrollEl, (initialDate.DayNumber - _start.DayNumber) * SlotsPerDay * SlotWidthPx);
+            }
         }
         catch (JSDisconnectedException) { }
         catch (TaskCanceledException) { }
@@ -265,6 +282,12 @@ else
             _start = _timeline.StartDate;
             _end = _timeline.EndDate;
             _days = Math.Max(1, _end.DayNumber - _start.DayNumber + 1);
+            if (InitialDate is { } requestedDate)
+            {
+                _currentDate = requestedDate < _start ? _start : requestedDate > _end ? _end : requestedDate;
+                _appliedInitialDate = InitialDate;
+                _initialScrollPending = true;
+            }
         }
         StateHasChanged();
         // Notify the host so header controls that depend on this component's data
@@ -274,6 +297,7 @@ else
 
     // ── Date navigation ────────────────────────────────────────────────
     private DateOnly? _currentDate;
+    private DateOnly? _appliedInitialDate;
 
     /// <summary>Every date in the trip range, start to end inclusive. Empty until loaded.</summary>
     public IReadOnlyList<DateOnly> TripDates
@@ -459,12 +483,19 @@ else
     {
         // Clicking a restricted leg's lane must not open the item editor: there is nowhere valid
         // for that item to go.
-        if (!CanEdit || !leg.CanContainItems) return;
+        if (!CanEdit || !leg.CanContainItems || !OnLegSlotSelected.HasDelegate) return;
         var totalSlots = _days * SlotsPerDay;
         var slotIndex = Math.Clamp((int)Math.Floor(args.OffsetX / SlotWidthPx), 0, totalSlots - 1);
         var startLocal = _start.ToDateTime(TimeOnly.MinValue).AddMinutes(slotIndex * SlotMinutes);
         await OnLegSlotSelected.InvokeAsync(new TimelineSlotSelection(leg.TripLegId, startLocal));
     }
+
+    private string LegItemHref(TimelineLeg leg)
+    {
+        var start = EffectiveCurrent.ToDateTime(TimeOnly.FromDateTime(leg.StartLocal));
+        return EntryPageUrls.ItemCreate(TripId, leg.TripLegId, start, ReturnUrl);
+    }
+
 
     public async ValueTask DisposeAsync()
     {

@@ -6,7 +6,9 @@
 @using TripPlanner.Contracts.FavoriteDestinations
 @using TripPlanner.Web.Components.Favorites
 @using TripPlanner.Web.Features.FavoriteDestinations
+@using TripPlanner.Web.Features.EntryPages
 @inject IFavoriteDestinationApiClient FavoriteApi
+@inject NavigationManager Nav
 
 <PageTitle>Favorites</PageTitle>
 
@@ -26,15 +28,15 @@
     }
     else
     {
-        <ul class="nav nav-tabs favorites-tabs mb-3" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button id="favorite-tab-list" type="button" role="tab" class="nav-link @(_activeTab == FavoritesTab.List ? "active" : null)" aria-selected="@(_activeTab == FavoritesTab.List ? "true" : "false")" aria-controls="favorite-panel-list" @onclick="ShowListTab">
+        <nav class="nav nav-tabs favorites-tabs mb-3" aria-label="Favorite destinations">
+            <span class="nav-item">
+                <a id="favorite-tab-list" class="nav-link active" aria-selected="true" aria-controls="favorite-panel-list" aria-current="page" href="@EntryPageUrls.Favorites(_search)">
                     Favorites
                     <span class="badge rounded-pill text-bg-secondary ms-1" data-testid="favorite-count-badge" title="@_totalFavorites favorite@(_totalFavorites == 1 ? null : "s") saved">@_totalFavorites<span class="visually-hidden"> favorite@(_totalFavorites == 1 ? null : "s") saved</span></span>
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button id="favorite-tab-import" type="button" role="tab" class="nav-link @(_activeTab == FavoritesTab.Import ? "active" : null)" aria-selected="@(_activeTab == FavoritesTab.Import ? "true" : "false")" aria-controls="favorite-panel-import" title="Import favorites from a JSON or CSV file" @onclick="ShowImportTab">
+                </a>
+            </span>
+            <span class="nav-item">
+                <a id="favorite-tab-import" class="nav-link" href="@(_openImport is { } openImport ? EntryPageUrls.FavoriteImportJob(openImport.ImportId, ReturnHref) : EntryPageUrls.FavoriteImport(ReturnHref))" title="Import favorites from a JSON or CSV file">
                     <ActionIcon Name="import" CssClass="me-1 align-text-bottom" />Import
                     @if (_openImport is { Status: FavoriteDestinationImportStatus.NeedsReview } && ReviewItemCount > 0)
                     {
@@ -48,19 +50,11 @@
                     {
                         <span class="badge rounded-pill text-bg-danger ms-1" data-testid="favorite-import-failed-badge" title="Import failed">!<span class="visually-hidden"> Import failed</span></span>
                     }
-                </button>
-            </li>
-        </ul>
+                </a>
+            </span>
+        </nav>
 
-        @if (_activeTab == FavoritesTab.Import)
-        {
-            <div id="favorite-panel-import" role="tabpanel" aria-labelledby="favorite-tab-import">
-                <FavoriteDestinationImport OnImported="ReloadFavoritesAsync" OnCancel="ShowListTab" OnImportChanged="ImportChanged" />
-            </div>
-        }
-        else
-        {
-        <div id="favorite-panel-list" role="tabpanel" aria-labelledby="favorite-tab-list" class="card favorites-card">
+        <div id="favorite-panel-list" class="card favorites-card">
             <div class="card-header">
                 <div class="row g-2 align-items-center">
                     <div class="col-12 col-md-6">
@@ -69,9 +63,9 @@
                     </div>
                     <div class="col-12 col-md-6">
                         <div class="d-flex flex-wrap gap-2 justify-content-md-end" role="toolbar" aria-label="Favorite actions">
-                            <button id="favorite-add" type="button" class="btn btn-sm btn-primary" title="Add a new favorite" @onclick="ShowCreateForm">
+                            <a id="favorite-add" class="btn btn-sm btn-primary" title="Add a new favorite" href="@EntryPageUrls.FavoriteCreate(ReturnHref)">
                                 <ActionIcon Name="add" CssClass="me-1 align-text-bottom" />New
-                            </button>
+                            </a>
                             <button id="favorite-delete-selected" type="button" class="btn btn-sm btn-outline-danger" title="Delete the selected favorites" disabled="@(SelectedFavorites.Count == 0)" @onclick="RequestBulkDelete">
                                 <ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete@(SelectedFavorites.Count > 0 ? $" ({SelectedFavorites.Count})" : null)
                             </button>
@@ -96,7 +90,7 @@
                     <div class="favorites-card-section py-4 text-center">
                         <h2 class="h5">No favorite destinations yet</h2>
                         <p class="text-secondary">Save a place you have researched and keep its details here.</p>
-                        <button id="favorite-add-empty" class="btn btn-primary" type="button" @onclick="ShowCreateForm">Add your first favorite</button>
+                        <a id="favorite-add-empty" class="btn btn-primary" href="@EntryPageUrls.FavoriteCreate(ReturnHref)">Add your first favorite</a>
                     </div>
                 }
                 else if (_favorites.Count == 0 && !string.IsNullOrWhiteSpace(_search))
@@ -126,7 +120,7 @@
                                             <input class="form-check-input" type="checkbox" aria-label="Select @favorite.Name" data-testid="favorite-select-@favorite.FavoriteDestinationId" checked="@_selectedIds.Contains(favorite.FavoriteDestinationId)" @onchange="args => ToggleSelection(favorite.FavoriteDestinationId, args)" />
                                         </td>
                                         <th scope="row">
-                                            <button type="button" class="btn btn-link p-0 text-start fw-semibold" data-testid="favorite-edit-@favorite.FavoriteDestinationId" @onclick="() => EditFavorite(favorite)">@favorite.Name</button>
+                                            <a class="btn btn-link p-0 text-start fw-semibold" data-testid="favorite-edit-@favorite.FavoriteDestinationId" href="@EntryPageUrls.FavoriteEdit(favorite.FavoriteDestinationId, ReturnHref)">@favorite.Name</a>
                                         </th>
                                         <td>
                                             <button type="button" class="btn btn-link p-0 text-start" data-testid="favorite-map-@favorite.FavoriteDestinationId" title="View @favorite.Name on a map" @onclick="() => ShowFavoriteMap(favorite)">
@@ -145,54 +139,6 @@
                 }
             </div>
         </div>
-        }
-    }
-
-    @if (_showForm || _editingFavorite is not null)
-    {
-        <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="favoriteModalTitle">
-            <div class="modal-dialog modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 class="modal-title h5" id="favoriteModalTitle">@(_editingFavorite is null ? "Add favorite" : "Edit favorite")</h2>
-                        <button type="button" class="btn-close" aria-label="Close" disabled="@(_isSaving || _isDeleting)" @onclick="CancelForm"></button>
-                    </div>
-                    <FavoriteDestinationForm Favorite="_editingFavorite" OnCreate="CreateAsync" OnUpdate="UpdateAsync" OnCancel="CancelForm" OnDelete="RequestDelete" IsSaving="@(_isSaving || _isDeleting)" ErrorMessage="@_formError">
-                        @if (_duplicateWarning is not null)
-                        {
-                            <div class="alert alert-warning mt-3 mb-0" role="alert" data-testid="favorite-duplicate-warning">
-                                <p class="mb-2">This may be a possible duplicate. Save it as a separate favorite?</p>
-                                <ul class="mb-2">
-                                    @foreach (var match in _duplicateWarning.Matches)
-                                    {
-                                        <li>@match.Name, @match.Address</li>
-                                    }
-                                </ul>
-                                <div class="d-flex gap-2">
-                                    <button id="favorite-confirm-duplicate" type="button" class="btn btn-sm btn-warning" disabled="@_isSaving" @onclick="ConfirmDuplicateAsync">Save separately</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_isSaving" @onclick="CancelDuplicate">Cancel</button>
-                                </div>
-                            </div>
-                        }
-                        @if (_deleteCandidate is not null)
-                        {
-                            <div id="favorite-delete-confirm" class="alert alert-warning mt-3 mb-0" role="alert">
-                                <p class="mb-2">Remove <strong>@_deleteCandidate.Name</strong> from your favorites? Existing trip items will not change.</p>
-                                @if (_deleteError is not null)
-                                {
-                                    <p class="text-danger mb-2">@_deleteError</p>
-                                }
-                                <div class="d-flex gap-2">
-                                    <button id="favorite-delete-confirm-action" type="button" class="btn btn-sm btn-danger" disabled="@_isDeleting" @onclick="DeleteFavoriteAsync">@(_isDeleting ? "Removing..." : "Remove favorite")</button>
-                                    <button id="favorite-delete-cancel" type="button" class="btn btn-sm btn-outline-secondary" disabled="@_isDeleting" @onclick="CancelDelete">Keep favorite</button>
-                                </div>
-                            </div>
-                        }
-                    </FavoriteDestinationForm>
-                </div>
-            </div>
-        </div>
-        <div class="modal-backdrop show"></div>
     }
 
     @if (_showBulkDeleteConfirm)
@@ -264,25 +210,13 @@
     private IReadOnlyList<FavoriteDestinationDto> _favorites = Array.Empty<FavoriteDestinationDto>();
     private int _totalFavorites;
     private bool _isLoading = true;
-    private bool _isSaving;
-    private bool _isDeleting;
-    private bool _showForm;
-    private FavoritesTab _activeTab = FavoritesTab.List;
     private bool _showBulkDeleteConfirm;
     private bool _isBulkDeleting;
     private string? _bulkDeleteError;
     private readonly HashSet<Guid> _selectedIds = [];
-    private FavoriteDestinationDto? _editingFavorite;
-    private FavoriteDestinationDto? _deleteCandidate;
     private string _search = string.Empty;
     private string? _loadError;
-    private string? _formError;
-    private string? _deleteError;
     private string? _saveMessage;
-    private FavoriteDestinationDuplicateWarning? _duplicateWarning;
-    private CreateFavoriteDestinationRequest? _pendingDuplicateRequest;
-    private UpdateFavoriteDestinationRequest? _pendingDuplicateUpdate;
-    private Guid? _pendingDuplicateFavoriteId;
     private int _searchRequestVersion;
     private CancellationTokenSource? _saveMessageTimer;
     private FavoriteDestinationImportJobDto? _openImport;
@@ -302,46 +236,25 @@
             : _openImport.Ambiguities.Count
                 + _openImport.PossibleDuplicates.Count(duplicate => _openImport.Ambiguities.All(ambiguity => ambiguity.RowNumber != duplicate.RowNumber));
 
+    [SupplyParameterFromQuery(Name = "q")] public string? Query { get; set; }
+    private string ReturnHref => EntryPageUrls.Favorites(_search);
+
     protected override async Task OnInitializedAsync()
     {
+        _search = string.IsNullOrWhiteSpace(Query) ? string.Empty : Query[..Math.Min(Query.Length, 100)];
         await CallApiAsync(
             () => RefreshFavoritesAsync(),
             message => _loadError = message);
-        // An import still running or waiting for review opens the Import tab; failing to check is not worth an error.
+        // The separate import page owns review state; the list keeps its progress badge current.
         await CallApiAsync(
             async () =>
             {
                 _openImport = (await FavoriteApi.GetOpenImportsAsync()).FirstOrDefault();
-                if (_openImport is not null)
-                {
-                    _activeTab = FavoritesTab.Import;
-                }
+                if (_openImport is not null) StartImportWatch();
             },
             _ => { });
         _isLoading = false;
     }
-
-    private enum FavoritesTab
-    {
-        List,
-        Import
-    }
-
-    private void ShowListTab()
-    {
-        _activeTab = FavoritesTab.List;
-        StartImportWatch();
-    }
-
-    private void ShowImportTab()
-    {
-        _activeTab = FavoritesTab.Import;
-        StopImportWatch();
-        DismissSaveMessage();
-    }
-
-    private void ImportChanged(FavoriteDestinationImportJobDto? import)
-        => _openImport = import;
 
     // The importer is not rendered on the Favorites tab, so the page keeps the tab badge current itself.
     private void StartImportWatch()
@@ -487,42 +400,10 @@
         _isBulkDeleting = false;
     }
 
-    private void ShowCreateForm()
-    {
-        _editingFavorite = null;
-        _formError = null;
-        _saveMessage = null;
-        _duplicateWarning = null;
-        _pendingDuplicateRequest = null;
-        CancelDelete();
-        _showForm = true;
-    }
-
-    private void CancelForm()
-    {
-        _showForm = false;
-        _editingFavorite = null;
-        _formError = null;
-        _duplicateWarning = null;
-        _pendingDuplicateRequest = null;
-        _pendingDuplicateUpdate = null;
-        _pendingDuplicateFavoriteId = null;
-        CancelDelete();
-    }
-
-    private void EditFavorite(FavoriteDestinationDto favorite)
-    {
-        _showForm = false;
-        _editingFavorite = favorite;
-        _formError = null;
-        _saveMessage = null;
-        ClearDuplicateWarning();
-        CancelDelete();
-    }
-
     private async Task SearchChangedAsync(ChangeEventArgs eventArgs)
     {
         _search = eventArgs.Value?.ToString() ?? string.Empty;
+        Nav.NavigateTo(EntryPageUrls.Favorites(_search), replace: true);
         var requestVersion = ++_searchRequestVersion;
         await CallApiAsync(
             async () =>
@@ -550,153 +431,6 @@
         _totalFavorites = string.IsNullOrWhiteSpace(_search)
             ? _favorites.Count
             : (await FavoriteApi.GetAsync(ct: cancellationToken)).Count;
-    }
-
-    private async Task CreateAsync(CreateFavoriteDestinationRequest request)
-        => await SaveAsync(request);
-
-    private async Task ConfirmDuplicateAsync()
-    {
-        if (_pendingDuplicateRequest is not null)
-        {
-            await SaveAsync(_pendingDuplicateRequest with { ConfirmPossibleDuplicate = true });
-        }
-        else if (_pendingDuplicateUpdate is not null && _pendingDuplicateFavoriteId is { } favoriteId)
-        {
-            await UpdateAsync(favoriteId, _pendingDuplicateUpdate with { ConfirmPossibleDuplicate = true });
-        }
-    }
-
-    private async Task SaveAsync(CreateFavoriteDestinationRequest request)
-    {
-        _isSaving = true;
-        _formError = null;
-        _saveMessage = null;
-
-        await CallApiAsync(
-            async () =>
-            {
-                var result = await FavoriteApi.CreateAsync(request);
-                if (result.DuplicateWarning is not null)
-                {
-                    _pendingDuplicateRequest = request;
-                    _pendingDuplicateUpdate = null;
-                    _pendingDuplicateFavoriteId = null;
-                    _duplicateWarning = result.DuplicateWarning;
-                    return;
-                }
-                if (!result.Succeeded)
-                {
-                    _formError = result.ErrorMessage ?? "The favorite destination could not be saved.";
-                    return;
-                }
-
-                await RefreshFavoritesAsync();
-                ClearDuplicateWarning();
-                _showForm = false;
-                ShowSaveMessage("Favorite destination saved");
-            },
-            message => _formError = message);
-
-        _isSaving = false;
-    }
-
-    private async Task UpdateAsync(UpdateFavoriteDestinationRequest request)
-    {
-        if (_editingFavorite is null)
-        {
-            return;
-        }
-
-        await UpdateAsync(_editingFavorite.FavoriteDestinationId, request);
-    }
-
-    private async Task UpdateAsync(Guid favoriteDestinationId, UpdateFavoriteDestinationRequest request)
-    {
-        _isSaving = true;
-        _formError = null;
-        _saveMessage = null;
-
-        await CallApiAsync(
-            async () =>
-            {
-                var result = await FavoriteApi.UpdateAsync(favoriteDestinationId, request);
-                if (result.DuplicateWarning is not null)
-                {
-                    _pendingDuplicateRequest = null;
-                    _pendingDuplicateUpdate = request;
-                    _pendingDuplicateFavoriteId = favoriteDestinationId;
-                    _duplicateWarning = result.DuplicateWarning;
-                    return;
-                }
-                if (!result.Succeeded)
-                {
-                    _formError = result.ErrorMessage ?? "The favorite destination could not be updated.";
-                    return;
-                }
-
-                await RefreshFavoritesAsync();
-                _editingFavorite = null;
-                ClearDuplicateWarning();
-                ShowSaveMessage("Favorite destination updated");
-            },
-            message => _formError = message);
-
-        _isSaving = false;
-    }
-
-    private void RequestDelete()
-    {
-        _deleteCandidate = _editingFavorite;
-        _deleteError = null;
-        ClearDuplicateWarning();
-    }
-
-    private void CancelDelete()
-    {
-        _deleteCandidate = null;
-        _deleteError = null;
-    }
-
-    private async Task DeleteFavoriteAsync()
-    {
-        if (_deleteCandidate is null)
-        {
-            return;
-        }
-
-        var favoriteId = _deleteCandidate.FavoriteDestinationId;
-        _isDeleting = true;
-        _deleteError = null;
-        await CallApiAsync(
-            async () =>
-            {
-                if (!await FavoriteApi.DeleteAsync(favoriteId))
-                {
-                    _deleteError = "The favorite could not be removed. Refresh and try again.";
-                    return;
-                }
-
-                _deleteCandidate = null;
-                _editingFavorite = null;
-                await RefreshFavoritesAsync();
-                ShowSaveMessage("Favorite destination removed");
-            },
-            message => _deleteError = message);
-        _isDeleting = false;
-    }
-
-    private void CancelDuplicate()
-    {
-        ClearDuplicateWarning();
-    }
-
-    private void ClearDuplicateWarning()
-    {
-        _duplicateWarning = null;
-        _pendingDuplicateRequest = null;
-        _pendingDuplicateUpdate = null;
-        _pendingDuplicateFavoriteId = null;
     }
 
     // Imports keep the original link when no map match was chosen; only http(s) links are ever rendered as hrefs.

@@ -1,0 +1,45 @@
+@page "/trips/{TripId:guid}/share"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits ApiComponentBase
+@using TripPlanner.Web.Features.EntryPages
+@inject ITripApiClient TripApi
+@inject NavigationManager Nav
+
+<PageTitle>Share trip</PageTitle>
+<EntryNavigationGuard IsDirty="_isDirty" IsDirtyChanged="SetDirty" IsSubmitting="_isSubmitting">
+<EntryPageShell Title="Share trip" Context="Manage who can view or edit this trip. Changes save automatically." Icon="share" Breadcrumbs="Breadcrumbs" LoadState="_state" ErrorMessage="@_error" SafeBackHref="@Destination">
+    @if (_trip is not null && _state == EntryPageShell.EntryLoadState.Ready)
+    {
+        <TripSharingForm @key="TripId" TripId="@TripId" OnClose="Cancel" OnChanged="ReloadAsync" OnSubmittingChanged="SetSubmitting" OnPendingChangesChanged="SetDirty" />
+    }
+</EntryPageShell>
+</EntryNavigationGuard>
+
+@code {
+    private bool _isDirty;
+    private bool _isSubmitting;
+    private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
+    private Task SetSubmitting(bool value) { _isSubmitting = value; return Task.CompletedTask; }
+    [Parameter] public Guid TripId { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+    private TripDetail? _trip;
+    private string? _error;
+    private EntryPageShell.EntryLoadState _state = EntryPageShell.EntryLoadState.Loading;
+    private string TripHref => $"/trips/{TripId:D}";
+    private string Destination => EntryPageUrls.NormalizeReturnUrl(ReturnUrl, TripHref);
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs => [new("Home", "/"), new("Trips", "/trips"), new(_trip?.Name ?? "Trip", TripHref), new("Share trip", IsCurrent: true)];
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+    private async Task ReloadAsync()
+    {
+        _state = EntryPageShell.EntryLoadState.Loading; _trip = null; _error = null;
+        await CallApiAsync(async () =>
+        {
+            _trip = await TripApi.GetDetailAsync(TripId);
+            if (_trip is null || !_trip.IsOwner) { _trip = null; _state = EntryPageShell.EntryLoadState.MissingOrDenied; return; }
+            _state = EntryPageShell.EntryLoadState.Ready;
+        }, message => { _error = message; _state = EntryPageShell.EntryLoadState.Error; });
+        if (IsReauthenticating) _state = EntryPageShell.EntryLoadState.Loading;
+    }
+    private void Cancel() => Nav.NavigateTo(Destination);
+}

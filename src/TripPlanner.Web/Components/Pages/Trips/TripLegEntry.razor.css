@@ -1,0 +1,8 @@
+/* Keep leg-entry controls comfortable on narrow screens and preserve visible keyboard focus. */
+.trip-leg-entry ::deep .entry-page-shell .form-control,
+.trip-leg-entry ::deep .entry-page-shell .form-select,
+.trip-leg-entry ::deep .entry-page-shell .btn { min-height: 2.75rem; }
+.trip-leg-entry ::deep .entry-page-shell :focus-visible { outline: 3px solid var(--bs-primary); outline-offset: 2px; }
+@media (max-width: 575.98px) {
+    .trip-leg-entry ::deep .entry-page-actions { width: 100%; }
+}

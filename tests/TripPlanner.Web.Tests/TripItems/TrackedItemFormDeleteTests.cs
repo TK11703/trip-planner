@@ -26,7 +26,7 @@ public class TrackedItemFormDeleteTests : BunitContext
     private static readonly DateTime LegStart = new(2026, 9, 1, 8, 0, 0);
     private static readonly DateTime LegEnd = new(2026, 9, 10, 18, 0, 0);
 
-    private IRenderedComponent<TrackedItemForm> RenderEdit(Action? onSaved = null, bool canEditContent = true)
+    private IRenderedComponent<TrackedItemForm> RenderEdit(Action? onSaved = null, bool canEditContent = true, Action? onCancel = null)
     {
         var leg = TrackedItemFormTestData.Leg(LegStart, LegEnd);
         var item = TrackedItemFormTestData.Item(leg.TripLegId, new DateTime(2026, 9, 5, 14, 0, 0), new DateTime(2026, 9, 5, 16, 0, 0));
@@ -40,7 +40,34 @@ public class TrackedItemFormDeleteTests : BunitContext
             {
                 p.Add(x => x.OnSaved, onSaved);
             }
+            if (onCancel is not null)
+            {
+                p.Add(x => x.OnCancel, onCancel);
+            }
         });
+    }
+
+    [Fact]
+    public void FooterActions_PlaceSaveAndCancelOnTheLeftAndDeleteOnTheRight()
+    {
+        var cancelled = 0;
+        var cut = RenderEdit(onCancel: () => cancelled++);
+        var actions = cut.Find(".card-footer .entry-form-actions");
+        Assert.Contains("justify-content-start", actions.ClassList);
+        Assert.Contains("w-100", actions.ClassList);
+        Assert.Contains("gap-3", actions.ClassList);
+        var delete = cut.Find("#item-delete");
+        Assert.Contains("btn-outline-danger", delete.ClassList);
+        Assert.Contains("ms-auto", delete.ClassList);
+        Assert.DoesNotContain("btn-sm", delete.ClassList);
+        Assert.DoesNotContain("btn-outline-secondary", delete.ClassList);
+        Assert.Equal("submit", actions.Children[0].GetAttribute("type"));
+        Assert.Equal("Delete", delete.TextContent.Trim());
+        Assert.Equal("Confirm deletion of this trip item", delete.GetAttribute("title"));
+        Assert.Equal(["Save", "Cancel", "Delete"], actions.Children.Select(button => button.TextContent.Trim()));
+        Assert.Equal("Save changes to this trip item", actions.Children[0].GetAttribute("title"));
+        cut.Find("#item-cancel").Click();
+        Assert.Equal(1, cancelled);
     }
 
     [Fact]
@@ -74,6 +101,11 @@ public class TrackedItemFormDeleteTests : BunitContext
         cut.Find("#item-delete").Click();
 
         Assert.NotNull(cut.Find("[data-testid=item-delete-confirm]"));
+        Assert.Contains("Are you sure you want to delete this item", cut.Find("[role='dialog']").TextContent);
+        Assert.Empty(cut.FindAll(".card-footer [data-testid=item-delete-confirm]"));
+        Assert.NotNull(cut.Find(".modal-backdrop"));
+        Assert.Equal("Delete", cut.Find("#item-delete-confirm").TextContent.Trim());
+        Assert.Equal("Permanently delete this trip item", cut.Find("#item-delete-confirm").GetAttribute("title"));
         Assert.Empty(_api.DeletedItems);
     }
 
@@ -114,6 +146,7 @@ public class TrackedItemFormDeleteTests : BunitContext
         cut.Find("#item-delete-confirm").Click();
 
         Assert.Contains(reason, cut.Markup, StringComparison.Ordinal);
+        Assert.Contains(reason, cut.Find("[role='dialog'] [role='alert']").TextContent);
         Assert.NotNull(cut.Find("[data-testid=item-delete-confirm]"));
     }
 }

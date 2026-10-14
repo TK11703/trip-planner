@@ -1,0 +1,8 @@
+/* Edit-trip entry remains readable and usable when the mobile keyboard is open. */
+.edit-trip-entry ::deep .entry-page-shell .form-control,
+.edit-trip-entry ::deep .entry-page-shell .form-select,
+.edit-trip-entry ::deep .entry-page-shell .btn { min-height: 2.75rem; }
+.edit-trip-entry ::deep .entry-page-shell :focus-visible { outline: 3px solid var(--bs-primary); outline-offset: 2px; }
+@media (max-width: 575.98px) {
+    .edit-trip-entry ::deep .entry-page-actions { width: 100%; }
+}

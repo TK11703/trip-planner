@@ -1,0 +1,2 @@
+.share-trip-page { max-width: 58rem; }
+.share-trip-page :is(button, input, select) { min-height: 44px; }

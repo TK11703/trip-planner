@@ -1,0 +1,107 @@
+@page "/trips/{TripId:guid}/items/new"
+@page "/trips/{TripId:guid}/items/{ItemId:guid}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits ApiComponentBase
+@using System.Globalization
+@using TripPlanner.Web.Features.EntryPages
+@inject ITripApiClient TripApi
+@inject NavigationManager Nav
+
+<div class="tracked-item-entry">
+<PageTitle>@Title</PageTitle>
+<EntryNavigationGuard IsDirty="_isDirty" IsDirtyChanged="SetDirty" IsSubmitting="_isSubmitting">
+<EntryPageShell Title="@Title" Context="Organize an activity, reservation, or other detail for your trip." Icon="item" Breadcrumbs="Breadcrumbs" LoadState="_state" ErrorMessage="@_loadError" SafeBackHref="@TripHref">
+    @if (_trip is not null && _state == EntryPageShell.EntryLoadState.Ready)
+    {
+        <TrackedItemForm @key="FormKey" TripId="@TripId" Item="_item" Legs="_trip.Legs" InitialTripLegId="_initialLegId" InitialStartsAt="_initialStart" CanEditContent="true" OnSaved="SavedAsync" OnCancel="CancelAsync" OnSubmittingChanged="SetSubmitting" />
+    }
+</EntryPageShell>
+</EntryNavigationGuard>
+</div>
+
+@code {
+    private bool _isDirty;
+    private bool _isSubmitting;
+    private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
+    private Task SetSubmitting(bool value) { _isSubmitting = value; return Task.CompletedTask; }
+    [Parameter] public Guid TripId { get; set; }
+    [Parameter] public Guid? ItemId { get; set; }
+    [SupplyParameterFromQuery(Name = "legId")] public Guid? LegId { get; set; }
+    [SupplyParameterFromQuery(Name = "startLocal")] public string? StartLocal { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+
+    private TripDetail? _trip;
+    private TrackedItemDto? _item;
+    private Guid? _initialLegId;
+    private DateTime? _initialStart;
+    private EntryPageShell.EntryLoadState _state = EntryPageShell.EntryLoadState.Loading;
+    private string? _loadError;
+    private bool IsEdit => ItemId.HasValue;
+    private string Title => IsEdit ? "Edit this item" : "Create an item";
+    private string TripHref => $"/trips/{TripId:D}";
+    private string FormKey => $"{TripId:D}:{ItemId:D}";
+    private string Destination => EntryPageUrls.NormalizeReturnUrl(ReturnUrl, TripHref);
+
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs
+    {
+        get
+        {
+            var items = new List<BreadcrumbItem> { new("Home", "/"), new("Trips", "/trips") };
+            if (_trip is not null)
+            {
+                var legId = _item?.TripLegId;
+                var leg = legId is { } id ? _trip.Legs.FirstOrDefault(x => x.TripLegId == id) : null;
+                if (IsEdit && leg is not null)
+                {
+                    items.Add(new($"{_trip.Name} - {leg.Title}", $"{TripHref}#leg-{leg.TripLegId:D}"));
+                }
+                else
+                {
+                    items.Add(new(_trip.Name, TripHref));
+                    if (IsEdit) items.Add(new("Unassigned items", $"{TripHref}#unassigned-items"));
+                }
+            }
+            items.Add(new(IsEdit ? _item?.Title ?? "Item" : "New Item", IsCurrent: true));
+            return items;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _state = EntryPageShell.EntryLoadState.Loading;
+        _trip = null; _item = null; _loadError = null; _initialLegId = null; _initialStart = null;
+        await CallApiAsync(async () =>
+        {
+            var trip = await TripApi.GetDetailAsync(TripId);
+            if (trip is null) { _state = EntryPageShell.EntryLoadState.MissingOrDenied; return; }
+            if (!trip.IsOwner && trip.AccessLevel != TripAccessLevel.Collaborator) { _state = EntryPageShell.EntryLoadState.MissingOrDenied; return; }
+            _trip = trip;
+            if (ItemId is { } itemId)
+            {
+                _item = trip.TrackedItems.FirstOrDefault(item => item.TrackedItemId == itemId && item.TripId == TripId);
+                if (_item is null) { _state = EntryPageShell.EntryLoadState.MissingOrDenied; return; }
+            }
+            else
+            {
+                if (LegId is { } legId)
+                {
+                    var leg = trip.Legs.FirstOrDefault(candidate => candidate.TripLegId == legId && candidate.TripId == TripId);
+                    if (leg is null || !leg.CanContainItems) { _state = EntryPageShell.EntryLoadState.Error; _loadError = "That leg is not available for items. Choose an eligible leg or add an unassigned item."; return; }
+                    _initialLegId = legId;
+                }
+                if (!string.IsNullOrWhiteSpace(StartLocal))
+                {
+                    if (!DateTime.TryParseExact(StartLocal, "yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+                    { _state = EntryPageShell.EntryLoadState.Error; _loadError = "The requested start time is invalid."; return; }
+                    _initialStart = parsed;
+                }
+            }
+            _state = EntryPageShell.EntryLoadState.Ready;
+        }, error => { _loadError = error; _state = EntryPageShell.EntryLoadState.Error; });
+        if (IsReauthenticating) _state = EntryPageShell.EntryLoadState.Loading;
+    }
+
+    private void SavedAsync() { _isDirty = false; _isSubmitting = false; Nav.NavigateTo(Destination); }
+    private void CancelAsync() => Nav.NavigateTo(Destination);
+}

@@ -3,14 +3,11 @@
 
 <EditForm Model="Model" OnValidSubmit="SubmitAsync" FormName="trip-form">
     <DataAnnotationsValidator />
+    <div class="card-body">
     <div class="mb-3">
         <label class="form-label" for="name">Name</label>
         <InputText id="name" class="form-control" @bind-Value="Model.Name" />
         <ValidationMessage For="@(() => Model.Name)" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label" for="description">Description</label>
-        <InputTextArea id="description" rows="3" class="form-control" @bind-Value="Model.Description" />
     </div>
     <div class="row g-3">
         <div class="col-md-6">
@@ -22,29 +19,32 @@
             <InputDate TValue="DateTime" id="endDate" class="form-control" min="@Model.StartDate.ToString("yyyy-MM-dd")" Value="Model.EndDate" ValueChanged="@((DateTime value) => OnEndDateChanged(value))" ValueExpression="@(() => Model.EndDate)" />
         </div>
     </div>
+    <div class="mb-3 mt-3">
+        <label class="form-label" for="description">Description</label>
+        <InputTextArea id="description" rows="3" class="form-control" @bind-Value="Model.Description" />
+    </div>
 
     @if (!string.IsNullOrWhiteSpace(_errorMessage))
     {
         <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
     }
 
-    <div class="tp-modal-actions mt-4">
-        <div class="tp-modal-actions-start">
-            <button type="submit" class="btn btn-primary" disabled="@_isSubmitting"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save trip" : "Create trip")</button>
-        </div>
-        @if (OnCancel.HasDelegate || !string.IsNullOrWhiteSpace(CancelHref))
-        {
-            <div class="tp-modal-actions-end">
+    </div>
+    <div class="card-footer entry-form-footer">
+        <div class="entry-form-actions d-flex flex-wrap justify-content-start gap-3 w-100">
+            <button type="submit" class="btn btn-primary" title="@(IsEdit ? "Save changes to this trip" : "Create this new trip")" disabled="@_isSubmitting"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save" : "Create trip")</button>
+            @if (OnCancel.HasDelegate || !string.IsNullOrWhiteSpace(CancelHref))
+            {
                 @if (OnCancel.HasDelegate)
                 {
-                    <button type="button" id="trip-cancel" class="btn btn-outline-secondary" disabled="@_isSubmitting" @onclick="OnCancel"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</button>
+                    <button type="button" id="trip-cancel" class="btn btn-outline-secondary" title="Cancel without saving changes to this trip" disabled="@_isSubmitting" @onclick="OnCancel"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</button>
                 }
                 else
                 {
-                    <a class="btn btn-outline-secondary" href="@CancelHref"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</a>
+                    <a class="btn btn-outline-secondary" title="Cancel without saving changes to this trip" href="@CancelHref"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</a>
                 }
-            </div>
-        }
+            }
+        </div>
     </div>
 </EditForm>
 

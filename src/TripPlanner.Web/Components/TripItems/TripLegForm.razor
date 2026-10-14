@@ -4,14 +4,14 @@
 
 <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName" class="d-flex flex-column overflow-hidden">
     <DataAnnotationsValidator />
-    <div class="modal-body">
-    <div class="mb-2">
+    <div class="card-body">
+    <div class="mb-3">
         <label class="form-label" for="leg-title">Name</label>
         <InputText id="leg-title" class="form-control" @bind-Value="_model.Title" />
         <ValidationMessage For="@(() => _model.Title)" />
     </div>
-    <div class="row g-2 mb-2">
-        <div class="@(_model.Kind == LegKind.Travel ? "col-6" : "col-12")">
+    <div class="row gx-2 gy-3 mb-3">
+        <div class="@(_model.Kind == LegKind.Travel ? "col-12 col-md-3" : "col-12")">
             <fieldset>
                 <legend class="form-label fs-6 mb-1">Leg type</legend>
                 <InputRadioGroup @bind-Value="_model.Kind">
@@ -28,22 +28,29 @@
         </div>
         @if (_model.Kind == LegKind.Travel)
         {
-            <div class="col-6">
-                <label class="form-label" for="leg-transportation-mode">Travel Mode</label>
-                <InputSelect id="leg-transportation-mode" class="form-select" @bind-Value="_model.TransportationMode">
-                    <option value="">Select how you're traveling</option>
-                    @foreach (var mode in TransportationModes.All)
-                    {
-                        <option value="@mode">@TransportationModes.Label(mode)</option>
-                    }
-                </InputSelect>
+            <div class="col-12 col-md-9">
+                <fieldset id="leg-transportation-mode">
+                    <legend class="form-label fs-6 mb-1">Travel Mode</legend>
+                    <InputRadioGroup @bind-Value="_model.TransportationMode">
+                        <div class="btn-group leg-travel-modes">
+                            @foreach (var mode in TransportationModes.All)
+                            {
+                                <InputRadio id="@($"leg-mode-{mode}")" class="btn-check" Value="@mode" />
+                                <label class="btn btn-outline-primary d-inline-flex align-items-center justify-content-center gap-2" for="@($"leg-mode-{mode}")">
+                                    <ActionIcon Name="@mode" CssClass="flex-shrink-0" />
+                                    @TransportationModes.Label(mode)
+                                </label>
+                            }
+                        </div>
+                    </InputRadioGroup>
+                </fieldset>
                 <ValidationMessage For="@(() => _model.TransportationMode)" />
             </div>
         }
     </div>
     @if (_model.Kind == LegKind.Travel)
     {
-        <div class="row g-2 mb-2">
+        <div class="row gx-2 gy-3 mb-3">
             <div class="col-6">
                 <label class="form-label" for="leg-origin">
                     Origin
@@ -72,44 +79,48 @@
             </div>
         </div>
     }
-    <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="form-label" for="leg-start">Start</label>
-            <InputDate id="leg-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@TripRangeMin" max="@TripRangeMax" step="60" @bind-Value="_model.StartAt" @bind-Value:after="OnStartChanged" />
-        </div>
-        <div class="col-6">
-            <label class="form-label" for="leg-end">End</label>
-            <InputDate id="leg-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@TripRangeMin" max="@TripRangeMax" step="60" @bind-Value="_model.EndAt" />
-        </div>
-    </div>
-    <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="form-label" for="leg-start-timezone">Start timezone</label>
-            <TimezoneSelect Id="leg-start-timezone" @bind-Value="_model.StartTimeZoneId" Placeholder="Select a timezone" />
-            <ValidationMessage For="@(() => _model.StartTimeZoneId)" />
-        </div>
-        <div class="col-6">
-            <label class="form-label" for="leg-end-timezone">End timezone</label>
-            <TimezoneSelect Id="leg-end-timezone" @bind-Value="_model.EndTimeZoneId" Placeholder="Select a timezone" />
-            <ValidationMessage For="@(() => _model.EndTimeZoneId)" />
+    <div class="card bg-body-tertiary shadow-none mb-3" id="leg-schedule" role="group" aria-label="Schedule">
+        <div class="card-body p-3">
+            <div class="row gx-2 gy-3 mb-3">
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="leg-start">Start</label>
+                    <InputDate id="leg-start" Type="InputDateType.DateTimeLocal" class="form-control" min="@TripRangeMin" max="@TripRangeMax" step="60" @bind-Value="_model.StartAt" @bind-Value:after="OnStartChanged" />
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="leg-start-timezone">Start timezone</label>
+                    <TimezoneSelect Id="leg-start-timezone" @bind-Value="_model.StartTimeZoneId" Placeholder="Select a timezone" />
+                    <ValidationMessage For="@(() => _model.StartTimeZoneId)" />
+                </div>
+            </div>
+            <div class="row gx-2 gy-3">
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="leg-end">End</label>
+                    <InputDate id="leg-end" Type="InputDateType.DateTimeLocal" class="form-control" min="@TripRangeMin" max="@TripRangeMax" step="60" @bind-Value="_model.EndAt" />
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="leg-end-timezone">End timezone</label>
+                    <TimezoneSelect Id="leg-end-timezone" @bind-Value="_model.EndTimeZoneId" Placeholder="Select a timezone" />
+                    <ValidationMessage For="@(() => _model.EndTimeZoneId)" />
+                </div>
+            </div>
         </div>
     </div>
     @if (_model.Kind == LegKind.Travel)
     {
-        <div class="row g-2 mb-2">
-            <div class="col-6">
-                <label class="form-label" for="leg-travel-cost">Cost <span class="text-body-secondary fw-normal">(optional)</span></label>
-                <InputNumber id="leg-travel-cost" class="form-control" step="0.01" @bind-Value="_model.TravelCost" />
-                <ValidationMessage For="@(() => _model.TravelCost)" />
-            </div>
+        <div class="row gx-2 gy-3 mb-3">
             <div class="col-6">
                 <label class="form-label" for="leg-confirmation-code">Confirmation/Reservation Code <span class="text-body-secondary fw-normal">(optional)</span></label>
                 <InputText id="leg-confirmation-code" class="form-control" @bind-Value="_model.ConfirmationCode" />
                 <ValidationMessage For="@(() => _model.ConfirmationCode)" />
             </div>
+            <div class="col-6">
+                <label class="form-label" for="leg-travel-cost">Cost <span class="text-body-secondary fw-normal">(optional)</span></label>
+                <InputNumber id="leg-travel-cost" class="form-control" step="0.01" @bind-Value="_model.TravelCost" />
+                <ValidationMessage For="@(() => _model.TravelCost)" />
+            </div>
         </div>
     }
-    <div class="mb-2">
+    <div class="mb-3">
         <label class="form-label">Notes</label>
         <InputTextArea class="form-control" rows="2" @bind-Value="_model.Notes" />
     </div>
@@ -120,38 +131,51 @@
         </div>
     }
     </div>
-    <div class="modal-footer tp-modal-footer">
+    <div class="card-footer entry-form-footer">
         @if (!string.IsNullOrWhiteSpace(_error))
         {
             <div class="alert alert-danger py-2 small mb-0">@_error</div>
         }
-        <div class="tp-modal-actions">
-            <div class="tp-modal-actions-start">
-                <button type="submit" class="btn btn-primary" disabled="@(_submitting || _deleting)"><ActionIcon Name="@(IsEdit ? "save" : "add")" CssClass="me-1 align-text-bottom" />@(IsEdit ? "Save leg" : "Add leg")</button>
-                @if (CanDelete)
-                {
-                    <button type="button" id="leg-delete" class="btn btn-sm btn-outline-secondary tp-delete-action" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete leg</button>
-                }
-            </div>
+        <div class="entry-form-actions d-flex flex-wrap justify-content-start gap-3 w-100">
+            <button type="submit" class="btn btn-primary" title="@(IsEdit ? "Save changes to this trip leg" : "Save this new leg to the trip")" disabled="@(_submitting || _deleting)"><ActionIcon Name="save" CssClass="me-1 align-text-bottom" />Save</button>
             @if (OnCancel.HasDelegate)
             {
-                <div class="tp-modal-actions-end">
-                    <button type="button" id="leg-cancel" class="btn btn-outline-secondary" disabled="@(_submitting || _deleting)" @onclick="OnCancel"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</button>
-                </div>
+                <button type="button" id="leg-cancel" class="btn btn-outline-secondary" title="Cancel without saving this trip leg" disabled="@(_submitting || _deleting)" @onclick="OnCancel"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</button>
+            }
+            @if (CanDelete)
+            {
+                <button type="button" id="leg-delete" class="btn btn-outline-danger ms-auto" title="Confirm deletion of this trip leg" disabled="@(_submitting || _deleting)" @onclick="RequestDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete</button>
             }
         </div>
-        @if (_confirmDelete)
-        {
-            <div class="alert alert-warning mb-0 py-2 small" role="alert" data-testid="leg-delete-confirm">
-                <p class="mb-2">Delete <strong>@_model.Title</strong>? This can't be undone. Items on this leg have to be moved off it first.</p>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_deleting" @onclick="CancelDelete"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Keep leg</button>
-                    <button type="button" id="leg-delete-confirm" class="btn btn-sm btn-danger" disabled="@_deleting" @onclick="DeleteLegAsync"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />@(_deleting ? "Deleting…" : "Delete leg")</button>
-                </div>
-            </div>
-        }
     </div>
 </EditForm>
+
+@if (_confirmDelete)
+{
+    <div class="modal d-block" role="dialog" aria-modal="true" aria-labelledby="leg-delete-title" data-testid="leg-delete-confirm">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="leg-delete-title">Delete leg</h2>
+                    <button type="button" class="btn-close" aria-label="Close" title="Close without deleting this trip leg" disabled="@_deleting" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this leg: <strong>@_model.Title</strong>?</p>
+                    <p class="mb-0">This can't be undone. Items on this leg have to be moved off it first.</p>
+                    @if (!string.IsNullOrWhiteSpace(_error))
+                    {
+                        <div class="alert alert-danger mt-3 mb-0" role="alert">@_error</div>
+                    }
+                </div>
+                <div class="modal-footer gap-3">
+                    <button type="button" class="btn btn-outline-secondary" title="Cancel deletion and keep this trip leg" disabled="@_deleting" @onclick="CancelDelete"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Keep leg</button>
+                    <button type="button" id="leg-delete-confirm" class="btn btn-danger" title="Permanently delete this trip leg" disabled="@_deleting" @onclick="DeleteLegAsync"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />@(_deleting ? "Deleting…" : "Delete")</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
 
 @code {
     public enum LegKind { Travel, Stay }
@@ -245,6 +269,7 @@
     [Parameter] public DateOnly? TripEndDate { get; set; }
     [Parameter] public EventCallback OnSaved { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback<bool> OnSubmittingChanged { get; set; }
 
     // Only an owner or a collaborator may remove a leg. Defaults to denied so a host that forgets
     // to pass it hides the action instead of offering one the API will reject.
@@ -344,10 +369,16 @@
     private async Task SubmitAsync()
     {
         _error = null; _submitting = true;
-
-        await CallApiAsync(SaveLegAsync, message => _error = message);
-
-        _submitting = false;
+        await OnSubmittingChanged.InvokeAsync(true);
+        try
+        {
+            await CallApiAsync(SaveLegAsync, message => _error = message);
+        }
+        finally
+        {
+            _submitting = false;
+            await OnSubmittingChanged.InvokeAsync(false);
+        }
     }
 
     private void RequestDelete()
@@ -365,19 +396,25 @@
         if (!CanDelete) return;
 
         _error = null; _deleting = true;
-
-        await CallApiAsync(
-            async () =>
-            {
-                await TripApi.DeleteLegAsync(TripId, Leg!.TripLegId);
-                _confirmDelete = false;
-                await OnSaved.InvokeAsync();
-            },
-            // The API refuses to delete a leg that still holds items, and it says why, so the
-            // confirmation stays open with that reason rather than closing on a silent failure.
-            message => _error = message);
-
-        _deleting = false;
+        await OnSubmittingChanged.InvokeAsync(true);
+        try
+        {
+            await CallApiAsync(
+                async () =>
+                {
+                    await TripApi.DeleteLegAsync(TripId, Leg!.TripLegId);
+                    _confirmDelete = false;
+                    await OnSaved.InvokeAsync();
+                },
+                // The API refuses to delete a leg that still holds items, and it says why, so the
+                // confirmation stays open with that reason rather than closing on a silent failure.
+                message => _error = message);
+        }
+        finally
+        {
+            _deleting = false;
+            await OnSubmittingChanged.InvokeAsync(false);
+        }
     }
 
     private async Task SaveLegAsync()

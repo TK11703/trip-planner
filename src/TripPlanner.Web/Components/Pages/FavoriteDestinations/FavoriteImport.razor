@@ -1,0 +1,41 @@
+@page "/favorites/import"
+@page "/favorites/import/{ImportId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using TripPlanner.Web.Features.EntryPages
+@using TripPlanner.Web.Components.Favorites
+@using TripPlanner.Contracts.FavoriteDestinations
+@inject NavigationManager Nav
+
+<PageTitle>Import favorites</PageTitle>
+<EntryNavigationGuard IsDirty="_isDirty" IsDirtyChanged="SetDirty" IsSubmitting="_isSubmitting">
+<EntryPageShell Title="Import favorites" Context="Bring saved destinations into your favorites from a JSON or CSV file." Icon="import" Breadcrumbs="Breadcrumbs" SafeBackHref="@Destination">
+    <FavoriteDestinationImport ImportId="ImportId" OnImported="ImportCompleted" OnCancel="CancelImport" OnImportChanged="ImportChanged" OnSubmittingChanged="SetSubmitting" />
+</EntryPageShell>
+</EntryNavigationGuard>
+
+@code {
+    private bool _isDirty;
+    private bool _isSubmitting;
+    private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
+    private Task SetSubmitting(bool value) { _isSubmitting = value; return Task.CompletedTask; }
+    [Parameter] public Guid? ImportId { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+    private string Destination => EntryPageUrls.NormalizeReturnUrl(ReturnUrl, "/favorites");
+    private FavoriteDestinationImportJobDto? _job;
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs => ImportId is null
+        ? [new("Home", "/"), new("Favorites", "/favorites"), new("Import favorites", IsCurrent: true)]
+        : [new("Home", "/"), new("Favorites", "/favorites"), new("Import", "/favorites/import"), new(_job?.FileName ?? "Import job", IsCurrent: true)];
+    private void CancelImport() => Nav.NavigateTo(Destination);
+    private void ImportCompleted() { _isDirty = false; _isSubmitting = false; Nav.NavigateTo(Destination); }
+    private void ImportChanged(TripPlanner.Contracts.FavoriteDestinations.FavoriteDestinationImportJobDto? job)
+    {
+        _job = job;
+        if (job is not null) _isDirty = false;
+        if (job is not null && job.ImportId != ImportId)
+        {
+            _isSubmitting = false;
+            Nav.NavigateTo(EntryPageUrls.FavoriteImportJob(job.ImportId, ReturnUrl ?? Destination));
+        }
+    }
+}

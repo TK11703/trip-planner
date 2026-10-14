@@ -1,0 +1,50 @@
+@using TripPlanner.Web.Features.EntryPages
+
+<section class="entry-page-shell">
+    <EntryBreadcrumb Items="Breadcrumbs" />
+    @if (LoadState == EntryLoadState.Loading)
+    {
+        <div class="alert alert-info" role="status">@LoadingMessage</div>
+    }
+    else if (LoadState == EntryLoadState.MissingOrDenied)
+    {
+        <div class="alert alert-warning" role="alert"><h1 class="h4">This entry is unavailable</h1><p>@(ErrorMessage ?? "The record may have been removed or you may not have permission to view it.")</p><a class="btn btn-outline-secondary" href="@SafeBackHref">Back</a></div>
+    }
+    else if (LoadState == EntryLoadState.Error)
+    {
+        <div class="alert alert-danger" role="alert"><h1 class="h4">We couldn't load this page</h1><p>@(ErrorMessage ?? "Please try again.")</p><a class="btn btn-outline-secondary" href="@SafeBackHref">Back</a></div>
+    }
+    else
+    {
+        <header class="entry-page-heading">
+            <div class="entry-page-intro">
+                <span class="entry-page-icon"><ActionIcon Name="@Icon" /></span>
+                <div class="entry-page-copy">
+                    <h1 tabindex="-1">@Title</h1>
+                    @if (!string.IsNullOrWhiteSpace(Context))
+                    {
+                        <p class="entry-page-subtitle">@Context</p>
+                    }
+                </div>
+            </div>
+            @if (Actions is not null){<div class="entry-page-actions">@Actions</div>}
+        </header>
+        <div class="card entry-form-card">
+            @ChildContent
+        </div>
+    }
+</section>
+
+@code {
+    public enum EntryLoadState { Ready, Loading, MissingOrDenied, Error }
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Context { get; set; }
+    [Parameter] public string Icon { get; set; } = "edit";
+    [Parameter] public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; set; } = Array.Empty<BreadcrumbItem>();
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EntryLoadState LoadState { get; set; } = EntryLoadState.Ready;
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public string LoadingMessage { get; set; } = "Loading…";
+    [Parameter] public string SafeBackHref { get; set; } = "/trips";
+}

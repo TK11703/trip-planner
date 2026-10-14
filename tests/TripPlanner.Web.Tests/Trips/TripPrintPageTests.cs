@@ -30,11 +30,17 @@ public class TripPrintPageTests : BunitContext
         {
             Assert.Contains("Japan 2026", cut.Markup);
             Assert.Single(cut.FindAll("article.tp-print-doc"));
-            // A Print button exists inside the print-only-hidden action bar.
-            var printButton = cut.FindAll(".tp-print-actions button").First();
+            var actions = cut.Find(".tp-print-actions");
+            Assert.Equal("A", actions.Children[0].TagName);
+            Assert.Equal("BUTTON", actions.Children[1].TagName);
+
+            var printButton = cut.Find(".tp-print-actions button");
             Assert.Equal("Print", printButton.TextContent.Trim());
-            // Back link returns to the trip.
-            Assert.Contains(cut.FindAll(".tp-print-actions a"), a => a.TextContent.Contains("Back"));
+            Assert.NotNull(printButton.QuerySelector("svg"));
+
+            var backLink = cut.Find(".tp-print-actions a");
+            Assert.Equal("Back", backLink.TextContent.Trim());
+            Assert.NotNull(backLink.QuerySelector("svg"));
         });
     }
 

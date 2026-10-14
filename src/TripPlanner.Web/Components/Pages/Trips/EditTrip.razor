@@ -1,0 +1,69 @@
+@page "/trips/{TripId:guid}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits ApiComponentBase
+@using TripPlanner.Web.Features.EntryPages
+@inject ITripApiClient TripApi
+@inject NavigationManager Nav
+
+<div class="edit-trip-entry">
+<PageTitle>Edit this trip</PageTitle>
+<EntryNavigationGuard IsDirty="_isDirty" IsDirtyChanged="SetDirty" IsSubmitting="_isSubmitting">
+<EntryPageShell Title="Edit this trip" Context="Update your trip details and travel dates." Icon="trip" Breadcrumbs="Breadcrumbs" LoadState="_state" ErrorMessage="@_error" SafeBackHref="@TripHref">
+    @if (_trip is not null && _state == EntryPageShell.EntryLoadState.Ready)
+    {
+        <div class="card-body pb-0">
+            <div class="alert alert-warning d-flex align-items-center gap-2 small mb-0" role="alert">
+                <ActionIcon Name="warning" CssClass="flex-shrink-0" />
+                <span>Changing trip dates can leave existing legs or items outside the trip range. Review the calendar after saving.</span>
+            </div>
+        </div>
+        <TripForm @key="TripId" Model="_model" IsEdit="true" CancelHref="@Destination" OnSubmit="SaveAsync" />
+    }
+</EntryPageShell>
+</EntryNavigationGuard>
+</div>
+
+@code {
+    private bool _isDirty;
+    private bool _isSubmitting;
+    private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
+    [Parameter] public Guid TripId { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+    private TripDetail? _trip;
+    private TripPlanner.Web.Components.Trips.TripForm.TripFormModel _model = new();
+    private EntryPageShell.EntryLoadState _state = EntryPageShell.EntryLoadState.Loading;
+    private string? _error;
+    private string TripHref => $"/trips/{TripId:D}";
+    private string Destination => EntryPageUrls.NormalizeReturnUrl(ReturnUrl, TripHref);
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs => _trip is null
+        ? [new("Home", "/"), new("Trips", "/trips"), new("Trip", IsCurrent: true)]
+        : [new("Home", "/"), new("Trips", "/trips"), new(_trip.Name, IsCurrent: true)];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _state = EntryPageShell.EntryLoadState.Loading; _trip = null; _error = null;
+        await CallApiAsync(async () =>
+        {
+            var trip = await TripApi.GetDetailAsync(TripId);
+            if (trip is null || (!trip.IsOwner && trip.AccessLevel != TripAccessLevel.Collaborator)) { _state = EntryPageShell.EntryLoadState.MissingOrDenied; return; }
+            _trip = trip;
+            _model = new() { Name = trip.Name, Description = trip.Description, StartDate = trip.StartDate.ToDateTime(TimeOnly.MinValue), EndDate = trip.EndDate.ToDateTime(TimeOnly.MinValue) };
+            _state = EntryPageShell.EntryLoadState.Ready;
+        }, message => { _error = message; _state = EntryPageShell.EntryLoadState.Error; });
+        if (IsReauthenticating) _state = EntryPageShell.EntryLoadState.Loading;
+    }
+
+    private async Task SaveAsync(TripPlanner.Web.Components.Trips.TripForm.TripFormModel model)
+    {
+        _isSubmitting = true;
+        try
+        {
+            await TripApi.UpdateAsync(TripId, new UpdateTripRequest(model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), DateOnly.FromDateTime(model.StartDate), DateOnly.FromDateTime(model.EndDate)));
+            _isDirty = false;
+            _isSubmitting = false;
+            Nav.NavigateTo(Destination);
+        }
+        finally { _isSubmitting = false; }
+    }
+}

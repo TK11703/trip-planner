@@ -4,7 +4,7 @@
 
 <EditForm id="favorite-form" Model="_model" OnValidSubmit="SubmitAsync" FormName="@FormName" class="d-flex flex-column overflow-hidden">
     <DataAnnotationsValidator />
-    <div class="modal-body">
+    <div class="card-body">
         <div class="row g-3">
             <div class="col-12">
                 <label class="form-label" for="favorite-name">Name</label>
@@ -39,19 +39,17 @@
         @ChildContent
     </div>
 
-    <div class="modal-footer justify-content-between">
-        <div>
-            @if (Favorite is not null && OnDelete.HasDelegate)
-            {
-                <button id="favorite-delete" type="button" class="btn btn-outline-danger" disabled="@IsSaving" @onclick="OnDelete">Delete</button>
-            }
-        </div>
-        <div class="d-flex gap-2">
+    <div class="card-footer entry-form-footer">
+        <div class="entry-form-actions d-flex flex-wrap justify-content-start gap-3 w-100">
+            <button type="submit" class="btn btn-primary" title="Save this favorite destination" disabled="@IsSaving"><ActionIcon Name="save" CssClass="me-1 align-text-bottom" />@(IsSaving ? "Saving..." : "Save")</button>
             @if (OnCancel.HasDelegate)
             {
-                <button id="favorite-cancel" type="button" class="btn btn-outline-secondary" disabled="@IsSaving" @onclick="OnCancel">Cancel</button>
+                <button id="favorite-cancel" type="button" class="btn btn-outline-secondary" title="Cancel without saving this favorite" disabled="@IsSaving" @onclick="OnCancel"><ActionIcon Name="cancel" CssClass="me-1 align-text-bottom" />Cancel</button>
             }
-            <button type="submit" class="btn btn-primary" disabled="@IsSaving">@(IsSaving ? "Saving..." : "Save favorite")</button>
+            @if (Favorite is not null && OnDelete.HasDelegate)
+            {
+                <button id="favorite-delete" type="button" class="btn btn-outline-danger ms-auto" title="Confirm deletion of this favorite" disabled="@IsSaving" @onclick="OnDelete"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete</button>
+            }
         </div>
     </div>
 </EditForm>

@@ -5,29 +5,21 @@
 @inject ITripApiClient TripApi
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@using TripPlanner.Web.Features.EntryPages
 
 <PageTitle>Trip details</PageTitle>
 
-<TripsBreadcrumb Current="@(_trip?.Name ?? "Trip")">
+<EntryBreadcrumb Items="TripBreadcrumbs" />
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     @if (_trip is not null)
     {
         <span class="small text-secondary">View mode:</span>
         <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
-            <button type="button"
-                    class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")"
-                    aria-pressed="@(_planningView == TripPlanningView.Table)"
-                    @onclick="() => _planningView = TripPlanningView.Table">
-                Table
-            </button>
-            <button type="button"
-                    class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")"
-                    aria-pressed="@(_planningView == TripPlanningView.Timeline)"
-                    @onclick="() => _planningView = TripPlanningView.Timeline">
-                Timeline
-            </button>
+            <a class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Table ? "page" : null)" href="@TripViewHref(TripPlanningView.Table)">Table</a>
+            <a class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Timeline ? "page" : null)" href="@TripViewHref(TripPlanningView.Timeline)">Timeline</a>
         </div>
     }
-</TripsBreadcrumb>
+</div>
 
 @if (_loading)
 {
@@ -51,12 +43,12 @@ else
         <div class="d-flex flex-wrap gap-2 align-items-center">
             @if (CanEditContent)
             {
-                <button type="button" class="btn btn-sm btn-primary" @onclick="OpenTripEditModal"><ActionIcon Name="edit" CssClass="me-1 align-text-bottom" />Edit trip</button>
+                <a class="btn btn-sm btn-primary" href="@EntryPageUrls.TripEdit(TripId, CurrentTripReturn)"><ActionIcon Name="edit" CssClass="me-1 align-text-bottom" />Edit trip</a>
             }
             @if (_trip.IsOwner)
             {
                 <a class="btn btn-sm btn-outline-secondary" href="@($"/trips/{TripId}/print")"><ActionIcon Name="print" CssClass="me-1 align-text-bottom" />Print</a>
-                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OpenShareModal"><ActionIcon Name="share" CssClass="me-1 align-text-bottom" />Share</button>
+                <a class="btn btn-sm btn-outline-primary" href="@EntryPageUrls.TripSharing(TripId, CurrentTripReturn)"><ActionIcon Name="share" CssClass="me-1 align-text-bottom" />Share</a>
                 <button type="button" class="btn btn-sm btn-outline-danger" @onclick="OpenDeleteModal"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete trip</button>
             }
         </div>
@@ -84,8 +76,8 @@ else
                     <div class="d-flex flex-wrap gap-2 align-items-center">
                         @if (CanEditContent && itinerary.HasContent)
                         {
-                            <button id="tp-table-add-leg" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add leg" @onclick="OpenTableCreateLeg"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add leg</button>
-                            <button id="tp-table-add-item" type="button" class="btn btn-sm btn-outline-primary" aria-label="Add item" @onclick="() => OpenTableCreateItem(null)"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add item</button>
+                            <a id="tp-table-add-leg" class="btn btn-sm btn-outline-primary" aria-label="Add leg" href="@EntryPageUrls.LegCreate(TripId, CurrentTripReturn)"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add leg</a>
+                            <a id="tp-table-add-item" class="btn btn-sm btn-outline-primary" aria-label="Add item" href="@EntryPageUrls.ItemCreate(TripId, startLocal: _planningView == TripPlanningView.Timeline ? (_timeline?.CurrentDate ?? InitialDate)?.ToDateTime(TimeOnly.MinValue) : null, returnUrl: CurrentTripReturn)"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add item</a>
                         }
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 @onclick="OpenMapModal" disabled="@(!CanOpenMap)"
@@ -152,15 +144,11 @@ else
                 <div class="card-body @(itinerary.HasContent ? "tp-itinerary-flush" : null)">
                     @if (_planningView == TripPlanningView.Timeline)
                     {
-                        <TripTimeline @ref="_timeline" TripId="@TripId" CanEdit="@CanEditContent" OnLegSelected="OnTimelineLegSelected" OnItemSelected="OnTimelineItemSelected" OnLegSlotSelected="OnTimelineLegSlotSelected" OnAddLegRequested="OpenCreateLegModal" OnLoaded="HandleTimelineLoaded" OnActiveDateChanged="HandleActiveDateChanged" />
+                        <TripTimeline @ref="_timeline" TripId="@TripId" ReturnUrl="@CurrentTripReturn" InitialDate="@InitialDate" CanEdit="@CanEditContent" OnLoaded="HandleTimelineLoaded" OnActiveDateChanged="HandleActiveDateChanged" />
                     }
                     else
                     {
-                        <TripItineraryTable Model="@itinerary"
-                                            OnEditLeg="@(CanEditContent ? EventCallback.Factory.Create<Guid>(this, OpenTableEditLeg) : default)"
-                                            OnEditItem="@(CanEditContent ? EventCallback.Factory.Create<Guid>(this, OpenTableEditItem) : default)"
-                                            OnAddLeg="@(CanEditContent ? EventCallback.Factory.Create(this, OpenTableCreateLeg) : default)"
-                                            OnAddItem="@(CanEditContent ? EventCallback.Factory.Create<Guid?>(this, (Action<Guid?>)OpenTableCreateItem) : default)" />
+                        <TripItineraryTable Model="@itinerary" TripId="@TripId" ReturnUrl="@CurrentTripReturn" CanEdit="@CanEditContent" />
                     }
                 </div>
             </div>
@@ -210,7 +198,7 @@ else
                     <span>People with access</span>
                     @if (_trip.IsOwner)
                     {
-                        <button class="btn btn-sm btn-outline-primary" @onclick="OpenShareModal">Manage</button>
+                        <a class="btn btn-sm btn-outline-primary" href="@EntryPageUrls.TripSharing(TripId, CurrentTripReturn)">Manage</a>
                     }
                 </div>
                 @{
@@ -254,52 +242,9 @@ else
         </div>
     </div>
 
-    @if (_showShareModal)
-    {
-        <ShareTripModal TripId="@TripId" OnClose="CloseShareModal" OnChanged="ReloadAsync" />
-    }
-
     @if (_showMapModal)
     {
-        <TripPlanner.Web.Components.Trips.TripMapModal TripId="@TripId" OnClose="CloseMapModal" OnOpenItem="HandleMapOpenItemAsync" />
-    }
-
-    @if (_activeModal is not ActiveModal.None)
-    {
-        <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 class="modal-title h5">@ModalTitle</h2>
-                        <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
-                    </div>
-                    @switch (_activeModal)
-                    {
-                        case ActiveModal.EditTrip:
-                            <div class="modal-body">
-                                <div class="alert alert-warning small" role="alert">
-                                    Changing trip dates can leave existing legs or items outside the trip range. Review the calendar after saving.
-                                </div>
-                                <TripForm Model="_tripEditModel" IsEdit="true" OnSubmit="HandleTripEditAsync" OnCancel="CloseModal" />
-                            </div>
-                            break;
-                        case ActiveModal.CreateLeg:
-                            <TripLegForm TripId="@TripId" TripStartDate="_trip.StartDate" TripEndDate="_trip.EndDate" OnSaved="HandleModalSavedAsync" OnCancel="CloseModal" />
-                            break;
-                        case ActiveModal.EditLeg:
-                            <TripLegForm TripId="@TripId" Leg="_editingLeg" TripStartDate="_trip.StartDate" TripEndDate="_trip.EndDate" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" OnCancel="CloseModal" />
-                            break;
-                        case ActiveModal.CreateItem:
-                            <TrackedItemForm TripId="@TripId" Legs="_trip.Legs" InitialTripLegId="_initialItemLegId" InitialStartsAt="_initialItemStart" OnSaved="HandleModalSavedAsync" OnCancel="CloseModal" />
-                            break;
-                        case ActiveModal.EditItem:
-                            <TrackedItemForm TripId="@TripId" Item="_editingItem" Legs="_trip.Legs" CanEditContent="@CanEditContent" OnSaved="HandleModalSavedAsync" OnCancel="CloseModal" />
-                            break;
-                    }
-                </div>
-            </div>
-        </div>
-        <div class="modal-backdrop show"></div>
+        <TripPlanner.Web.Components.Trips.TripMapModal TripId="@TripId" ReturnUrl="@CurrentTripReturn" OnClose="CloseMapModal" />
     }
 
     @if (_showDeleteModal)
@@ -331,24 +276,21 @@ else
 
 @code {
     [Parameter] public Guid TripId { get; set; }
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    [SupplyParameterFromQuery(Name = "date")] public DateOnly? InitialDate { get; set; }
+    private string CurrentTripReturn => EntryPageUrls.TripDetails(TripId, _planningView == TripPlanningView.Timeline ? "timeline" : "table", _timeline?.CurrentDate ?? InitialDate);
+    private IReadOnlyList<BreadcrumbItem> TripBreadcrumbs => [new("Home", "/"), new("Trips", "/trips"), new(_trip?.Name ?? "Trip", IsCurrent: true)];
+    private string TripViewHref(TripPlanningView view) => EntryPageUrls.TripDetails(TripId, view == TripPlanningView.Timeline ? "timeline" : "table", _timeline?.CurrentDate ?? InitialDate);
 
     private bool _loading = true;
     private TripDetail? _trip;
     private TripTimeline? _timeline;
+    private Guid? _loadedTripId;
     private TripPlanningView _planningView = TripPlanningView.Table;
-    private ActiveModal _activeModal = ActiveModal.None;
-    private bool _showShareModal;
     private bool _showMapModal;
-    private TripPlanner.Web.Components.Trips.TripForm.TripFormModel _tripEditModel = new();
-    private TripLegDto? _editingLeg;
-    private TrackedItemDto? _editingItem;
-    private Guid? _initialItemLegId;
-    private DateTime? _initialItemStart;
     private bool _showDeleteModal;
     private bool _isDeleting;
     private string? _deleteError;
-    private string? _returnFocusElementId;
-    private string? _pendingFocusElementId;
 
     private enum TripPlanningView
     {
@@ -386,37 +328,11 @@ else
         _ => "Viewer"
     };
 
-    private enum ActiveModal
+    protected override async Task OnParametersSetAsync()
     {
-        None,
-        EditTrip,
-        CreateLeg,
-        EditLeg,
-        CreateItem,
-        EditItem
-    }
+        _planningView = string.Equals(View, "timeline", StringComparison.OrdinalIgnoreCase) ? TripPlanningView.Timeline : TripPlanningView.Table;
+        if (_loadedTripId != TripId) { _loadedTripId = TripId; await ReloadAsync(); }
 
-    private string ModalTitle => _activeModal switch
-    {
-        ActiveModal.EditTrip => "Edit trip",
-        ActiveModal.CreateLeg => "Add leg",
-        ActiveModal.EditLeg => "Edit leg",
-        ActiveModal.CreateItem => "Add item",
-        ActiveModal.EditItem => "Edit item",
-        _ => string.Empty
-    };
-
-    protected override async Task OnInitializedAsync() => await ReloadAsync();
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (_pendingFocusElementId is not { } elementId)
-        {
-            return;
-        }
-
-        _pendingFocusElementId = null;
-        await JS.InvokeVoidAsync("tripFocus.focusById", elementId);
     }
 
     private async Task ReloadAsync()
@@ -429,10 +345,6 @@ else
             async () =>
             {
                 _trip = await TripApi.GetDetailAsync(TripId);
-                if (_trip is not null && _activeModal != ActiveModal.EditTrip)
-                {
-                    PopulateTripEditModel();
-                }
             },
             _ => _trip = null);
 
@@ -444,24 +356,6 @@ else
             await _timeline.RefreshAsync();
         }
         StateHasChanged();
-    }
-
-    private void PopulateTripEditModel()
-    {
-        if (_trip is null) return;
-        _tripEditModel = new TripPlanner.Web.Components.Trips.TripForm.TripFormModel
-        {
-            Name = _trip.Name,
-            Description = _trip.Description,
-            StartDate = _trip.StartDate.ToDateTime(TimeOnly.MinValue),
-            EndDate = _trip.EndDate.ToDateTime(TimeOnly.MinValue)
-        };
-    }
-
-    private void OpenTripEditModal()
-    {
-        PopulateTripEditModel();
-        _activeModal = ActiveModal.EditTrip;
     }
 
     private void OpenDeleteModal()
@@ -478,164 +372,23 @@ else
         _deleteError = null;
     }
 
-    private void OpenShareModal() => _showShareModal = true;
-
-    private void CloseShareModal() => _showShareModal = false;
+    private async Task HandleTripDeleteAsync()
+    {
+        _deleteError = null;
+        _isDeleting = true;
+        try { await TripApi.DeleteTripAsync(TripId); Nav.NavigateTo("/trips"); }
+        catch { _deleteError = "We couldn't delete this trip. Please try again."; _isDeleting = false; }
+    }
 
     private void OpenMapModal() => _showMapModal = true;
 
     private void CloseMapModal() => _showMapModal = false;
 
-    private async Task HandleMapOpenItemAsync(Guid trackedItemId)
+    private Task HandleMapOpenItemAsync(Guid trackedItemId)
     {
-        var item = _trip?.TrackedItems.FirstOrDefault(i => i.TrackedItemId == trackedItemId);
-        if (item is null)
-        {
-            return;
-        }
         _showMapModal = false;
-        if (CanEditContent)
-        {
-            OpenEditItemModal(item);
-        }
-        await Task.CompletedTask;
-    }
-
-    private void OpenCreateLegModal()
-    {
-        _editingLeg = null;
-        _activeModal = ActiveModal.CreateLeg;
-    }
-
-    private void OpenEditLegModal(TripLegDto leg)
-    {
-        _editingLeg = leg;
-        _activeModal = ActiveModal.EditLeg;
-    }
-
-    private void OpenCreateItemModal(Guid? initialTripLegId)
-    {
-        _editingItem = null;
-        _initialItemLegId = initialTripLegId;
-        // Default a new item to the timeline's active (centered) date when available.
-        _initialItemStart = _timeline?.CurrentDate is { } activeDate
-            ? activeDate.ToDateTime(new TimeOnly(9, 0))
-            : null;
-        _activeModal = ActiveModal.CreateItem;
-    }
-
-    private void OpenTableEditLeg(Guid tripLegId)
-    {
-        if (!CanEditContent) return;
-        var leg = _trip?.Legs.FirstOrDefault(candidate => candidate.TripLegId == tripLegId);
-        if (leg is not null)
-        {
-            _returnFocusElementId = TripItineraryTable.EditLegActionId(tripLegId);
-            OpenEditLegModal(leg);
-        }
-    }
-
-    private void OpenTableEditItem(Guid trackedItemId)
-    {
-        if (!CanEditContent) return;
-        var item = _trip?.TrackedItems.FirstOrDefault(candidate => candidate.TrackedItemId == trackedItemId);
-        if (item is not null)
-        {
-            _returnFocusElementId = TripItineraryTable.EditItemActionId(trackedItemId);
-            OpenEditItemModal(item);
-        }
-    }
-
-    private void OpenTableCreateLeg()
-    {
-        _returnFocusElementId = "tp-table-add-leg";
-        OpenCreateLegModal();
-    }
-
-    private void OpenTableCreateItem(Guid? initialTripLegId)
-    {
-        _returnFocusElementId = initialTripLegId is { } tripLegId
-            ? TripItineraryTable.AddItemActionId(tripLegId)
-            : "tp-table-add-item";
-        OpenCreateItemModal(initialTripLegId);
-    }
-
-    private void OpenEditItemModal(TrackedItemDto item)
-    {
-        _editingItem = item;
-        _activeModal = ActiveModal.EditItem;
-    }
-
-    private void CloseModal()
-    {
-        _activeModal = ActiveModal.None;
-        _editingLeg = null;
-        _editingItem = null;
-        _pendingFocusElementId = _returnFocusElementId;
-        _returnFocusElementId = null;
-    }
-
-    private async Task HandleTripEditAsync(TripPlanner.Web.Components.Trips.TripForm.TripFormModel model)
-    {
-        var request = new UpdateTripRequest(
-            model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
-            DateOnly.FromDateTime(model.StartDate),
-            DateOnly.FromDateTime(model.EndDate));
-        await TripApi.UpdateAsync(TripId, request);
-        CloseModal();
-        await ReloadAsync();
-    }
-
-    private async Task HandleTripDeleteAsync()
-    {
-        _deleteError = null;
-        _isDeleting = true;
-        try
-        {
-            await TripApi.DeleteTripAsync(TripId);
-            Nav.NavigateTo("/trips");
-        }
-        catch
-        {
-            _deleteError = "We couldn't delete this trip. Please try again.";
-            _isDeleting = false;
-        }
-    }
-
-    private async Task HandleModalSavedAsync()
-    {
-        CloseModal();
-        await ReloadAsync();
-    }
-
-    private void OnTimelineLegSelected(Guid tripLegId)
-    {
-        if (!CanEditContent) return;
-        var leg = _trip?.Legs.FirstOrDefault(l => l.TripLegId == tripLegId);
-        if (leg is not null)
-        {
-            OpenEditLegModal(leg);
-        }
-    }
-
-    private void OnTimelineItemSelected(Guid trackedItemId)
-    {
-        if (!CanEditContent) return;
-        var item = _trip?.TrackedItems.FirstOrDefault(i => i.TrackedItemId == trackedItemId);
-        if (item is not null)
-        {
-            OpenEditItemModal(item);
-        }
-    }
-
-    private void OnTimelineLegSlotSelected(TripTimeline.TimelineSlotSelection selection)
-    {
-        if (!CanEditContent) return;
-        _editingItem = null;
-        _initialItemLegId = selection.TripLegId;
-        _initialItemStart = selection.StartLocal;
-        _activeModal = ActiveModal.CreateItem;
+        if (CanEditContent) Nav.NavigateTo(EntryPageUrls.ItemEdit(TripId, trackedItemId, CurrentTripReturn));
+        return Task.CompletedTask;
     }
 
     private async Task JumpToDateAsync(DateOnly date)
@@ -670,5 +423,11 @@ else
 
     private void HandleTimelineLoaded() => StateHasChanged();
 
-    private void HandleActiveDateChanged(DateOnly activeDate) => StateHasChanged();
+    private void HandleActiveDateChanged(DateOnly activeDate)
+    {
+        var target = EntryPageUrls.TripDetails(TripId, "timeline", activeDate);
+        var current = new Uri(Nav.Uri).PathAndQuery;
+        if (!string.Equals(current, target, StringComparison.Ordinal)) Nav.NavigateTo(target, replace: true);
+        StateHasChanged();
+    }
 }

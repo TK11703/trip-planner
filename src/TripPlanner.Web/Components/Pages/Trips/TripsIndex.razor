@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inherits ApiComponentBase
 @inject ITripApiClient TripApi
+@using TripPlanner.Web.Features.EntryPages
 
 <PageTitle>Trips</PageTitle>
 
@@ -11,7 +12,7 @@
         <h1 class="mb-1">Trips</h1>
         <p class="text-secondary mb-0">Keep your upcoming and shared travel plans organized in one place — trips you own and trips shared with you.</p>
     </div>
-    <a class="btn btn-primary" href="/trips/new">New trip</a>
+    <a class="btn btn-primary" href="@EntryPageUrls.TripCreate(OriginHref)">New trip</a>
 </div>
 
 @if (_isLoading)
@@ -24,7 +25,7 @@ else if (_error is not null)
 }
 else if (_response.TotalCount == 0)
 {
-    <NoTripsEmptyState />
+    <NoTripsEmptyState ReturnUrl="@OriginHref" />
 }
 else
 {
@@ -32,7 +33,7 @@ else
         @foreach (var trip in _response.Trips)
         {
             <div class="col-md-6 col-lg-4">
-                <TripCard Trip="trip" ShowAccess="true" />
+                <TripCard Trip="trip" ShowAccess="true" ReturnUrl="@OriginHref" />
             </div>
         }
     </div>
@@ -42,8 +43,8 @@ else
             Page @_response.Page of @TotalPages (@_response.TotalCount trips)
         </div>
         <div class="btn-group">
-            <button type="button" class="btn btn-outline-secondary" disabled="@(_response.Page <= 1)" @onclick="PreviousPageAsync">Previous</button>
-            <button type="button" class="btn btn-outline-secondary" disabled="@(_response.Page >= TotalPages)" @onclick="NextPageAsync">Next</button>
+            <a class="btn btn-outline-secondary @(_response.Page <= 1 ? "disabled" : null)" aria-disabled="@(_response.Page <= 1)" href="@EntryPageUrls.TripsList(Math.Max(1, _response.Page - 1), _response.PageSize)">Previous</a>
+            <a class="btn btn-outline-secondary @(_response.Page >= TotalPages ? "disabled" : null)" aria-disabled="@(_response.Page >= TotalPages)" href="@EntryPageUrls.TripsList(Math.Min(TotalPages, _response.Page + 1), _response.PageSize)">Next</a>
         </div>
     </nav>
 
@@ -56,18 +57,19 @@ else
 }
 
 @code {
-    private const int PageSize = 12;
+    private const int DefaultPageSize = 12;
+    [SupplyParameterFromQuery(Name = "page")] public int? RequestedPage { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public int? RequestedPageSize { get; set; }
+    private int PageSize => Math.Clamp(RequestedPageSize ?? DefaultPageSize, 1, 100);
+    private int Page => Math.Clamp(RequestedPage ?? 1, 1, 100000);
+    private string OriginHref => EntryPageUrls.TripsList(Page, PageSize);
     private bool _isLoading = true;
     private string? _error;
-    private TripListResponse _response = new(Array.Empty<TripSummary>(), 1, PageSize, 0);
+    private TripListResponse _response = new(Array.Empty<TripSummary>(), 1, DefaultPageSize, 0);
 
     private int TotalPages => Math.Max(1, (int)Math.Ceiling(_response.TotalCount / (double)_response.PageSize));
 
-    protected override async Task OnInitializedAsync() => await LoadPageAsync(1);
-
-    private async Task PreviousPageAsync() => await LoadPageAsync(_response.Page - 1);
-
-    private async Task NextPageAsync() => await LoadPageAsync(_response.Page + 1);
+    protected override async Task OnParametersSetAsync() => await LoadPageAsync(Page);
 
     private async Task LoadPageAsync(int page)
     {
