@@ -73,7 +73,7 @@ public sealed class FavoriteDestinationMaintenanceTests : BunitContext
         Assert.Empty(cut.FindAll("#favorite-city"));
         Assert.Empty(cut.FindAll("#favorite-country"));
         Assert.Empty(cut.FindAll("#favorite-source"));
-        Assert.Contains("Old city · Old country · 38.65123, -77.25321", cut.Find("[data-testid='favorite-calculated-location']").TextContent);
+        Assert.Contains("Old city Â· Old country Â· 38.65123, -77.25321", cut.Find("[data-testid='favorite-calculated-location']").TextContent);
         cut.Find("#favorite-name").Change("Updated name");
         cut.Find("#favorite-notes").Change("Updated notes");
         cut.Find("#favorite-form").Submit();
