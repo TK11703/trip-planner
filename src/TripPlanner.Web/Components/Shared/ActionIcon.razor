@@ -38,6 +38,10 @@
             <rect x="5" y="5" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" />
             <path d="M3 11H2V2h9v1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
             break;
+        case "calendar":
+            <rect x="1.5" y="3" width="13" height="11.5" rx="1.5" fill="none" stroke="currentColor" />
+            <path d="M1.5 6.5h13M5 1v4M11 1v4M4 9h2M7 9h2M10 9h2M4 12h2M7 12h2" fill="none" stroke="currentColor" stroke-linecap="round" />
+            break;
         case "trip":
             <rect x="1.5" y="4" width="13" height="10" rx="1.5" fill="none" stroke="currentColor" />
             <path d="M5 4V2.5A1.5 1.5 0 0 1 6.5 1h3A1.5 1.5 0 0 1 11 2.5V4M5 4v10M11 4v10" fill="none" stroke="currentColor" />
@@ -91,6 +95,10 @@
         case "edit":
             @* pencil *@
             <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z" />
+            break;
+        case "map-pin":
+            <path d="M8 15s5-4.75 5-9A5 5 0 0 0 3 6c0 4.25 5 9 5 9Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            <circle cx="8" cy="6" r="1.75" fill="none" stroke="currentColor" stroke-width="1.5" />
             break;
         case "map":
             @* map *@

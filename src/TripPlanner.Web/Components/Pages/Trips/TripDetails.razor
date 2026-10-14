@@ -7,19 +7,9 @@
 @inject IJSRuntime JS
 @using TripPlanner.Web.Features.EntryPages
 
-<PageTitle>Trip details</PageTitle>
+<PageTitle>@(_trip?.Name ?? "Trip details")</PageTitle>
 
 <EntryBreadcrumb Items="TripBreadcrumbs" />
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    @if (_trip is not null)
-    {
-        <span class="small text-secondary">View mode:</span>
-        <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
-            <a class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Table ? "page" : null)" href="@TripViewHref(TripPlanningView.Table)">Table</a>
-            <a class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Timeline ? "page" : null)" href="@TripViewHref(TripPlanningView.Timeline)">Timeline</a>
-        </div>
-    }
-</div>
 
 @if (_loading)
 {
@@ -31,32 +21,37 @@ else if (_trip is null)
 }
 else
 {
-    <header class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-        <div>
-            <h1 class="mb-1">@_trip.Name</h1>
-            <p class="text-secondary mb-0">@_trip.StartDate.ToLongDateString() - @_trip.EndDate.ToLongDateString()</p>
-            @if (!_trip.IsOwner)
-            {
-                <span class="badge @AccessBadgeClass mt-2">Shared - @AccessLevelLabel</span>
-            }
-        </div>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
+    <EntryPageHeading Title="@_trip.Name" Context="@($"{_trip.StartDate:MMM d, yyyy} \u2013 {_trip.EndDate:MMM d, yyyy}")" Icon="trip">
+        <Actions>
+            <div class="trip-header-actions">
             @if (CanEditContent)
             {
-                <a class="btn btn-sm btn-primary" href="@EntryPageUrls.TripEdit(TripId, CurrentTripReturn)"><ActionIcon Name="edit" CssClass="me-1 align-text-bottom" />Edit trip</a>
+                <a class="btn btn-sm btn-primary" aria-label="Edit trip" title="Edit trip" href="@EntryPageUrls.TripEdit(TripId, CurrentTripReturn)"><ActionIcon Name="edit" /></a>
             }
             @if (_trip.IsOwner)
             {
-                <a class="btn btn-sm btn-outline-secondary" href="@($"/trips/{TripId}/print")"><ActionIcon Name="print" CssClass="me-1 align-text-bottom" />Print</a>
-                <a class="btn btn-sm btn-outline-primary" href="@EntryPageUrls.TripSharing(TripId, CurrentTripReturn)"><ActionIcon Name="share" CssClass="me-1 align-text-bottom" />Share</a>
-                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="OpenDeleteModal"><ActionIcon Name="delete" CssClass="me-1 align-text-bottom" />Delete trip</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" aria-label="Delete trip" title="Delete trip" @onclick="OpenDeleteModal"><ActionIcon Name="delete" /></button>
+                <a class="btn btn-sm btn-outline-secondary" aria-label="Print trip" title="Print trip" href="@($"/trips/{TripId}/print")"><ActionIcon Name="print" /></a>
+                <a class="btn btn-sm btn-outline-primary" aria-label="Share trip" title="Share trip" href="@EntryPageUrls.TripSharing(TripId, CurrentTripReturn)"><ActionIcon Name="share" /></a>
             }
-        </div>
-    </header>
+            </div>
+        </Actions>
+    </EntryPageHeading>
 
+    <nav class="nav nav-tabs trip-detail-tabs mb-4" aria-label="Trip sections">
+        <a class="nav-link @(!_showDetails ? "active" : null)" aria-current="@(!_showDetails ? "page" : null)" href="@TripTabHref("overview")">Overview</a>
+        <a class="nav-link @(_showDetails ? "active" : null)" aria-current="@(_showDetails ? "page" : null)" href="@TripTabHref("details")">Details</a>
+    </nav>
+    @if (!_trip.IsOwner)
+    {
+        <p><span class="badge @AccessBadgeClass">Shared - @AccessLevelLabel</span></p>
+    }
+    var itinerary = TripPrintFormatting.BuildItineraryTable(_trip);
+    @if (_showDetails)
+    {
+    <section aria-label="Trip details">
     <div class="row g-3">
         <div class="col-12">
-            @{ var itinerary = TripPrintFormatting.BuildItineraryTable(_trip); }
             @if (itinerary.UnassignedItems.Count > 0)
             {
                 <div class="alert alert-warning d-flex align-items-start gap-3 mb-3" role="alert">
@@ -72,7 +67,13 @@ else
             }
             <div class="card shadow-sm mb-3 tp-static">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div class="fw-semibold">@(_planningView == TripPlanningView.Timeline ? "Trip timeline" : "Itinerary table")</div>
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <h2 class="h6 mb-0">@(_planningView == TripPlanningView.Timeline ? "Trip timeline" : "Itinerary table")</h2>
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
+                            <a class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Table ? "page" : null)" href="@TripViewHref(TripPlanningView.Table)">Table</a>
+                            <a class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Timeline ? "page" : null)" href="@TripViewHref(TripPlanningView.Timeline)">Timeline</a>
+                        </div>
+                    </div>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
                         @if (CanEditContent && itinerary.HasContent)
                         {
@@ -141,106 +142,163 @@ else
                         }
                     </div>
                 </div>
-                <div class="card-body @(itinerary.HasContent ? "tp-itinerary-flush" : null)">
+                <div class="card-body @(_planningView == TripPlanningView.Timeline && itinerary.HasContent ? "tp-itinerary-flush" : null)">
                     @if (_planningView == TripPlanningView.Timeline)
                     {
                         <TripTimeline @ref="_timeline" TripId="@TripId" ReturnUrl="@CurrentTripReturn" InitialDate="@InitialDate" CanEdit="@CanEditContent" OnLoaded="HandleTimelineLoaded" OnActiveDateChanged="HandleActiveDateChanged" />
                     }
                     else
                     {
-                        <TripItineraryTable Model="@itinerary" TripId="@TripId" ReturnUrl="@CurrentTripReturn" CanEdit="@CanEditContent" />
+                        <TripItineraryTable Model="@itinerary" TripId="@TripId" ReturnUrl="@CurrentTripReturn" CanEdit="@CanEditContent" GroupByLeg="true" />
                     }
                 </div>
             </div>
         </div>
-
-        <div class="col-md-6 col-xl-4">
-            <div class="card mb-3">
-                <div class="card-header">Overview</div>
+    </div>
+    </section>
+    }
+    else
+    {
+    <section class="trip-overview" aria-label="Trip overview">
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-8">
+            <div class="card trip-about">
                 <div class="card-body">
+                    <h2 class="h5">About this trip</h2>
                     @if (!string.IsNullOrWhiteSpace(_trip.Description))
                     {
                         <p class="mb-2">@_trip.Description</p>
                     }
                     else
                     {
-                        <p class="text-secondary mb-2">No description yet.</p>
+                        <p class="text-secondary mb-2">A description was not provided.</p>
                     }
                     <div class="small text-secondary">Created @_trip.CreatedAtUtc.ToString("yyyy-MM-dd")</div>
                 </div>
             </div>
-        </div>
-
-        <div class="col-md-6 col-xl-4">
-            <div class="card mb-3">
-                <div class="card-header">Itinerary summary</div>
-                <ul class="list-group list-group-flush small">
-                    <li class="list-group-item d-flex justify-content-between"><span>Legs</span><span>@_trip.Legs.Count</span></li>
-                    <li class="list-group-item d-flex justify-content-between"><span>Items</span><span>@_trip.TrackedItems.Count</span></li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>Estimated total</span>
-                        @if (_trip.EstimatedCostTotal > 0)
-                        {
-                            <span>@_trip.EstimatedCostTotal.ToDisplayAmount()</span>
-                        }
-                        else
-                        {
-                            <span class="text-secondary">No estimates yet</span>
-                        }
-                    </li>
-                </ul>
             </div>
-        </div>
-
-        <div class="col-md-6 col-xl-4">
-            <div class="card mb-3">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>People with access</span>
-                    @if (_trip.IsOwner)
+            <div class="col-12 col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="h6 mb-0"><ActionIcon Name="share" CssClass="me-2" />Sharing</h2>
+                    </div>
+                    @{
+                        var sharedPeople = _trip.SharedPeople ?? Array.Empty<TripShareMember>();
+                        var hasMembers = sharedPeople.Any(p => p.AccessLevel != TripAccessLevel.Owner);
+                    }
+                    @if (sharedPeople.Count == 0)
                     {
-                        <a class="btn btn-sm btn-outline-primary" href="@EntryPageUrls.TripSharing(TripId, CurrentTripReturn)">Manage</a>
+                        <div class="card-body">
+                            @if (_trip.IsOwner)
+                            {
+                                <p class="text-secondary mb-0">This trip isn't shared yet. Select Share to invite viewers or collaborators.</p>
+                            }
+                            else
+                            {
+                                <p class="text-secondary mb-0">No one else has access to this trip yet.</p>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush small">
+                            @foreach (var person in sharedPeople)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                                    <span class="text-truncate">@(string.IsNullOrWhiteSpace(person.DisplayName) ? person.Email ?? person.UserId : person.DisplayName)</span>
+                                    <span class="badge @AccessBadge(person.AccessLevel)">
+                                        @AccessText(person.AccessLevel)
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                        @if (_trip.IsOwner && !hasMembers)
+                        {
+                            <div class="card-body py-2">
+                                <p class="text-secondary small mb-0">Only you have access. Select Share to invite viewers or collaborators.</p>
+                            </div>
+                        }
                     }
                 </div>
-                @{
-                    var sharedPeople = _trip.SharedPeople ?? Array.Empty<TripShareMember>();
-                    var hasMembers = sharedPeople.Any(p => p.AccessLevel != TripAccessLevel.Owner);
-                }
-                @if (sharedPeople.Count == 0)
+            </div>
+        </div>
+    <div class="row g-4">
+        <div class="col-12 col-lg-8">
+            <section aria-labelledby="trip-legs-heading">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <h2 id="trip-legs-heading" class="h5 mb-0">Travel legs</h2>
+                    @if (CanEditContent)
+                    {
+                        <a class="btn btn-sm btn-outline-primary" aria-label="Add leg" href="@EntryPageUrls.LegCreate(TripId, CurrentTripReturn)"><ActionIcon Name="add" CssClass="me-1" />Add leg</a>
+                    }
+                </div>
+                @if (itinerary.Legs.Count == 0)
                 {
-                    <div class="card-body">
-                        @if (_trip.IsOwner)
-                        {
-                            <p class="text-secondary mb-0">This trip isn't shared yet. Select Share to invite viewers or collaborators.</p>
-                        }
-                        else
-                        {
-                            <p class="text-secondary mb-0">No one else has access to this trip yet.</p>
-                        }
-                    </div>
+                    <div class="card"><div class="card-body text-secondary">No trip legs yet. Add a leg to start building your itinerary.</div></div>
                 }
                 else
                 {
-                    <ul class="list-group list-group-flush small">
-                        @foreach (var person in sharedPeople)
+                    <ol class="trip-leg-list list-unstyled">
+                        @foreach (var leg in itinerary.Legs)
                         {
-                            <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
-                                <span class="text-truncate">@(string.IsNullOrWhiteSpace(person.DisplayName) ? person.Email ?? person.UserId : person.DisplayName)</span>
-                                <span class="badge @AccessBadge(person.AccessLevel)">
-                                    @AccessText(person.AccessLevel)
-                                </span>
+                            <li id="leg-@leg.TripLegId" class="card mb-3">
+                                <div class="card-body">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                                        <h3 class="h6 mb-0">
+                                            @if (CanEditContent)
+                                            {
+                                                <a title="Edit travel leg: @leg.Title" aria-label="Edit leg @leg.Title" href="@EntryPageUrls.LegEdit(TripId, leg.TripLegId, CurrentTripReturn)">@leg.Title</a>
+                                            }
+                                            else
+                                            {
+                                                @leg.Title
+                                            }
+                                        </h3>
+                                        <span class="trip-leg-mode text-secondary" role="img"
+                                              title="@(string.IsNullOrWhiteSpace(leg.ModeText) ? "Stay" : leg.ModeText)"
+                                              aria-label="@(string.IsNullOrWhiteSpace(leg.ModeText) ? "Stay" : leg.ModeText)">
+                                            <ActionIcon Name="@(string.IsNullOrWhiteSpace(leg.ModeText) ? "map-pin" : leg.ModeText)" />
+                                        </span>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(leg.RouteText))
+                                    {
+                                        <p class="mb-1 fw-semibold">@leg.RouteText</p>
+                                    }
+                                    <p class="small text-secondary mb-0">@leg.StartText &ndash; @leg.EndText</p>
+                                </div>
                             </li>
                         }
-                    </ul>
-                    @if (_trip.IsOwner && !hasMembers)
-                    {
-                        <div class="card-body py-2">
-                            <p class="text-secondary small mb-0">Only you have access. Select Manage to invite viewers or collaborators.</p>
-                        </div>
-                    }
+                    </ol>
                 }
+            </section>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="row g-3 mb-3" aria-label="Trip dashboard">
+                <div class="col-6">
+                    <div class="card h-100 trip-stat trip-icon-widget"><span class="trip-widget-icon"><ActionIcon Name="leg" /></span><div class="card-body"><h2 class="h6 text-secondary">Legs</h2><div class="h3 mb-0">@_trip.Legs.Count</div></div></div>
+                </div>
+                <div class="col-6">
+                    <div class="card h-100 trip-stat trip-icon-widget"><span class="trip-widget-icon"><ActionIcon Name="item" /></span><div class="card-body"><h2 class="h6 text-secondary">Travel Items</h2><div class="h3 mb-0">@_trip.TrackedItems.Count</div></div></div>
+                </div>
+                <div class="col-12">
+                    <div class="card trip-stat"><div class="card-body"><h2 class="h6 text-secondary">Estimated total</h2>
+                        @if (_trip.EstimatedCostTotal > 0)
+                        {
+                            <div class="h3 mb-0">@_trip.EstimatedCostTotal.ToDisplayAmount()</div>
+                        }
+                        else
+                        {
+                            <div class="text-secondary">No estimates yet</div>
+                        }
+                    </div></div>
+                </div>
             </div>
         </div>
     </div>
+
+    </section>
+    }
 
     @if (_showMapModal)
     {
@@ -278,9 +336,12 @@ else
     [Parameter] public Guid TripId { get; set; }
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
     [SupplyParameterFromQuery(Name = "date")] public DateOnly? InitialDate { get; set; }
-    private string CurrentTripReturn => EntryPageUrls.TripDetails(TripId, _planningView == TripPlanningView.Timeline ? "timeline" : "table", _timeline?.CurrentDate ?? InitialDate);
+    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
+    private bool _showDetails;
+    private string CurrentTripReturn => EntryPageUrls.TripDetails(TripId, _planningView == TripPlanningView.Timeline ? "timeline" : "table", _timeline?.CurrentDate ?? InitialDate, tab: _showDetails ? "details" : "overview");
     private IReadOnlyList<BreadcrumbItem> TripBreadcrumbs => [new("Home", "/"), new("Trips", "/trips"), new(_trip?.Name ?? "Trip", IsCurrent: true)];
     private string TripViewHref(TripPlanningView view) => EntryPageUrls.TripDetails(TripId, view == TripPlanningView.Timeline ? "timeline" : "table", _timeline?.CurrentDate ?? InitialDate);
+    private string TripTabHref(string tab) => EntryPageUrls.TripDetails(TripId, _planningView == TripPlanningView.Timeline ? "timeline" : "table", _timeline?.CurrentDate ?? InitialDate, tab: tab);
 
     private bool _loading = true;
     private TripDetail? _trip;
@@ -331,6 +392,11 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _planningView = string.Equals(View, "timeline", StringComparison.OrdinalIgnoreCase) ? TripPlanningView.Timeline : TripPlanningView.Table;
+        // Existing format/date/row links still open the itinerary, while a plain trip URL opens Overview.
+        _showDetails = string.Equals(Tab, "details", StringComparison.OrdinalIgnoreCase)
+            || (!string.Equals(Tab, "overview", StringComparison.OrdinalIgnoreCase)
+                && (View is not null || InitialDate is not null || !string.IsNullOrEmpty(new Uri(Nav.Uri).Fragment)));
+        if (!_showDetails || _planningView != TripPlanningView.Timeline) _timeline = null;
         if (_loadedTripId != TripId) { _loadedTripId = TripId; await ReloadAsync(); }
 
     }

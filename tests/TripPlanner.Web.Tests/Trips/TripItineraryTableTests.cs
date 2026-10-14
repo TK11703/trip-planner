@@ -10,6 +10,155 @@ namespace TripPlanner.Web.Tests.Trips;
 public class TripItineraryTableTests : BunitContext
 {
     [Fact]
+    public void GroupedUnassignedItemsHaveWarningHeaderAndIconsOnlyOnUnassignedRows()
+    {
+        var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
+        var cut = Render<TripItineraryTable>(parameters => parameters
+            .Add(component => component.Model, model)
+            .Add(component => component.GroupByLeg, true));
+
+        Assert.Contains("tp-itinerary-unassigned-header", cut.Find("#unassigned-items").ClassList);
+        Assert.NotNull(cut.Find("#unassigned-items svg"));
+        Assert.Equal(model.UnassignedItems.Count, cut.FindAll(".tp-itinerary-item-warning").Count);
+        foreach (var item in model.UnassignedItems)
+        {
+            var row = cut.Find($"#item-{item.TrackedItemId}");
+            Assert.NotNull(row.QuerySelector("[aria-label='Travel leg required'] svg"));
+            Assert.Null(row.QuerySelector(".tp-tracked-item-icon"));
+        }
+        Assert.All(cut.FindAll(".tp-itinerary-item:not(.tp-itinerary-item-warning)"), row =>
+            Assert.Null(row.QuerySelector(".tp-itinerary-assignment-warning")));
+    }
+
+    [Theory]
+    [InlineData(0, null)]
+    [InlineData(1, "1 item")]
+    [InlineData(2, "2 items")]
+    public void GroupedHeaderShowsCountOnlyForNonemptyLegs(int count, string? expected)
+    {
+        var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
+        var leg = model.Legs[0] with { Items = model.Legs[0].Items.Take(count).ToArray() };
+        var cut = Render<TripItineraryTable>(parameters => parameters
+            .Add(component => component.Model, new ItineraryTableModel([leg], []))
+            .Add(component => component.GroupByLeg, true));
+
+        var counts = cut.FindAll(".tp-itinerary-leg-count");
+        if (expected is null) Assert.Empty(counts);
+        else Assert.Equal(expected, Assert.Single(counts).TextContent);
+    }
+
+    [Fact]
+    public void HeaderToggleIsSeparateFromEditAndAddActions()
+    {
+        var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
+        Guid? edited = null;
+        Guid? added = null;
+        var cut = Render<TripItineraryTable>(parameters => parameters
+            .Add(component => component.Model, model)
+            .Add(component => component.GroupByLeg, true)
+            .Add(component => component.OnEditLeg, id => edited = id)
+            .Add(component => component.OnAddItem, id => added = id));
+
+        var header = cut.Find($"#leg-{TripFixtures.ArrivalLegId}");
+        Assert.NotNull(header.QuerySelector(".tp-itinerary-leg-expandable .tp-itinerary-leg-toggle"));
+        var edit = cut.Find($"#{TripItineraryTable.EditLegActionId(TripFixtures.ArrivalLegId)}");
+        Assert.Equal("Edit travel leg: Arrival", edit.GetAttribute("title"));
+        edit.Click();
+        cut.Find($"#{TripItineraryTable.AddItemActionId(TripFixtures.ArrivalLegId)}").Click();
+        Assert.Equal(TripFixtures.ArrivalLegId, edited);
+        Assert.Equal(TripFixtures.ArrivalLegId, added);
+        Assert.Equal("true", cut.Find($"#leg-{TripFixtures.ArrivalLegId} .tp-itinerary-leg-toggle").GetAttribute("aria-expanded"));
+    }
+
+    [Fact]
+    public void GroupedLegHeaderSeparatesIdentityMetadataAndAddItemAction()
+    {
+        var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
+        var cut = Render<TripItineraryTable>(parameters => parameters
+            .Add(component => component.Model, model)
+            .Add(component => component.GroupByLeg, true)
+            .Add(component => component.TripId, TripFixtures.RepresentativeTripId)
+            .Add(component => component.CanEdit, true));
+
+        var header = cut.Find($"#leg-{TripFixtures.ArrivalLegId}");
+        Assert.Equal("Arrival", header.QuerySelector(".tp-itinerary-leg-identity .tp-itinerary-leg-title")!.TextContent);
+        Assert.Equal("Edit travel leg: Arrival", header.QuerySelector("a.tp-itinerary-leg-title")!.GetAttribute("title"));
+        Assert.Equal("Car", header.QuerySelector(".tp-itinerary-leg-icon")!.GetAttribute("aria-label"));
+        Assert.Null(header.QuerySelector(".tp-itinerary-leg-mode"));
+        var identity = header.QuerySelector(".tp-itinerary-leg-identity")!;
+        Assert.Contains("tp-itinerary-leg-icon", identity.FirstElementChild!.ClassList);
+        Assert.Contains("tp-itinerary-leg-title", identity.FirstElementChild.NextElementSibling!.ClassList);
+        var details = header.QuerySelector(".tp-itinerary-leg-details")!;
+        Assert.Contains("tp-itinerary-leg-count", details.NextElementSibling!.ClassList);
+        Assert.Contains("tp-itinerary-row-add", details.NextElementSibling.NextElementSibling!.ClassList);
+        var stay = cut.Find($"#leg-{model.Legs.Single(leg => leg.Title == "Free day").TripLegId}");
+        Assert.Equal("Stay", stay.QuerySelector(".tp-itinerary-leg-icon")!.GetAttribute("aria-label"));
+        Assert.NotNull(stay.QuerySelector(".tp-itinerary-leg-icon svg circle"));
+        Assert.Contains("Seattle", header.QuerySelector(".tp-itinerary-leg-details .tp-itinerary-leg-route")!.TextContent, StringComparison.Ordinal);
+        var add = header.QuerySelector(".tp-itinerary-leg-heading > a[aria-label='Add item to Arrival']")!;
+        Assert.Contains("btn-link", add.ClassList);
+        Assert.DoesNotContain("ttl-leg-add", add.ClassList);
+        Assert.Empty(add.QuerySelectorAll("span:not([aria-hidden='true'])"));
+        Assert.Equal("Add an item to Arrival", add.GetAttribute("title"));
+        Assert.Contains($"legId={TripFixtures.ArrivalLegId}", add.GetAttribute("href"), StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(cut.FindAll("[aria-label='Add item to Departure']"));
+    }
+
+    [Fact]
+    public void GroupedViewRendersTablesForItemCapableLegsAndUnassignedWithIdenticalColumnTracks()
+    {
+        var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
+        var cut = Render<TripItineraryTable>(parameters => parameters
+            .Add(component => component.Model, model)
+            .Add(component => component.GroupByLeg, true));
+
+        var tables = cut.FindAll("table");
+        Assert.Equal(3, tables.Count);
+        var tracks = tables[0].QuerySelector("colgroup")!.InnerHtml;
+        Assert.All(tables, table =>
+        {
+            Assert.Equal(tracks, table.QuerySelector("colgroup")!.InnerHtml);
+            Assert.Equal(6, table.QuerySelectorAll("thead th").Length);
+            Assert.Empty(table.QuerySelectorAll("tbody .tp-itinerary-leg"));
+            Assert.Equal("CAPTION", table.FirstElementChild!.TagName);
+            Assert.Contains("visually-hidden", table.FirstElementChild.ClassList);
+            Assert.Equal("THEAD", table.QuerySelector("colgroup")!.NextElementSibling!.TagName);
+        });
+        Assert.Equal(new[] { "Arrival", "Free day", "Departure", "Unassigned" },
+            cut.FindAll(".tp-itinerary-leg-header .tp-itinerary-leg-title").Select(title => title.TextContent));
+        Assert.Equal(4, cut.FindAll(".tp-itinerary-item").Count);
+        Assert.Single(cut.FindAll(".tp-itinerary-leg-empty"));
+        Assert.Single(cut.FindAll("[role='region']"));
+    }
+
+    [Fact]
+    public void GroupedLegsToggleIndependentlyAndTravelOnlyLegsHaveNoToggle()
+    {
+        var model = TripPrintFormatting.BuildItineraryTable(TripFixtures.Representative());
+        var cut = Render<TripItineraryTable>(parameters => parameters
+            .Add(component => component.Model, model)
+            .Add(component => component.GroupByLeg, true));
+
+        var toggles = cut.FindAll(".accordion-button");
+        Assert.Equal(model.Legs.Count(leg => leg.CanContainItems), toggles.Count);
+        Assert.Empty(cut.FindAll($"#leg-{TripFixtures.DepartureLegId} .accordion-button"));
+        var departure = cut.Find($"#leg-{TripFixtures.DepartureLegId}").ParentElement!;
+        Assert.Single(departure.Children);
+        Assert.Empty(departure.QuerySelectorAll("table, .accordion-collapse"));
+        Assert.DoesNotContain("No items for this leg.", departure.TextContent, StringComparison.Ordinal);
+        Assert.All(toggles, toggle => Assert.Equal("true", toggle.GetAttribute("aria-expanded")));
+
+        var firstPanelId = toggles[0].GetAttribute("aria-controls");
+        toggles[0].Click();
+        Assert.Equal("false", cut.Find($"[aria-controls='{firstPanelId}']").GetAttribute("aria-expanded"));
+        Assert.DoesNotContain("show", cut.Find($"#{firstPanelId}").ClassList);
+        Assert.Equal("true", cut.FindAll(".accordion-button")[1].GetAttribute("aria-expanded"));
+
+        cut.Find($"[aria-controls='{firstPanelId}']").Click();
+        Assert.Contains("show", cut.Find($"#{firstPanelId}").ClassList);
+    }
+
+    [Fact]
     public void RendersCaptionAndSixColumnHeaders()
     {
         var cut = Render(TripFixtures.Representative());

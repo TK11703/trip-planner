@@ -1262,6 +1262,110 @@ body {
     color: var(--bs-secondary-color);
 }
 
+.tp-itinerary-grouped { container-type: inline-size; }
+.tp-itinerary-grouped .tp-itinerary-leg-card {
+    min-width: 64rem;
+    margin-bottom: 1.25rem;
+    border: 1px solid var(--tp-border);
+    border-radius: .75rem;
+    overflow: hidden;
+    background: var(--tp-surface);
+    box-shadow: 0 .2rem .6rem rgba(0, 0, 0, .05);
+}
+
+.tp-itinerary-grouped .tp-itinerary-leg-card:last-child { margin-bottom: 0; }
+.tp-itinerary-grouped .tp-itinerary-table { table-layout: fixed; min-width: 64rem; }
+/* Identical fixed tracks keep every leg aligned, regardless of its contents. */
+.tp-itinerary-grouped .tp-column-title { width: 25%; }
+.tp-itinerary-grouped .tp-column-location { width: 19%; }
+.tp-itinerary-grouped .tp-column-start,
+.tp-itinerary-grouped .tp-column-end { width: 16%; }
+.tp-itinerary-grouped .tp-column-confirmation { width: 14%; }
+.tp-itinerary-grouped .tp-column-cost { width: 10%; }
+.tp-itinerary-grouped .tp-itinerary-table thead th {
+    min-width: 0;
+    padding: .8rem;
+    font-size: .75rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+}
+.tp-itinerary-grouped .tp-itinerary-table td { padding: 1rem .8rem; }
+.tp-itinerary-grouped .tp-itinerary-leg-header {
+    caption-side: top;
+    padding: 0;
+    background: var(--tp-surface);
+    color: var(--tp-text);
+    overflow-wrap: anywhere;
+}
+.tp-itinerary-grouped .tp-itinerary-leg-summary {
+    /* Keep header actions visible before scrolling the wider table on mobile. */
+    width: calc(100cqi - 6px);
+    max-width: 100%;
+    padding: .25rem .8rem;
+}
+.tp-itinerary-grouped .tp-itinerary-leg-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .25rem 1rem;
+}
+.tp-itinerary-grouped .tp-itinerary-leg-identity { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; min-width: 0; }
+.tp-itinerary-grouped .tp-itinerary-leg-icon { display: inline-flex; flex-shrink: 0; font-size: 1.1rem; color: var(--bs-secondary-color); }
+.tp-itinerary-grouped .tp-itinerary-leg-count { flex-shrink: 0; }
+.tp-itinerary-grouped .tp-itinerary-leg-title { margin: 0; font-size: .95rem; font-weight: 600; line-height: 1.4; }
+.tp-itinerary-grouped .tp-itinerary-leg-title.tp-itinerary-title-action { color: var(--tp-text); text-decoration: none; }
+.tp-itinerary-grouped .tp-itinerary-leg-title.tp-itinerary-title-action:hover { color: var(--bs-link-hover-color); text-decoration: underline; }
+.tp-itinerary-grouped .tp-itinerary-leg-mode {
+    margin: 0;
+    font-size: .75rem;
+    color: var(--bs-secondary-color);
+}
+.tp-itinerary-grouped .tp-itinerary-leg-details { display: flex; flex: 1; flex-wrap: wrap; min-width: 0; gap: .15rem .75rem; color: var(--bs-secondary-color); }
+.tp-itinerary-grouped .tp-itinerary-leg-details > span { margin: 0; }
+.tp-itinerary-grouped .tp-itinerary-leg-route,
+.tp-itinerary-grouped .tp-itinerary-leg-when { font-size: .8rem; }
+.tp-itinerary-grouped .tp-itinerary-leg-confirmation,
+.tp-itinerary-grouped .tp-itinerary-leg-cost { font-size: .8rem; }
+.tp-itinerary-grouped .tp-itinerary-row-add { margin: 0; flex-shrink: 0; width: 44px; justify-content: center; padding: 0; text-decoration: none; }
+.tp-itinerary-grouped .tp-itinerary-row-add:hover { background: var(--tp-brand-soft); }
+.tp-itinerary-grouped .tp-itinerary-leg-expandable { position: relative; padding-inline-end: 3.55rem; }
+.tp-itinerary-grouped .tp-itinerary-leg-expandable .tp-itinerary-title-action,
+.tp-itinerary-grouped .tp-itinerary-leg-expandable .tp-itinerary-row-add { position: relative; z-index: 2; }
+.tp-itinerary-grouped .tp-itinerary-leg-toggle {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 44px;
+    padding: 0;
+    border-radius: .25rem;
+    background: transparent;
+    box-shadow: none;
+}
+.tp-itinerary-grouped .tp-itinerary-leg-toggle:focus-visible {
+    outline: 2px solid var(--tp-brand);
+    outline-offset: -2px;
+}
+.tp-itinerary-grouped .tp-itinerary-leg-toggle::after { position: absolute; right: 1.45rem; margin: 0; }
+@container (max-width: 36rem) {
+    .tp-itinerary-grouped .tp-itinerary-leg-heading { flex-wrap: wrap; }
+    .tp-itinerary-grouped .tp-itinerary-leg-details { flex-basis: 100%; }
+}
+.tp-itinerary-grouped .tp-itinerary-item:nth-child(odd) { background: var(--tp-surface-raised); }
+.tp-itinerary-grouped .tp-itinerary-item:hover { background: var(--tp-brand-soft); }
+.tp-itinerary-grouped .tp-itinerary-unassigned-header,
+.tp-itinerary-grouped .tp-itinerary-item-warning,
+.tp-itinerary-grouped .tp-itinerary-item-warning:hover {
+    background: var(--bs-warning-bg-subtle);
+    color: var(--bs-warning-text-emphasis);
+}
+.tp-itinerary-grouped .tp-itinerary-assignment-warning { display: inline-flex; color: var(--bs-warning-text-emphasis); }
+.tp-itinerary-grouped .tp-itinerary-item td:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+.tp-itinerary-grouped .tp-itinerary-title-action,
+.tp-itinerary-grouped .tp-itinerary-row-add { display: inline-flex; align-items: center; min-height: 44px; padding-block: .35rem; }
+.tp-itinerary-grouped .tp-itinerary-table tbody tr:last-child > * { border-bottom: 0; }
 
 
 /* ===== Printable trip view (feature 020) ===== */

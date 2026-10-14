@@ -29,7 +29,7 @@ public class TripDetailsPrintButtonTests : BunitContext
 
         cut.WaitForAssertion(() =>
         {
-            var printLink = cut.FindAll("a").First(a => a.TextContent.Trim() == "Print");
+            var printLink = cut.Find("a[aria-label='Print trip']");
             Assert.Equal($"/trips/{tripId}/print", printLink.GetAttribute("href"));
         });
     }
@@ -42,7 +42,7 @@ public class TripDetailsPrintButtonTests : BunitContext
 
         cut.WaitForAssertion(() =>
         {
-            Assert.DoesNotContain(cut.FindAll("a"), a => a.TextContent.Trim() == "Print");
+            Assert.Empty(cut.FindAll("a[aria-label='Print trip']"));
         });
     }
 

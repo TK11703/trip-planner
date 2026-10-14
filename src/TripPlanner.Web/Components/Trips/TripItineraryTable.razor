@@ -25,10 +25,48 @@
 }
 else
 {
-    <div class="tp-itinerary-table-region" role="region" aria-label="Itinerary table" tabindex="0">
+    <div class="tp-itinerary-table-region @(GroupByLeg ? "tp-itinerary-grouped accordion" : null)" role="region" aria-label="Itinerary table" tabindex="0">
+        @foreach (var group in TableGroups())
+        {
+        var headerLeg = group.Legs.FirstOrDefault();
+        var expandable = GroupByLeg && headerLeg?.CanContainItems == true;
+        var expanded = headerLeg is null || !_collapsedLegs.Contains(headerLeg.TripLegId);
+        var panelId = $"leg-items-{headerLeg?.TripLegId}";
+        <div class="@(GroupByLeg ? "tp-itinerary-leg-card accordion-item" : null)">
+            @if (GroupByLeg)
+            {
+                @if (headerLeg is not null)
+                {
+                    <div id="leg-@headerLeg.TripLegId" class="tp-itinerary-leg-header accordion-header">
+                        @RenderLegHeader(headerLeg, expandable, expanded, panelId)
+                    </div>
+                }
+                else
+                {
+                    <div id="unassigned-items" class="tp-itinerary-leg-header tp-itinerary-unassigned-header">
+                        <div class="tp-itinerary-leg-summary">
+                            <span class="tp-itinerary-leg-title"><ActionIcon Name="warning" CssClass="me-2" />Unassigned</span>
+                            <p class="small mb-0 mt-2">Items waiting for a trip leg</p>
+                        </div>
+                    </div>
+                }
+            }
+        @if (!GroupByLeg || headerLeg is null || headerLeg.CanContainItems)
+        {
+        <div id="@(expandable ? panelId : null)" class="@(expandable ? $"accordion-collapse collapse {(expanded ? "show" : null)}" : null)">
         <table class="tp-itinerary-table">
-            @* The surrounding card header already names this table on screen. *@
-            <caption class="visually-hidden">Itinerary</caption>
+            <caption class="visually-hidden">@(GroupByLeg ? headerLeg?.Title ?? "Unassigned" : "Itinerary")</caption>
+            @if (GroupByLeg)
+            {
+                <colgroup>
+                    <col class="tp-column-title" />
+                    <col class="tp-column-location" />
+                    <col class="tp-column-start" />
+                    <col class="tp-column-end" />
+                    <col class="tp-column-confirmation" />
+                    <col class="tp-column-cost" />
+                </colgroup>
+            }
             <thead>
                 <tr>
                     <th scope="col">Title</th>
@@ -40,49 +78,16 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var leg in Model.Legs)
+                @foreach (var leg in group.Legs)
                 {
+                    @if (!GroupByLeg)
+                    {
                     <tr id="leg-@leg.TripLegId" class="tp-itinerary-leg">
                         <th scope="rowgroup" colspan="@ColumnCount">
-                            @if (CanEdit && TripId != Guid.Empty)
-                            {
-                                <a id="@EditLegActionId(leg.TripLegId)" class="tp-itinerary-leg-title tp-itinerary-title-action" aria-label="Edit leg @leg.Title" href="@EntryPageUrls.LegEdit(TripId, leg.TripLegId, ReturnUrl)">@leg.Title</a>
-                            }
-                            else if (OnEditLeg.HasDelegate)
-                            {
-                                <button id="@EditLegActionId(leg.TripLegId)" type="button" class="tp-itinerary-leg-title tp-itinerary-title-action" aria-label="Edit leg @leg.Title" @onclick="() => OnEditLeg.InvokeAsync(leg.TripLegId)">@leg.Title</button>
-                            }
-                            else
-                            {
-                                <span class="tp-itinerary-leg-title">@leg.Title</span>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(leg.ModeText))
-                            {
-                                <span class="tp-itinerary-leg-mode">@leg.ModeText</span>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(leg.RouteText))
-                            {
-                                <span class="tp-itinerary-leg-route">@leg.RouteText</span>
-                            }
-                            <span class="tp-itinerary-leg-when">@leg.StartText &ndash; @leg.EndText</span>
-                            @if (!string.IsNullOrWhiteSpace(leg.ConfirmationCode))
-                            {
-                                <span class="tp-itinerary-leg-confirmation">Confirmation @leg.ConfirmationCode</span>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(leg.TravelCostText))
-                            {
-                                <span class="tp-itinerary-leg-cost">@leg.TravelCostText</span>
-                            }
-                            @if (leg.CanContainItems && CanEdit && TripId != Guid.Empty)
-                            {
-                                <a id="@AddItemActionId(leg.TripLegId)" class="ttl-leg-add tp-itinerary-row-add" title="Add an item to @leg.Title" aria-label="Add item to @leg.Title" href="@EntryPageUrls.ItemCreate(TripId, leg.TripLegId, returnUrl: ReturnUrl)"><span aria-hidden="true">+</span> Add item</a>
-                            }
-                            else if (leg.CanContainItems && OnAddItem.HasDelegate)
-                            {
-                                <button id="@AddItemActionId(leg.TripLegId)" type="button" class="ttl-leg-add tp-itinerary-row-add" title="Add an item to @leg.Title" aria-label="Add item to @leg.Title" @onclick="() => OnAddItem.InvokeAsync(leg.TripLegId)"><span aria-hidden="true">+</span> Add item</button>
-                            }
+                            @RenderLegSummary(leg)
                         </th>
                     </tr>
+                    }
                     @if (leg.Items.Count == 0)
                     {
                         <tr class="tp-itinerary-leg-empty">
@@ -98,20 +103,27 @@ else
                     }
                 }
 
-                @if (Model.UnassignedItems.Count > 0)
+                @if (group.UnassignedItems.Count > 0)
                 {
+                    @if (!GroupByLeg)
+                    {
                     <tr id="unassigned-items" class="tp-itinerary-leg">
                         <th scope="rowgroup" colspan="@ColumnCount">
                             <span class="tp-itinerary-leg-title">Unassigned</span>
                         </th>
                     </tr>
-                    @foreach (var item in Model.UnassignedItems)
+                    }
+                    @foreach (var item in group.UnassignedItems)
                     {
-                        @RenderItemRow(item)
+                        @RenderItemRow(item, needsLeg: GroupByLeg)
                     }
                 }
             </tbody>
         </table>
+        </div>
+        }
+        </div>
+        }
     </div>
 }
 
@@ -120,23 +132,144 @@ else
     [Parameter] public Guid TripId { get; set; }
     [Parameter] public string? ReturnUrl { get; set; }
     [Parameter] public bool CanEdit { get; set; }
+    [Parameter] public bool GroupByLeg { get; set; }
     [Parameter] public EventCallback<Guid> OnEditLeg { get; set; }
     [Parameter] public EventCallback<Guid> OnEditItem { get; set; }
     [Parameter] public EventCallback OnAddLeg { get; set; }
     [Parameter] public EventCallback<Guid?> OnAddItem { get; set; }
 
     private const int ColumnCount = 6;
+    private readonly HashSet<Guid> _collapsedLegs = [];
+
+    private void ToggleLeg(Guid legId)
+    {
+        if (!_collapsedLegs.Add(legId))
+        {
+            _collapsedLegs.Remove(legId);
+        }
+    }
+
+    private IEnumerable<ItineraryTableModel> TableGroups()
+    {
+        if (!GroupByLeg)
+        {
+            yield return Model;
+            yield break;
+        }
+
+        foreach (var leg in Model.Legs)
+        {
+            yield return new ItineraryTableModel([leg], Array.Empty<ItineraryItemRow>());
+        }
+        if (Model.UnassignedItems.Count > 0)
+        {
+            yield return new ItineraryTableModel(Array.Empty<ItineraryLegRow>(), Model.UnassignedItems);
+        }
+    }
 
     public static string EditLegActionId(Guid tripLegId) => $"tp-table-edit-leg-{tripLegId}";
     public static string EditItemActionId(Guid trackedItemId) => $"tp-table-edit-item-{trackedItemId}";
     public static string AddItemActionId(Guid tripLegId) => $"tp-table-add-item-{tripLegId}";
 
-    private RenderFragment RenderItemRow(ItineraryItemRow item) => __builder =>
+    private RenderFragment RenderLegSummary(ItineraryLegRow leg) => __builder =>
     {
-        <tr id="item-@item.TrackedItemId" class="tp-itinerary-item">
+        @RenderLegTitle(leg)
+        @if (!string.IsNullOrWhiteSpace(leg.ModeText))
+        {
+            <span class="tp-itinerary-leg-mode">@leg.ModeText</span>
+        }
+        @RenderLegDetails(leg)
+        @RenderAddItemAction(leg)
+    };
+
+    private RenderFragment RenderLegHeader(ItineraryLegRow leg, bool expandable, bool expanded, string panelId) => __builder =>
+    {
+        <div class="tp-itinerary-leg-summary @(expandable ? "tp-itinerary-leg-expandable" : null)">
+            <div class="tp-itinerary-leg-heading">
+                <div class="tp-itinerary-leg-identity">
+                    <span class="tp-itinerary-leg-icon" role="img" aria-label="@(string.IsNullOrWhiteSpace(leg.ModeText) ? "Stay" : leg.ModeText)">
+                        <ActionIcon Name="@(string.IsNullOrWhiteSpace(leg.ModeText) ? "map-pin" : leg.ModeText)" />
+                    </span>
+                    @RenderLegTitle(leg)
+                </div>
+                <div class="tp-itinerary-leg-details">
+                    @RenderLegDetails(leg)
+                </div>
+                @if (leg.Items.Count > 0)
+                {
+                    <span class="badge rounded-pill text-bg-secondary tp-itinerary-leg-count">@leg.Items.Count @(leg.Items.Count == 1 ? "item" : "items")</span>
+                }
+                @RenderAddItemAction(leg)
+                @if (expandable)
+                {
+                    <button type="button" class="accordion-button tp-itinerary-leg-toggle @(!expanded ? "collapsed" : null)"
+                            aria-label="Toggle items for @leg.Title" aria-expanded="@expanded.ToString().ToLowerInvariant()"
+                            aria-controls="@panelId" @onclick="() => ToggleLeg(leg.TripLegId)"></button>
+                }
+            </div>
+        </div>
+    };
+
+    private RenderFragment RenderLegTitle(ItineraryLegRow leg) => __builder =>
+    {
+        @if (CanEdit && TripId != Guid.Empty)
+        {
+            <a id="@EditLegActionId(leg.TripLegId)" class="tp-itinerary-leg-title tp-itinerary-title-action" title="Edit travel leg: @leg.Title" aria-label="Edit leg @leg.Title" href="@EntryPageUrls.LegEdit(TripId, leg.TripLegId, ReturnUrl)">@leg.Title</a>
+        }
+        else if (OnEditLeg.HasDelegate)
+        {
+            <button id="@EditLegActionId(leg.TripLegId)" type="button" class="tp-itinerary-leg-title tp-itinerary-title-action" title="Edit travel leg: @leg.Title" aria-label="Edit leg @leg.Title" @onclick="() => OnEditLeg.InvokeAsync(leg.TripLegId)">@leg.Title</button>
+        }
+        else
+        {
+            <span class="tp-itinerary-leg-title">@leg.Title</span>
+        }
+    };
+
+    private RenderFragment RenderLegDetails(ItineraryLegRow leg) => __builder =>
+    {
+        @if (!string.IsNullOrWhiteSpace(leg.RouteText))
+        {
+            <span class="tp-itinerary-leg-route">@leg.RouteText</span>
+        }
+        <span class="tp-itinerary-leg-when">@leg.StartText &ndash; @leg.EndText</span>
+        @if (!string.IsNullOrWhiteSpace(leg.ConfirmationCode))
+        {
+            <span class="tp-itinerary-leg-confirmation">Confirmation @leg.ConfirmationCode</span>
+        }
+        @if (!string.IsNullOrWhiteSpace(leg.TravelCostText))
+        {
+            <span class="tp-itinerary-leg-cost">@leg.TravelCostText</span>
+        }
+    };
+
+    private string AddItemClass => GroupByLeg ? "btn btn-sm btn-link tp-itinerary-row-add" : "ttl-leg-add tp-itinerary-row-add";
+
+    private RenderFragment RenderAddItemAction(ItineraryLegRow leg) => __builder =>
+    {
+        @if (leg.CanContainItems && CanEdit && TripId != Guid.Empty)
+        {
+            <a id="@AddItemActionId(leg.TripLegId)" class="@AddItemClass" title="Add an item to @leg.Title" aria-label="Add item to @leg.Title" href="@EntryPageUrls.ItemCreate(TripId, leg.TripLegId, returnUrl: ReturnUrl)"><ActionIcon Name="add" />@if (!GroupByLeg) { <span>Add item</span> }</a>
+        }
+        else if (leg.CanContainItems && OnAddItem.HasDelegate)
+        {
+            <button id="@AddItemActionId(leg.TripLegId)" type="button" class="@AddItemClass" title="Add an item to @leg.Title" aria-label="Add item to @leg.Title" @onclick="() => OnAddItem.InvokeAsync(leg.TripLegId)"><ActionIcon Name="add" />@if (!GroupByLeg) { <span>Add item</span> }</button>
+        }
+    };
+
+    private RenderFragment RenderItemRow(ItineraryItemRow item, bool needsLeg = false) => __builder =>
+    {
+        <tr id="item-@item.TrackedItemId" class="tp-itinerary-item @(needsLeg ? "tp-itinerary-item-warning" : null)">
             <td>
                 <span class="tp-itinerary-item-title">
-                    <TrackedItemIcon Type="@item.TypeText" Label="@item.TypeText" />
+                    @if (needsLeg)
+                    {
+                        <span class="tp-itinerary-assignment-warning" role="img" aria-label="Travel leg required" title="Assign this item to a travel leg"><ActionIcon Name="warning" /></span>
+                    }
+                    else
+                    {
+                        <TrackedItemIcon Type="@item.TypeText" Label="@item.TypeText" />
+                    }
                     @if (CanEdit && TripId != Guid.Empty)
                     {
                         <a id="@EditItemActionId(item.TrackedItemId)" class="tp-itinerary-title-action" aria-label="Edit item @item.Title" href="@EntryPageUrls.ItemEdit(TripId, item.TrackedItemId, ReturnUrl)">@item.Title</a>

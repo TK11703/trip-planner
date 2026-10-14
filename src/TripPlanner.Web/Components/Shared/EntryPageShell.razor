@@ -16,19 +16,7 @@
     }
     else
     {
-        <header class="entry-page-heading">
-            <div class="entry-page-intro">
-                <span class="entry-page-icon"><ActionIcon Name="@Icon" /></span>
-                <div class="entry-page-copy">
-                    <h1 tabindex="-1">@Title</h1>
-                    @if (!string.IsNullOrWhiteSpace(Context))
-                    {
-                        <p class="entry-page-subtitle">@Context</p>
-                    }
-                </div>
-            </div>
-            @if (Actions is not null){<div class="entry-page-actions">@Actions</div>}
-        </header>
+        <EntryPageHeading Title="@Title" Context="@Context" Icon="@Icon" Actions="@Actions" />
         <div class="card entry-form-card">
             @ChildContent
         </div>

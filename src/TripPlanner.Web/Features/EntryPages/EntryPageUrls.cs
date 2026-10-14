@@ -54,11 +54,12 @@ public static partial class EntryPageUrls
     public static string TripsList(int page = 1, int pageSize = 12)
         => page <= 1 && pageSize == 12 ? Trips : $"{Trips}?page={Math.Clamp(page, 1, 100000)}&pageSize={Math.Clamp(pageSize, 1, 100)}";
 
-    public static string TripDetails(Guid tripId, string? view = null, DateOnly? date = null, string? fragment = null)
+    public static string TripDetails(Guid tripId, string? view = null, DateOnly? date = null, string? fragment = null, string? tab = null)
     {
         var query = new List<string>();
         if (view is "table" or "timeline") query.Add($"view={view}");
         if (date is { } day) query.Add($"date={day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}");
+        if (tab is "overview" or "details") query.Add($"tab={tab}");
         var suffix = query.Count == 0 ? string.Empty : $"?{string.Join('&', query)}";
         var safeFragment = NormalizeTripFragment(fragment);
         return $"/trips/{tripId:D}{suffix}{(safeFragment is null ? string.Empty : $"#{safeFragment}")}";
@@ -112,7 +113,12 @@ public static partial class EntryPageUrls
                 if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)) return fallback;
                 allowed.Add($"date={day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}");
             }
-            if (parsed.Keys.Any(key => key is not ("view" or "date"))) return fallback;
+            if (parsed.TryGetValue("tab", out var tab))
+            {
+                if (tab is not ("overview" or "details")) return fallback;
+                allowed.Add($"tab={tab}");
+            }
+            if (parsed.Keys.Any(key => key is not ("view" or "date" or "tab"))) return fallback;
         }
         else if (parsed.Count != 0) return fallback;
 

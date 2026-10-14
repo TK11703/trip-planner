@@ -23,6 +23,8 @@ public sealed class EntryPageUrlsTests
     [InlineData("/favorites?q=Rome%20%26%20Florence", "/favorites?q=Rome%20%26%20Florence")]
     [InlineData("/trips/8a5c40a8-4901-4f02-b248-947b791ed965?view=timeline&date=2026-07-14#unassigned-items", "/trips/8a5c40a8-4901-4f02-b248-947b791ed965?view=timeline&date=2026-07-14#unassigned-items")]
     [InlineData("/trips/8a5c40a8-4901-4f02-b248-947b791ed965?page=1", "/trips")]
+    [InlineData("/trips/8a5c40a8-4901-4f02-b248-947b791ed965?view=table&tab=overview", "/trips/8a5c40a8-4901-4f02-b248-947b791ed965?view=table&tab=overview")]
+    [InlineData("/trips/8a5c40a8-4901-4f02-b248-947b791ed965?tab=details", "/trips/8a5c40a8-4901-4f02-b248-947b791ed965?tab=details")]
     public void NormalizeReturnUrl_CanonicalizesAllowedPathsAndQuery(string candidate, string expected)
         => Assert.Equal(expected, EntryPageUrls.NormalizeReturnUrl(candidate));
 
@@ -34,6 +36,8 @@ public sealed class EntryPageUrlsTests
     [InlineData("/%252f%252fattacker.example")]
     [InlineData("/trips/8a5c40a8-4901-4f02-b248-947b791ed965?view=timeline&view=table")]
     [InlineData("/trips/8a5c40a8-4901-4f02-b248-947b791ed965?evil=x")]
+    [InlineData("/trips/8a5c40a8-4901-4f02-b248-947b791ed965?tab=invalid")]
+    [InlineData("/trips/8a5c40a8-4901-4f02-b248-947b791ed965?tab=overview&tab=details")]
     [InlineData("/favorites?q=%ZZ")]
     [InlineData("/trips?unknown=x")]
     [InlineData("/trips/new?returnUrl=%2Ftrips")]

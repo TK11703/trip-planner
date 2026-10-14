@@ -34,6 +34,43 @@ tests/
 
 ## Itinerary tables
 
+Trip pages open on **Overview**, with the description (or an explicit
+missing-description message) in an About card aligned to the travel legs' left-column
+width, with Sharing beside it in the right column. Both stack on mobile.
+The travel date range appears as a subtitle beneath the trip title on both tabs,
+without a separate dates widget. Chronological travel legs occupy the left column
+below; Legs and Travel Items, followed by estimated total, occupy the right column.
+Legs and Travel Items widgets include prominent left-aligned leg and item icons
+alongside their content rather than inside their headings. Sharing keeps a small
+share icon in its heading; owners manage access through the title-bar Share action.
+Owners and collaborators can
+select a leg to open its edit page and return to Overview afterward; viewers see
+read-only leg names. Overview legs use compact spacing and labeled travel-mode
+icons instead of text badges, with a map pin for stays. Owners and collaborators can
+add legs from this tab. The title bar keeps the permitted edit, delete, print,
+and sharing actions together as icon-only controls with accessible labels and
+descriptive hover titles.
+
+**Details** contains the Table/Timeline selector and itinerary controls. Table
+view groups each leg into a Bootstrap accordion item, with a compact header row containing
+the leg name, muted travel details, an accessible icon-only Add item action, identical fixed
+column widths, and a separate Unassigned table. Leg headers sit above the column
+headings, and their actions stay visible at narrow widths. Horizontal scrolling stays within the
+itinerary on smaller screens. Item-capable legs start open and can be toggled independently;
+legs that cannot contain items display only a static header, without a table,
+empty-items message, or collapse controls.
+Leg headers begin with a travel-mode icon (a map pin for stays) and the leg title,
+without visible mode text. After the travel details, nonempty legs show an item-count
+badge followed by the add-item action. Clicking the header background toggles
+its accordion; leg-edit and add-item links remain separate actions. Leg links have
+descriptive hover titles identifying their edit action.
+Unassigned-item warnings appear only in Details, not Overview. In table view the
+Unassigned header and its item rows use warning colors, and each unassigned item
+has a labeled warning icon in place of its usual item icon.
+Timeline and printable output retain their
+existing layouts. Tab, format, and timeline date are preserved when returning
+from an entry page; existing `?view=table` and `?view=timeline` links open Details.
+
 The trip details table and printable itinerary display each item's type as its
 associated icon immediately before the item title, with no separate Type column.
 Icons include an accessible type name (for example, Reservation or Activity) and

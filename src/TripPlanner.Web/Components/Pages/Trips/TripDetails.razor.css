@@ -1,0 +1,18 @@
+.trip-detail-tabs .nav-link { min-height: 44px; padding: .75rem 1.5rem; font-weight: 600; }
+.trip-stat { border-top: 3px solid var(--tp-brand); background: linear-gradient(135deg, var(--tp-brand-soft), var(--tp-surface)); }
+.trip-icon-widget { --trip-widget-icon-width: clamp(1.75rem, 3vw, 3rem); position: relative; padding-inline-start: calc(var(--trip-widget-icon-width) + .5rem); }
+.trip-widget-icon { position: absolute; inset-block: 1rem; inset-inline-start: .75rem; width: var(--trip-widget-icon-width); color: var(--tp-brand); display: flex; align-items: flex-start; }
+.trip-widget-icon ::deep svg { width: 100%; height: auto; max-height: 100%; }
+.trip-icon-widget .card-body { min-width: 0; }
+.trip-overview { min-width: 0; }
+.trip-overview .card-body { overflow-wrap: anywhere; }
+.trip-overview ::deep .btn { min-height: 44px; display: inline-flex; align-items: center; }
+.trip-leg-list .card { border-inline-start: 4px solid var(--tp-brand); }
+.trip-leg-list .card-body { padding-block: .5rem; }
+.trip-leg-list a { display: inline-flex; align-items: center; min-height: 44px; padding-block: .25rem; text-underline-offset: .2em; }
+.trip-leg-mode { display: inline-flex; align-items: center; font-size: 1.25rem; }
+@media (max-width: 575.98px) {
+    .trip-detail-tabs .nav-link { flex: 1; text-align: center; }
+}
+.trip-header-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; }
+.trip-header-actions .btn { width: 44px; height: 44px; padding: .5rem; }
