@@ -213,13 +213,30 @@ public class TripLegFormTests : BunitContext
     [InlineData(TransportationModes.Train)]
     [InlineData(TransportationModes.Bus)]
     [InlineData(TransportationModes.Boat)]
-    public void RestrictedMode_WarnsThatItemsBelongElsewhere(string mode)
+    public void RestrictedMode_ShowsBlueInfoRowImmediatelyAfterTravelMode(string mode)
     {
         var cut = RenderCreate();
 
         cut.Find($"#leg-mode-{mode}").Change(mode);
 
-        Assert.NotNull(cut.Find("[data-testid=leg-item-restriction]"));
+        var notice = Assert.Single(cut.FindAll("[data-testid=leg-item-restriction]"));
+        Assert.Same(cut.Find("#leg-transportation-mode").Closest(".row")!.NextElementSibling, notice);
+        Assert.Contains("alert-primary", notice.ClassList);
+        Assert.DoesNotContain("alert-warning", notice.ClassList);
+        Assert.Contains("mb-3", notice.ClassList);
+        Assert.Equal("note", notice.GetAttribute("role"));
+        var icon = notice.FirstElementChild!;
+        Assert.Equal("svg", icon.LocalName);
+        Assert.Equal("true", icon.GetAttribute("aria-hidden"));
+        Assert.Contains("flex-shrink-0", icon.ClassList);
+        Assert.Equal("You're a passenger on this leg, so you can't schedule stops along the way. Items belong on a stay or a car leg.", notice.TextContent.Trim());
+
+        cut.Find($"#leg-mode-{TransportationModes.Car}").Change(TransportationModes.Car);
+        Assert.Empty(cut.FindAll("[data-testid=leg-item-restriction]"));
+
+        cut.Find($"#leg-mode-{mode}").Change(mode);
+        cut.Find("#leg-kind-stay").Change("Stay");
+        Assert.Empty(cut.FindAll("[data-testid=leg-item-restriction]"));
     }
 
     [Fact]

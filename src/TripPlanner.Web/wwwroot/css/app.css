@@ -1283,6 +1283,7 @@ body {
 .tp-itinerary-grouped .tp-column-confirmation { width: 14%; }
 .tp-itinerary-grouped .tp-column-cost { width: 10%; }
 .tp-itinerary-grouped .tp-itinerary-table thead th {
+    background: color-mix(in srgb, var(--tp-brand) 16%, var(--tp-surface-raised));
     min-width: 0;
     padding: .8rem;
     font-size: .75rem;
@@ -1353,7 +1354,10 @@ body {
     .tp-itinerary-grouped .tp-itinerary-leg-heading { flex-wrap: wrap; }
     .tp-itinerary-grouped .tp-itinerary-leg-details { flex-basis: 100%; }
 }
-.tp-itinerary-grouped .tp-itinerary-item:nth-child(odd) { background: var(--tp-surface-raised); }
+.tp-itinerary-grouped .tp-itinerary-item { background: var(--tp-surface-raised); }
+.tp-itinerary-grouped .tp-itinerary-item:nth-child(odd) {
+    background: color-mix(in srgb, var(--tp-surface-raised) 97%, var(--tp-text));
+}
 .tp-itinerary-grouped .tp-itinerary-item:hover { background: var(--tp-brand-soft); }
 .tp-itinerary-grouped .tp-itinerary-unassigned-header,
 .tp-itinerary-grouped .tp-itinerary-item-warning,

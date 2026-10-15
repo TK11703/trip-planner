@@ -48,6 +48,13 @@
             </div>
         }
     </div>
+    @if (_model.Kind == LegKind.Travel && TransportationModes.IsValid(_model.TransportationMode) && !_model.CanContainItems)
+    {
+        <div class="alert alert-primary d-flex align-items-center gap-2 py-2 px-3 mb-3 small" role="note" data-testid="leg-item-restriction">
+            <ActionIcon Name="info" CssClass="flex-shrink-0" />
+            <span>You're a passenger on this leg, so you can't schedule stops along the way. Items belong on a stay or a car leg.</span>
+        </div>
+    }
     @if (_model.Kind == LegKind.Travel)
     {
         <div class="row gx-2 gy-3 mb-3">
@@ -124,12 +131,6 @@
         <label class="form-label">Notes</label>
         <InputTextArea class="form-control" rows="2" @bind-Value="_model.Notes" />
     </div>
-    @if (_model.Kind == LegKind.Travel && TransportationModes.IsValid(_model.TransportationMode) && !_model.CanContainItems)
-    {
-        <div class="alert alert-warning py-2 small mb-0" role="note" data-testid="leg-item-restriction">
-            You're a passenger on this leg, so you can't schedule stops along the way. Items belong on a stay or a car leg.
-        </div>
-    }
     </div>
     <div class="card-footer entry-form-footer">
         @if (!string.IsNullOrWhiteSpace(_error))

@@ -123,7 +123,7 @@
             {
                 <div class="alert alert-primary d-flex align-items-center gap-2 py-2 px-3 mb-3 small" id="item-leg-window-hint" role="note">
                     <ActionIcon Name="info" CssClass="flex-shrink-0" />
-                    <span>Must fall within the @LegNameForHint leg's date range of @LegWindowHint()</span>
+                    <span>Must fall within the <span class="badge text-bg-primary text-wrap">@SelectedLeg.Title</span> date range of <span class="badge text-bg-primary text-wrap">@LegWindowHint()</span>.</span>
                 </div>
             }
             <div class="row gx-2 gy-3 mb-3">
@@ -391,22 +391,6 @@
 
     private string LegWindowHint()
         => $"{FormatBound(_model.LegStartUtc, _model.StartTimeZoneId)} – {FormatBound(_model.LegEndUtc, EndTimeZoneId)}";
-
-    private string LegNameForHint
-    {
-        get
-        {
-            var title = SelectedLeg?.Title.Trim();
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                return "selected";
-            }
-
-            return title.Length > 4 && title.EndsWith(" leg", StringComparison.OrdinalIgnoreCase)
-                ? title[..^4]
-                : title;
-        }
-    }
 
     private static DateTimeOffset? ToInstant(DateTime local, string? timeZoneId)
     {

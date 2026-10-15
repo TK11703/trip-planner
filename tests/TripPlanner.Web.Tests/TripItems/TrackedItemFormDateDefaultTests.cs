@@ -88,14 +88,17 @@ public class TrackedItemFormDateDefaultTests : BunitContext
         Assert.Contains("mb-3", cut.Find("#item-start").Closest(".row")!.ClassList);
     }
 
-    [Fact]
-    public void ScheduleCard_GroupsBothRowsWithSingleLegWindowHintAndNoHeaderOrFooter()
+    [Theory]
+    [InlineData("Main leg", false)]
+    [InlineData("Paris", true)]
+    public void ScheduleCard_GroupsBothRowsWithSingleLegWindowHintAndNoHeaderOrFooter(string title, bool isEdit)
     {
-        var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0));
+        var leg = TrackedItemFormTestData.Leg(new DateTime(2026, 9, 1, 8, 0, 0), new DateTime(2026, 9, 10, 18, 0, 0), title: title);
         var cut = Render<TrackedItemForm>(p => p
             .Add(x => x.TripId, leg.TripId)
             .Add(x => x.Legs, new[] { leg })
-            .Add(x => x.InitialTripLegId, leg.TripLegId));
+            .Add(x => x.InitialTripLegId, leg.TripLegId)
+            .Add(x => x.Item, isEdit ? TrackedItemFormTestData.Item(leg.TripLegId, leg.StartLocal, leg.EndLocal) : null));
 
         var card = cut.Find("#item-schedule.card.bg-body-tertiary");
         Assert.Equal("group", card.GetAttribute("role"));
@@ -114,8 +117,12 @@ public class TrackedItemFormDateDefaultTests : BunitContext
         Assert.Equal("currentColor", icon.GetAttribute("fill"));
         Assert.Contains("flex-shrink-0", icon.ClassList);
         Assert.Single(cut.FindAll("#item-leg-window-hint"));
-        Assert.Equal(1, cut.Markup.Split("Must fall within the Main leg's date range of ").Length - 1);
-        Assert.StartsWith("Must fall within the Main leg's date range of ", hint.TextContent.Trim());
+        var badges = hint.QuerySelectorAll(".badge.text-bg-primary.text-wrap");
+        Assert.Equal(2, badges.Length);
+        Assert.Equal(title, badges[0].TextContent);
+        var dateRange = $"{leg.StartLocal:g} – {leg.EndLocal:g}";
+        Assert.Equal(dateRange, badges[1].TextContent);
+        Assert.Equal($"Must fall within the {title} date range of {dateRange}.", hint.TextContent.Trim());
     }
 
     [Fact]

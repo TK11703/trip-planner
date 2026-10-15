@@ -62,6 +62,31 @@ public class TripDetailsTableViewTests : BunitContext
     }
 
     [Fact]
+    public void OverviewEndsRightColumnWithPlanningTipLinkingToDetails()
+    {
+        var cut = RenderDetails("timeline", new DateOnly(2026, 7, 16), tab: "overview");
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".trip-overview")));
+
+        var tip = cut.Find("#trip-details-tip.card.modern-card");
+        var rightColumn = tip.ParentElement!;
+        Assert.Contains("col-lg-4", rightColumn.ClassList);
+        Assert.Equal(tip.Id, rightColumn.LastElementChild!.Id);
+        Assert.Equal("Trip dashboard", tip.PreviousElementSibling!.GetAttribute("aria-label"));
+        Assert.NotNull(tip.QuerySelector(".card-body.planning-tip"));
+        var badge = tip.QuerySelector(".planning-tip-badge")!;
+        Assert.Equal("true", badge.GetAttribute("aria-hidden"));
+        Assert.Equal("🗂️", badge.TextContent);
+        Assert.Equal("There's more to explore", tip.QuerySelector("h2")!.TextContent);
+        Assert.Equal("See more information about this trip in the Details tab.", tip.QuerySelector("p")!.TextContent);
+        var link = tip.QuerySelector("a")!;
+        var detailsTab = cut.FindAll("[aria-label='Trip sections'] a").Single(a => a.TextContent == "Details");
+        Assert.Equal(detailsTab.GetAttribute("href"), link.GetAttribute("href"));
+        Assert.Contains("view=timeline", link.GetAttribute("href"), StringComparison.Ordinal);
+        Assert.Contains("date=2026-07-16", link.GetAttribute("href"), StringComparison.Ordinal);
+        Assert.Contains("tab=details", link.GetAttribute("href"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OverviewDashboardUsesLargeIconsAndSharingKeepsSmallHeaderIcon()
     {
         var cut = RenderDetails(view: null);
@@ -214,6 +239,7 @@ public class TripDetailsTableViewTests : BunitContext
         var cut = RenderDetails(view: null, tab: "details");
         cut.WaitForAssertion(() => Assert.Equal(3, cut.FindAll("table.tp-itinerary-table").Count));
         Assert.Empty(cut.FindAll(".trip-overview"));
+        Assert.Empty(cut.FindAll("#trip-details-tip"));
         Assert.NotNull(cut.Find("[aria-label='Trip details'] [aria-label='Itinerary view']"));
         Assert.All(cut.FindAll("table"), table => Assert.Equal(6, table.QuerySelectorAll("col").Length));
     }
