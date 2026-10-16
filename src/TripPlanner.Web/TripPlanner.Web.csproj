@@ -24,4 +24,15 @@
     <ContainerRepository>web</ContainerRepository>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(CssOnlyWatch)' == 'true'">
+    <CustomCollectWatchItems>$(CustomCollectWatchItems);CollectCssWatchItems</CustomCollectWatchItems>
+  </PropertyGroup>
+
+  <Target Name="CollectCssWatchItems" Condition="'$(CssOnlyWatch)' == 'true'">
+    <ItemGroup>
+      <Watch Remove="@(Watch)" />
+      <Watch Include="Components\**\*.razor.css;wwwroot\**\*.css" />
+    </ItemGroup>
+  </Target>
+
 </Project>

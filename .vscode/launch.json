@@ -1,0 +1,38 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Aspire AppHost (https)",
+            "type": "aspire",
+            "request": "launch",
+            "preLaunchTask": "watch (CSS only)",
+            "program": "${workspaceFolder}\\src\\TripPlanner.AppHost\\TripPlanner.AppHost.csproj",
+            "launchProfile": "https",
+            "dashboardBrowser": "openExternalBrowser"
+        },
+        {
+            "name": "Aspire AppHost (http)",
+            "type": "aspire",
+            "request": "launch",
+            "preLaunchTask": "watch (CSS only)",
+            "program": "${workspaceFolder}\\src\\TripPlanner.AppHost\\TripPlanner.AppHost.csproj",
+            "launchProfile": "http",
+            "dashboardBrowser": "openExternalBrowser"
+        },
+        {
+            "name": "Attach to .NET process",
+            "type": "coreclr",
+            "request": "attach"
+        },
+        {
+            "name": "Launch Edge against Web app",
+            "type": "msedge",
+            "request": "launch",
+            "url": "https://localhost:7203",
+            "webRoot": "${workspaceFolder}/src/TripPlanner.Web"
+        }
+    ]
+}

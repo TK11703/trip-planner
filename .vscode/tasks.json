@@ -1,0 +1,97 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "detail": "Builds the solution so the debugger has up-to-date binaries.",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/TripPlanner.slnx",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "watch (CSS only)",
+      "detail": "Rebuilds the Web isolated CSS bundle on CSS saves without restarting any application processes.",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "--no-hot-reload",
+        "--project",
+        "${workspaceFolder}\\src\\TripPlanner.Web\\TripPlanner.Web.csproj",
+        "build",
+        "--target:BundleScopedCssFiles",
+        "--property:Configuration=Debug",
+        "--nologo"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "DOTNET_WATCH_SUPPRESS_EMOJIS": "1",
+          "CssOnlyWatch": "true"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "base": "$msCompile",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^dotnet watch .*Started",
+          "endsPattern": "^dotnet watch .*Waiting for a file to change"
+        }
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "watch (Aspire hot reload)",
+      "detail": "Runs the Aspire AppHost under dotnet watch so C# Hot Reload is applied across the AppHost, API, and Web projects.",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "--non-interactive",
+        "--project",
+        "${workspaceFolder}/src/TripPlanner.AppHost/TripPlanner.AppHost.csproj"
+      ],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "dotnet-watch",
+        "pattern": {
+          "regexp": "^\\s*(.*)\\((\\d+),(\\d+)\\):\\s+(error|warning)\\s+(\\w+):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^\\s*dotnet watch.*(Started|Building|Restarting)",
+          "endsPattern": "^\\s*(dotnet watch.*Hot reload|.*Distributed application started|.*Now listening on|.*Application started)"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ]
+}

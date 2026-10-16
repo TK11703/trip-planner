@@ -117,6 +117,44 @@ dotnet run --project src/TripPlanner.AppHost
 
 The Aspire dashboard prints the URLs for the Web app and API.
 
+### VS Code debugging and Hot Reload
+
+Install the **Aspire** (`microsoft-aspire.aspire-vscode`) and **C# Dev Kit**
+(`ms-dotnettools.csdevkit`) extensions. In VS Code **User** settings, enable
+**C# > Experimental > Debug: Hot Reload**
+(`csharp.experimental.debug.hotReload`) and leave
+**C# > Debug: Hot Reload On Save** (`csharp.debug.hotReloadOnSave`) enabled.
+These are machine-scoped settings, not workspace settings.
+
+Select **Aspire AppHost (https)** in Run and Debug and press **F5**. The native
+Aspire debugger builds and starts the AppHost, attaches debuggers to the API and
+Web project resources, and opens the dashboard. **Aspire AppHost (http)** uses the
+same workflow with the AppHost's HTTP profile.
+
+Save supported C# or Razor edits to apply Hot Reload, or use the debugger's
+**Hot Reload** action (**Ctrl+Shift+Enter** on Windows). Check **Output > .NET
+Hot Reload** for results. Not all edits can be hot reloaded; restart the affected
+resource, or stop and press F5 again for startup or AppHost composition changes.
+Blazor UI changes may require a browser refresh.
+
+Both F5 profiles also start **watch (CSS only)**. It watches the Web project's
+`Components/**/*.razor.css` and `wwwroot/**/*.css` files and runs only the
+`BundleScopedCssFiles` build target on CSS changes. It does not compile C#,
+restart application processes, or interfere with debugger-managed Razor/C# Hot
+Reload. Watcher build errors appear in its task terminal and the Problems panel.
+
+After saving CSS, refresh the browser to load the updated styles (**Ctrl+F5**
+if the browser still has cached CSS). This task rebuilds styles; it does not
+automatically refresh the browser.
+
+The watcher stays running between debug sessions and is reused by subsequent F5
+launches. To stop it, use **Tasks: Terminate Task** and select **watch (CSS only)**;
+the next F5 launch starts it again. To start it for an already-running app, use
+**Tasks: Run Task > watch (CSS only)**.
+
+Do not run the separate **watch (Aspire hot reload)** task at the same time as
+the F5 session; it is an alternative terminal-based workflow.
+
 ## Database
 
 Schema scripts in `src/TripPlanner.Database/Scripts/Schema/` are applied on startup

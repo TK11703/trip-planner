@@ -61,7 +61,9 @@ nunit-*.xml
 Thumbs.db
 *.tmp
 *.swp
-.vscode/
+**/.vscode/*
+!/.vscode/launch.json
+!/.vscode/tasks.json
 .idea/
 *.user
 *.suo
