@@ -1,3 +1,5 @@
+using Dapper;
+using Npgsql;
 using TripPlanner.Contracts.Notifications;
 using TripPlanner.Contracts.Profile;
 using TripPlanner.Database.Sql;
@@ -22,10 +24,14 @@ namespace TripPlanner.Database.Tests.UserProfiles;
 public class UserProfileRepositoryTests
 {
     private readonly UserProfileRepository _profiles;
+    private readonly string _connectionString;
 
     public UserProfileRepositoryTests(PostgresFixture fixture)
-        => _profiles = new UserProfileRepository(
+    {
+        _connectionString = fixture.ConnectionString;
+        _profiles = new UserProfileRepository(
             new StubConnectionFactory(fixture.ConnectionString), new SqlFileProvider());
+    }
 
     private static string NewUser() => $"user-{Guid.NewGuid():N}";
 
@@ -40,7 +46,7 @@ public class UserProfileRepositoryTests
         NotificationPreferences? notifications = null) =>
         new(firstName, lastName, displayName, email, timeZoneId, mapProvider,
             notifications ?? NotificationPreferences.Default,
-            personalization ?? new PersonalizationPreferences(null, null, null, null));
+            personalization ?? new PersonalizationPreferences());
 
     // ---- Seeding from sign-in claims ----
 
@@ -137,33 +143,57 @@ public class UserProfileRepositoryTests
     // ---- Personalization ----
 
     [Fact]
-    public async Task UpdateAsync_PersistsAndClearsPersonalizationPreferences()
+    public async Task RemoveUnusedProfileFields_DropsRetiredColumnsAndPreservesUserAndColors()
     {
-        var userId = NewUser();
-        await _profiles.EnsureFromAuthenticatedUserAsync(userId, null, null, null, null, DateTimeOffset.UtcNow);
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await connection.ExecuteAsync("""
+            CREATE TEMP TABLE users (
+                user_id text PRIMARY KEY,
+                display_name text,
+                item_type_colors jsonb,
+                travel_interests text,
+                home_airport text,
+                preferred_travel_style text,
+                accessibility_notes text,
+                personalization_updated_at_utc timestamptz
+            ) ON COMMIT DROP;
+            INSERT INTO users (
+                user_id, display_name, item_type_colors, travel_interests, home_airport,
+                preferred_travel_style, accessibility_notes, personalization_updated_at_utc)
+            VALUES (
+                @UserId, @DisplayName, CAST(@Colors AS jsonb), @Interests, @Airport,
+                @Style, @Notes, @Now);
+            """, new
+        {
+            UserId = "migration-user",
+            DisplayName = "Traveler",
+            Colors = """{"activity":"purple"}""",
+            Interests = "Museums",
+            Airport = "SEA",
+            Style = "Slow",
+            Notes = "Quiet rooms",
+            Now = DateTimeOffset.UtcNow
+        }, transaction);
 
-        await _profiles.UpdateAsync(
-            userId,
-            Update(personalization: new PersonalizationPreferences("Hiking", "SEA", "Slow", "Step-free routes")),
-            DateTimeOffset.UtcNow);
+        await connection.ExecuteAsync(
+            new SqlFileProvider().Get("Schema/025_remove_unused_profile_fields.sql"), transaction: transaction);
 
-        var saved = await _profiles.GetAsync(userId);
-        Assert.Equal("Hiking", saved!.PersonalizationPreferences.TravelInterests);
-        Assert.Equal("SEA", saved.PersonalizationPreferences.HomeAirport);
-        Assert.Equal("Slow", saved.PersonalizationPreferences.PreferredTravelStyle);
-        Assert.Equal("Step-free routes", saved.PersonalizationPreferences.AccessibilityNotes);
-
-        // Clearing is a decision the traveler is entitled to make, and it has to stick.
-        await _profiles.UpdateAsync(
-            userId,
-            Update(personalization: new PersonalizationPreferences(null, "   ", null, null)),
-            DateTimeOffset.UtcNow.AddMinutes(1));
-
-        var cleared = await _profiles.GetAsync(userId);
-        Assert.Null(cleared!.PersonalizationPreferences.TravelInterests);
-        Assert.Null(cleared.PersonalizationPreferences.HomeAirport);
-        Assert.Null(cleared.PersonalizationPreferences.PreferredTravelStyle);
-        Assert.Null(cleared.PersonalizationPreferences.AccessibilityNotes);
+        var columns = await connection.QueryAsync<string>("""
+            SELECT attname
+            FROM pg_attribute
+            WHERE attrelid = 'pg_temp.users'::regclass AND attnum > 0 AND NOT attisdropped
+            ORDER BY attname;
+            """, transaction: transaction);
+        Assert.Equal(["display_name", "item_type_colors", "user_id"], columns);
+        Assert.Equal("Traveler", await connection.QuerySingleAsync<string>(
+            "SELECT display_name FROM users WHERE user_id = @UserId;",
+            new { UserId = "migration-user" }, transaction));
+        Assert.Equal("purple", await connection.QuerySingleAsync<string>(
+            "SELECT item_type_colors ->> 'activity' FROM users WHERE user_id = @UserId;",
+            new { UserId = "migration-user" }, transaction));
+        await transaction.CommitAsync();
     }
 
     // ---- Notification preferences ----
@@ -178,7 +208,7 @@ public class UserProfileRepositoryTests
         await _profiles.EnsureFromAuthenticatedUserAsync(theirs, null, null, null, null, now);
         Assert.Empty((await _profiles.GetAsync(mine))!.PersonalizationPreferences.ItemTypeColors!);
 
-        await _profiles.UpdateAsync(mine, Update(personalization: new(null, null, null, null,
+        await _profiles.UpdateAsync(mine, Update(personalization: new(
             new Dictionary<string, string> { ["Activity"] = "PURPLE", ["event"] = "teal" })), now);
         var saved = await _profiles.GetAsync(mine);
         Assert.Equal("purple", saved!.PersonalizationPreferences.ItemTypeColors!["activity"]);
@@ -190,7 +220,7 @@ public class UserProfileRepositoryTests
         await _profiles.UpdateAsync(mine, Update(), now.AddMinutes(2));
         Assert.Equal("purple", (await _profiles.GetAsync(mine))!.PersonalizationPreferences.GetItemColor("activity"));
 
-        await _profiles.UpdateAsync(mine, Update(personalization: new(null, null, null, null,
+        await _profiles.UpdateAsync(mine, Update(personalization: new(
             new Dictionary<string, string>())), now.AddMinutes(3));
         var cleared = await _profiles.GetAsync(mine);
         Assert.Empty(cleared!.PersonalizationPreferences.ItemTypeColors!);

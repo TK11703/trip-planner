@@ -27,7 +27,7 @@ public class UpdateProfileNotificationTests
                 new NotificationCategoryPreference(NotificationCategories.ItineraryChanges, "Itinerary changes", true, false),
                 new NotificationCategoryPreference(NotificationCategories.TripSharing, "Trip sharing", false, false)
             }),
-            new PersonalizationPreferences(null, null, null, null)));
+            new PersonalizationPreferences()));
 
         response.EnsureSuccessStatusCode();
         var profile = await response.Content.ReadFromJsonAsync<UserProfileResponse>();
@@ -57,7 +57,7 @@ public class UpdateProfileNotificationTests
             {
                 new NotificationCategoryPreference(NotificationCategories.ItineraryChanges, "Itinerary changes", true, true)
             }),
-            new PersonalizationPreferences(null, null, null, null)));
+            new PersonalizationPreferences()));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiError>();

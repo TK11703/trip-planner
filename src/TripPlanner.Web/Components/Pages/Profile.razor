@@ -102,36 +102,11 @@ else if (_model is not null)
                     @foreach (var preference in _model.ItemTypeColors)
                     {
                         <div class="col-12 col-md-6">
-                            <label class="form-label" for="@($"color-{preference.ItemType}")">@preference.DisplayName</label>
-                            <InputSelect id="@($"color-{preference.ItemType}")" class="form-select" @bind-Value="preference.Color">
-                                <option value="">No preference (@TrackedItemColors.All[0])</option>
-                                @foreach (var color in TrackedItemColors.All)
-                                {
-                                    <option value="@color">@color</option>
-                                }
-                            </InputSelect>
+                            <ItemColorSelect Id="@($"color-{preference.ItemType}")" Label="@preference.DisplayName" AllowNoPreference="true" @bind-Value="preference.Color" />
                         </div>
                     }
                 </div>
             </fieldset>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label" for="travelInterests">Travel interests</label>
-                    <InputText id="travelInterests" class="form-control" @bind-Value="_model.TravelInterests" />
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label" for="homeAirport">Home airport</label>
-                    <InputText id="homeAirport" class="form-control" @bind-Value="_model.HomeAirport" />
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label" for="preferredTravelStyle">Preferred travel style</label>
-                    <InputText id="preferredTravelStyle" class="form-control" @bind-Value="_model.PreferredTravelStyle" />
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label" for="accessibilityNotes">Accessibility notes</label>
-                    <InputText id="accessibilityNotes" class="form-control" @bind-Value="_model.AccessibilityNotes" />
-                </div>
-            </div>
         </div>
 
         <div class="card-footer entry-form-footer">
@@ -192,7 +167,7 @@ else if (_model is not null)
                     new NotificationPreferences(_model.NotificationCategories
                         .Select(c => new NotificationCategoryPreference(c.Category, c.DisplayName, c.InAppEnabled, c.EmailEnabled))
                         .ToArray()),
-                    new PersonalizationPreferences(_model.TravelInterests, _model.HomeAirport, _model.PreferredTravelStyle, _model.AccessibilityNotes,
+                    new PersonalizationPreferences(
                         _model.ItemTypeColors.Where(preference => !string.IsNullOrEmpty(preference.Color))
                             .ToDictionary(preference => preference.ItemType, preference => preference.Color)));
 
@@ -226,10 +201,6 @@ else if (_model is not null)
                     EmailEnabled = c.EmailEnabled
                 })
                 .ToList(),
-            TravelInterests = profile.PersonalizationPreferences.TravelInterests,
-            HomeAirport = profile.PersonalizationPreferences.HomeAirport,
-            PreferredTravelStyle = profile.PersonalizationPreferences.PreferredTravelStyle,
-            AccessibilityNotes = profile.PersonalizationPreferences.AccessibilityNotes,
             ItemTypeColors = new[] { TrackedItemTypes.Activity, TrackedItemTypes.Reservation, TrackedItemTypes.Event, TrackedItemTypes.Reminder }
                 .Select(type => new ItemTypeColorModel
                 {
@@ -271,10 +242,6 @@ else if (_model is not null)
         public string TimeZoneId { get; set; } = "UTC";
         public string MapProvider { get; set; } = MapProviders.Bing;
         public List<CategoryPreferenceModel> NotificationCategories { get; set; } = new();
-        public string? TravelInterests { get; set; }
-        public string? HomeAirport { get; set; }
-        public string? PreferredTravelStyle { get; set; }
-        public string? AccessibilityNotes { get; set; }
         public List<ItemTypeColorModel> ItemTypeColors { get; set; } = new();
     }
 

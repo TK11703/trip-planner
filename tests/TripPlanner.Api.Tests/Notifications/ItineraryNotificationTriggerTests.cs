@@ -159,7 +159,7 @@ public class ItineraryNotificationTriggerTests
 
             var profile = new UserProfileResponse(
                 _ownerId, "Owner", "One", "Owner One", _ownerEmail, "UTC", MapProviders.Bing, true,
-                NotificationPreferences.Default, new PersonalizationPreferences(null, null, null, null),
+                NotificationPreferences.Default, new PersonalizationPreferences(),
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
             return Task.FromResult<UserProfileResponse?>(profile);
         }

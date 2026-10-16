@@ -39,7 +39,7 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
             MapProviders.Bing,
             IsComplete: !string.IsNullOrWhiteSpace(displayName ?? BuildDisplayName(firstName, lastName)) && !string.IsNullOrWhiteSpace(email),
             NotificationPreferences.Default,
-            new PersonalizationPreferences(null, null, null, null),
+            new PersonalizationPreferences(),
             nowUtc,
             nowUtc,
             nowUtc);
@@ -66,10 +66,6 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
             IsComplete = !string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(request.Email),
             NotificationPreferences = MergePreferences(request.NotificationPreferences, nowUtc),
             PersonalizationPreferences = new PersonalizationPreferences(
-                Normalize(request.PersonalizationPreferences.TravelInterests),
-                Normalize(request.PersonalizationPreferences.HomeAirport),
-                Normalize(request.PersonalizationPreferences.PreferredTravelStyle),
-                Normalize(request.PersonalizationPreferences.AccessibilityNotes),
                 request.PersonalizationPreferences.ItemTypeColors is { } colors
                     ? colors.ToDictionary(pair => pair.Key.ToLowerInvariant(), pair => pair.Value.ToLowerInvariant())
                     : existing.PersonalizationPreferences.ItemTypeColors),

@@ -189,7 +189,7 @@ public sealed class EntryPageLifecycleTests : BunitContext
         Services.AddSingleton<TripPlanner.Web.Features.Trips.ITripApiClient>(api);
         Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider>(new StubMapPreferenceProvider());
         Services.AddSingleton<IProfileApiClient>(new RecordingProfileApiClient(ProfileTestData.CompleteProfile(
-            personalization: new(null, null, null, null, new Dictionary<string, string> { ["activity"] = "purple" }))));
+            personalization: new(new Dictionary<string, string> { ["activity"] = "purple" }))));
         Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
         Services.AddSingleton<IFavoriteDestinationApiClient>(new RecordingFavoriteDestinationApiClient());
         return trip;

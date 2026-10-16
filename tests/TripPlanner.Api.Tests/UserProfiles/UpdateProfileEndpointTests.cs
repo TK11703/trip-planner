@@ -21,7 +21,7 @@ public class UpdateProfileEndpointTests
             "UTC",
             MapProviders.Bing,
             NotificationPreferences.Default,
-            new PersonalizationPreferences(null, null, null, null)));
+            new PersonalizationPreferences()));
 
         client.AddProfileTestUserHeaders(TestUsers.UserB, "B User", "B", "User", "b@example.test");
         var other = await client.GetFromJsonAsync<UserProfileResponse>("/api/profile");
@@ -45,7 +45,7 @@ public class UpdateProfileEndpointTests
             "UTC",
             MapProviders.Bing,
             NotificationPreferences.Default,
-            new PersonalizationPreferences(null, null, null, null)));
+            new PersonalizationPreferences()));
         valid.EnsureSuccessStatusCode();
 
         var invalid = await client.PutAsJsonAsync("/api/profile", new UpdateUserProfileRequest(
@@ -56,7 +56,7 @@ public class UpdateProfileEndpointTests
             "UTC",
             MapProviders.Bing,
             NotificationPreferences.Default,
-            new PersonalizationPreferences(null, null, null, null)));
+            new PersonalizationPreferences()));
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
 
         var current = await client.GetFromJsonAsync<UserProfileResponse>("/api/profile");

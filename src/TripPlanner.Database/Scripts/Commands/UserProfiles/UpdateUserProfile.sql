@@ -7,12 +7,7 @@ SET
     time_zone_id = @TimeZoneId,
     map_provider = @MapProvider,
     notification_updated_at_utc = @NowUtc,
-    travel_interests = @TravelInterests,
-    home_airport = @HomeAirport,
-    preferred_travel_style = @PreferredTravelStyle,
-    accessibility_notes = @AccessibilityNotes,
     item_type_colors = COALESCE(CAST(@ItemTypeColors AS jsonb), item_type_colors),
-    personalization_updated_at_utc = @NowUtc,
     last_seen_at_utc = @NowUtc
 WHERE user_id = @UserId
 RETURNING
@@ -23,10 +18,6 @@ RETURNING
     email AS Email,
     time_zone_id AS TimeZoneId,
     map_provider AS MapProvider,
-    travel_interests AS TravelInterests,
-    home_airport AS HomeAirport,
-    preferred_travel_style AS PreferredTravelStyle,
-    accessibility_notes AS AccessibilityNotes,
     item_type_colors::text AS ItemTypeColors,
     created_at_utc AS CreatedAtUtc,
     updated_at_utc AS UpdatedAtUtc,

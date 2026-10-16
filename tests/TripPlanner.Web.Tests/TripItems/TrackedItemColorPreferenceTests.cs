@@ -18,7 +18,7 @@ public class TrackedItemColorPreferenceTests : BunitContext
         Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
     }
 
-    private static PersonalizationPreferences Preferences => new(null, null, null, null,
+    private static PersonalizationPreferences Preferences => new(
         new Dictionary<string, string> { ["activity"] = "purple", ["reservation"] = "teal", ["event"] = "gold" });
 
     [Fact]

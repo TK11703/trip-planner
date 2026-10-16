@@ -68,7 +68,7 @@ internal static class ProfileTestData
             MapProviders.Bing,
             true,
             notifications ?? NotificationPreferences.Default,
-            personalization ?? new PersonalizationPreferences(null, null, null, null),
+            personalization ?? new PersonalizationPreferences(),
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow);

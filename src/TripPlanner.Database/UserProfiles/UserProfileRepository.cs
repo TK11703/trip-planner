@@ -79,10 +79,6 @@ public sealed class UserProfileRepository : IUserProfileRepository
             Email = Normalize(request.Email),
             TimeZoneId = request.TimeZoneId.Trim(),
             MapProvider = MapProviders.Normalize(request.MapProvider),
-            TravelInterests = Normalize(request.PersonalizationPreferences.TravelInterests),
-            HomeAirport = Normalize(request.PersonalizationPreferences.HomeAirport),
-            PreferredTravelStyle = Normalize(request.PersonalizationPreferences.PreferredTravelStyle),
-            AccessibilityNotes = Normalize(request.PersonalizationPreferences.AccessibilityNotes),
             ItemTypeColors = request.PersonalizationPreferences.ItemTypeColors is { } colors
                 ? JsonSerializer.Serialize(colors.ToDictionary(pair => pair.Key.ToLowerInvariant(), pair => pair.Value.ToLowerInvariant()))
                 : null,
@@ -180,10 +176,6 @@ public sealed class UserProfileRepository : IUserProfileRepository
         string? Email,
         string TimeZoneId,
         string MapProvider,
-        string? TravelInterests,
-        string? HomeAirport,
-        string? PreferredTravelStyle,
-        string? AccessibilityNotes,
         string ItemTypeColors,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset UpdatedAtUtc,
@@ -199,7 +191,7 @@ public sealed class UserProfileRepository : IUserProfileRepository
             MapProviders.Normalize(MapProvider),
             IsComplete: !string.IsNullOrWhiteSpace(DisplayName) && !string.IsNullOrWhiteSpace(Email),
             notificationPreferences,
-            new PersonalizationPreferences(TravelInterests, HomeAirport, PreferredTravelStyle, AccessibilityNotes,
+            new PersonalizationPreferences(
                 JsonSerializer.Deserialize<Dictionary<string, string>>(ItemTypeColors)
                     ?? throw new JsonException("Item type colors must be an object.")),
             CreatedAtUtc,

@@ -14,6 +14,7 @@ public class ProfileEditTests : BunitContext
     [Fact]
     public void ProfilePage_SavesEditedIdentityAndPreferenceValues()
     {
+        JSInterop.Mode = JSRuntimeMode.Loose;
         var client = new RecordingProfileApiClient(ProfileTestData.CompleteProfile());
         Services.AddSingleton<IProfileApiClient>(client);
         Services.AddSingleton<ITimezoneOptionsProvider, TimezoneOptionsProvider>();
@@ -31,7 +32,8 @@ public class ProfileEditTests : BunitContext
         Assert.Equal("Save", saveButton.TextContent.Trim());
         cut.Find("#displayName").Change("Avery Updated");
         cut.Find("#notif-TripSharing-email").Change(false);
-        cut.Find("#travelInterests").Change("food markets");
+        cut.Find("#color-activity").Click();
+        cut.Find("#color-activity + .item-color-options [data-color='teal']").Click();
         cut.Find("form").Submit();
 
         cut.WaitForAssertion(() => Assert.Contains("Profile saved.", cut.Markup));
@@ -39,6 +41,6 @@ public class ProfileEditTests : BunitContext
         Assert.Equal("Avery Updated", client.LastRequest!.DisplayName);
         Assert.Equal("UTC", client.LastRequest.TimeZoneId);
         Assert.False(client.LastRequest.NotificationPreferences.Find("TripSharing")!.EmailEnabled);
-        Assert.Equal("food markets", client.LastRequest.PersonalizationPreferences.TravelInterests);
+        Assert.Equal("teal", client.LastRequest.PersonalizationPreferences.ItemTypeColors!["activity"]);
     }
 }

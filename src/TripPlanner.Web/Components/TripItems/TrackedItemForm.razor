@@ -57,22 +57,7 @@
             </div>
         </div>
         <div class="col-12 col-md-3">
-            <label id="item-color-label" class="form-label" for="item-color">Color</label>
-            <details class="item-color-dropdown" open="@_colorOpen" @onkeydown="OnColorKeyDown">
-                <summary @ref="_colorSummary" id="item-color" class="form-select d-flex align-items-center gap-2" aria-labelledby="item-color-label item-color-name" @onclick="() => _colorOpen = !_colorOpen" @onclick:preventDefault="true">
-                    <span class="item-color-preview" style="background-color: @SwatchColor(_model.DisplayColor)" aria-hidden="true"></span>
-                    <span id="item-color-name">@_model.DisplayColor</span>
-                </summary>
-                <div class="item-color-options shadow-sm" role="group" aria-label="Item colors">
-                    @foreach (var color in TrackedItemColors.All)
-                    {
-                        <button type="button" class="item-color-option" aria-pressed="@(string.Equals(_model.DisplayColor, color, StringComparison.OrdinalIgnoreCase) ? "true" : "false")" @onclick="() => SelectColorAsync(color)">
-                            <span class="item-color-preview" style="background-color: @SwatchColor(color)" aria-hidden="true"></span>
-                            <span>@color</span>
-                        </button>
-                    }
-                </div>
-            </details>
+            <ItemColorSelect Id="item-color" @bind-Value="_model.DisplayColor" />
         </div>
     </div>
     <div class="mb-3 position-relative">
@@ -247,32 +232,9 @@
 
 @code {
     [Parameter] public PersonalizationPreferences? Personalization { get; set; }
-    [CascadingParameter] private EntryNavigationGuard? NavigationGuard { get; set; }
-    private bool _colorOpen;
-    private ElementReference _colorSummary;
 
     private void OnTypeChanged()
         => _model.DisplayColor = Personalization?.GetItemColor(_model.ItemType) ?? TrackedItemColors.All[0];
-
-    private async Task SelectColorAsync(string color)
-    {
-        _model.DisplayColor = color;
-        _colorOpen = false;
-        await _colorSummary.FocusAsync();
-        if (NavigationGuard is not null)
-        {
-            await NavigationGuard.MarkDirtyAsync();
-        }
-    }
-
-    private async Task OnColorKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape")
-        {
-            _colorOpen = false;
-            await _colorSummary.FocusAsync();
-        }
-    }
 
     private sealed class ItemModel : IValidatableObject
     {
@@ -568,27 +530,6 @@
         _placeCts?.Cancel();
         _placeCts?.Dispose();
     }
-
-    private static string SwatchColor(string color) => color.ToLowerInvariant() switch
-    {
-        "slate" => "#64748b",
-        "teal" => "#0d9488",
-        "blue" => "#2563eb",
-        "green" => "#2f7d57",
-        "gold" => "#e7b85d",
-        "orange" => "#c96f34",
-        "red" => "#b42318",
-        "purple" => "#7c3aed",
-        "pink" => "#ec4899",
-        "indigo" => "#4f46e5",
-        "cyan" => "#06b6d4",
-        "lime" => "#84cc16",
-        "amber" => "#f59e0b",
-        "brown" => "#92400e",
-        "magenta" => "#c026d3",
-        "navy" => "#1e3a8a",
-        _ => "#64748b"
-    };
 
     protected override async Task OnInitializedAsync()
     {

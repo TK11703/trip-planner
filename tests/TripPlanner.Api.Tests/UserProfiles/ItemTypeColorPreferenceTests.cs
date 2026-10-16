@@ -8,7 +8,7 @@ public class ItemTypeColorPreferenceTests
 {
     private static UpdateUserProfileRequest Request(IReadOnlyDictionary<string, string>? colors) =>
         new("Avery", "Traveler", "Avery", "avery@example.test", "UTC", MapProviders.Bing,
-            NotificationPreferences.Default, new(null, null, null, null, colors));
+            NotificationPreferences.Default, new(colors));
 
     [Fact]
     public async Task Preferences_RoundTrip_AreUserSpecific_AndCanBeCleared()

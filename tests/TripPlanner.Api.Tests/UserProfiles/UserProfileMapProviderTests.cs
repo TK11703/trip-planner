@@ -16,7 +16,7 @@ public class UserProfileMapProviderTests
             "UTC",
             mapProvider,
             NotificationPreferences.Default,
-            new PersonalizationPreferences(null, null, null, null));
+            new PersonalizationPreferences());
 
     [Fact]
     public async Task NewProfile_DefaultsToBing()

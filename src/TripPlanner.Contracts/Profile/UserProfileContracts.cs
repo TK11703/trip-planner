@@ -82,10 +82,6 @@ public static class NotificationPreferenceSource
 }
 
 public sealed record PersonalizationPreferences(
-    string? TravelInterests,
-    string? HomeAirport,
-    string? PreferredTravelStyle,
-    string? AccessibilityNotes,
     IReadOnlyDictionary<string, string>? ItemTypeColors = null)
 {
     public string GetItemColor(string itemType)

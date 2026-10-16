@@ -80,7 +80,7 @@ public sealed class ConfirmDraftAsLegTests : IDisposable
         _factory.Profiles.Profiles[EmailIngestionApiFactory.TravelerUserId] = new(
             EmailIngestionApiFactory.TravelerUserId, null, null, "Traveler", EmailIngestionApiFactory.TravelerEmail,
             "UTC", Contracts.Profile.MapProviders.Bing, true, Contracts.Profile.NotificationPreferences.Default,
-            new(null, null, null, null, new Dictionary<string, string> { ["reservation"] = "purple" }),
+            new(new Dictionary<string, string> { ["reservation"] = "purple" }),
             now, now, now);
 
         var response = await CreateTravelerClient().PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", null);
