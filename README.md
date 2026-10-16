@@ -36,7 +36,13 @@ tests/
 
 Trips, Profile, Favorites, Notifications, and Inbox (review and history) use the
 same responsive, icon-led title banner as trip details. Trips keeps its New trip
-action in the banner; Notifications and Inbox keep their refresh and related
+action in the banner. The shared Aurora header uses a deep teal gradient,
+a circular page icon, larger light-colored titles, and muted subtitles.
+Header actions use pale mint for the primary action, translucent secondary
+controls, and a distinct rose delete icon, with visible keyboard focus and
+44-pixel minimum targets. The same header works in light and dark themes, wraps
+actions on small screens, and respects forced-colors accessibility settings.
+Notifications and Inbox keep their refresh and related
 actions there. Notifications and Inbox use icon-only action controls with
 explanatory hover titles and screen-reader labels. Existing page descriptions,
 forms, and favorites actions remain available.

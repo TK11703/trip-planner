@@ -26,6 +26,7 @@ public sealed class EntryPageLifecycleTests : BunitContext
             .AddChildContent("<form id='entry-form'><div class='card-body'></div><div class='card-footer'></div></form>"));
 
         Assert.Equal("Entry", cut.Find(".entry-page-shell > header.entry-page-heading h1").TextContent);
+        Assert.Equal("-1", cut.Find("h1").GetAttribute("tabindex"));
         Assert.Equal("Plan your trip.", cut.Find(".entry-page-subtitle").TextContent);
         Assert.Equal("trip", cut.FindComponent<ActionIcon>().Instance.Name);
         Assert.Equal("true", cut.Find(".entry-page-icon svg").GetAttribute("aria-hidden"));
@@ -33,6 +34,24 @@ public sealed class EntryPageLifecycleTests : BunitContext
         Assert.Empty(cut.FindAll(".entry-form-card > .card-header"));
         Assert.NotNull(cut.Find(".entry-form-card > form > .card-body"));
         Assert.NotNull(cut.Find(".entry-form-card > form > .card-footer"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void HeadingWithoutContextOrActionsKeepsItsTitleAndDecorativeIcon(string? context)
+    {
+        var cut = Render<EntryPageHeading>(parameters => parameters
+            .Add(component => component.Title, "Profile")
+            .Add(component => component.Context, context)
+            .Add(component => component.Icon, "profile"));
+
+        Assert.Equal("Profile", Assert.Single(cut.FindAll("h1")).TextContent);
+        Assert.Equal("-1", cut.Find("h1").GetAttribute("tabindex"));
+        Assert.Equal("true", cut.Find(".entry-page-icon svg").GetAttribute("aria-hidden"));
+        Assert.Equal("false", cut.Find(".entry-page-icon svg").GetAttribute("focusable"));
+        Assert.Empty(cut.FindAll(".entry-page-subtitle, .entry-page-actions"));
     }
 
     [Theory]
