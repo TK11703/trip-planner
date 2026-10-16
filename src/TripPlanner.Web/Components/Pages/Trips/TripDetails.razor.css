@@ -7,11 +7,26 @@
 .trip-overview { min-width: 0; }
 .trip-overview .card-body { overflow-wrap: anywhere; }
 .trip-overview ::deep .btn { display: inline-flex; align-items: center; }
-.trip-leg-list .card { border-inline-start: 4px solid var(--tp-brand); }
-.trip-leg-list .card-body { padding-block: .5rem; }
-.trip-leg-list a { display: inline-flex; align-items: center; min-height: 44px; padding-block: .25rem; text-underline-offset: .2em; }
-.trip-leg-mode { display: inline-flex; align-items: center; font-size: 1.25rem; }
+.trip-leg-list { --trip-leg-icon-size: 4.5rem; --trip-leg-axis: calc(var(--trip-leg-icon-size) / 2); --trip-leg-spine: calc(var(--trip-leg-icon-size) + 1.75rem); --trip-leg-content-start: calc(var(--trip-leg-spine) + 1.25rem); margin: 0; padding: 0; }
+.trip-leg-entry { position: relative; min-width: 0; min-height: var(--trip-leg-icon-size); padding-inline-start: var(--trip-leg-content-start); padding-block-end: 1.75rem; }
+.trip-leg-entry::before { content: ""; position: absolute; inset-inline-start: calc(var(--trip-leg-spine) - 1px); inset-block: 0; width: 2px; background: var(--tp-muted); }
+.trip-leg-entry::after { content: ""; position: absolute; inset-inline-start: var(--trip-leg-icon-size); inset-block-start: calc(var(--trip-leg-axis) - 1px); width: calc(var(--trip-leg-content-start) - var(--trip-leg-icon-size)); height: 2px; background: var(--tp-brand); }
+.trip-leg-entry:last-child { padding-block-end: 0; }
+.trip-leg-entry:last-child::before { inset-block-end: auto; height: var(--trip-leg-axis); }
+.trip-leg-marker { position: absolute; z-index: 1; inset-inline-start: calc(var(--trip-leg-spine) - .4375rem); inset-block-start: calc(var(--trip-leg-axis) - .4375rem); width: .875rem; height: .875rem; border: 3px solid var(--bs-body-bg); border-radius: 50%; background: var(--tp-brand); }
+.trip-leg-content { position: relative; min-width: 0; min-height: var(--trip-leg-icon-size); padding: 0 1rem .75rem; border-block-end: 2px solid var(--tp-brand); overflow-wrap: anywhere; }
+.trip-leg-content::before { content: ""; position: absolute; inset-inline-start: 0; inset-block-start: var(--trip-leg-axis); inset-block-end: -2px; width: 2px; background: var(--tp-brand); }
+.trip-leg-heading { min-width: 0; }
+.trip-leg-title { min-width: 0; min-height: 44px; }
+.trip-leg-title h3 { min-width: 0; }
+.trip-leg-list a { display: inline-flex; align-items: center; min-height: 44px; padding-block: .25rem; text-decoration: none; text-underline-offset: .2em; }
+.trip-leg-list a:hover, .trip-leg-list a:focus-visible { text-decoration: underline; }
+.trip-leg-mode { position: absolute; inset-inline-start: 0; inset-block-start: 0; display: flex; align-items: center; justify-content: center; width: var(--trip-leg-icon-size); height: var(--trip-leg-icon-size); border: 2px solid var(--tp-brand); border-radius: 50%; background: var(--tp-brand-soft); box-shadow: inset 0 0 0 .375rem var(--bs-body-bg); color: var(--tp-brand-strong); }
+.trip-leg-mode ::deep svg { width: 2rem; height: 2rem; }
 @media (max-width: 575.98px) {
+    .trip-leg-list { --trip-leg-icon-size: 3.25rem; --trip-leg-spine: calc(var(--trip-leg-icon-size) + 1rem); --trip-leg-content-start: calc(var(--trip-leg-spine) + .75rem); }
+    .trip-leg-content { padding-inline: .75rem 0; }
+    .trip-leg-mode ::deep svg { width: 1.5rem; height: 1.5rem; }
     .trip-detail-tabs .nav-link { flex: 1; text-align: center; }
 }
 .trip-header-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; }

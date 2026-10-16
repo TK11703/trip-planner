@@ -5,6 +5,7 @@ using TripPlanner.Web.Components.Pages.Trips;
 using TripPlanner.Web.Components.Timeline;
 using TripPlanner.Web.Components.Trips;
 using TripPlanner.Web.Features.Timezones;
+using TripPlanner.Web.Features.Trips;
 using TripPlanner.Web.Tests.Infrastructure;
 using TripPlanner.Web.Tests.TripItems;
 using Xunit;
@@ -127,13 +128,67 @@ public class TripDetailsTableViewTests : BunitContext
         foreach (var leg in legs)
         {
             var icon = leg.QuerySelector(".trip-leg-mode")!;
+            Assert.Equal(leg.Id, icon.ParentElement!.Id);
             Assert.Equal("img", icon.GetAttribute("role"));
             Assert.Equal(icon.GetAttribute("aria-label"), icon.GetAttribute("title"));
             Assert.NotNull(icon.QuerySelector("svg"));
             Assert.True(string.IsNullOrWhiteSpace(icon.TextContent));
             Assert.Null(leg.QuerySelector(".badge"));
-            Assert.Contains("mb-1", leg.QuerySelector("h3")!.ParentElement!.ClassList);
+            Assert.Contains("mb-1", leg.QuerySelector("h3")!.Closest(".trip-leg-heading")!.ClassList);
         }
+    }
+
+    [Fact]
+    public void OverviewLegTimelineUsesDecorativeMarkersAndRetainsEachLegsInformation()
+    {
+        var trip = TripFixtures.Representative();
+        var cut = RenderDetails(view: null, tripOverride: trip);
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".trip-leg-list")));
+
+        var list = cut.Find("ol.trip-leg-list[role='list']");
+        var expected = TripPrintFormatting.BuildItineraryTable(trip).Legs;
+        Assert.Equal(expected.Select(leg => $"leg-{leg.TripLegId}"),
+            list.Children.Select(entry => entry.Id));
+        Assert.Empty(list.QuerySelectorAll(".card, .card-body"));
+        foreach (var leg in expected)
+        {
+            var entry = cut.Find($"#leg-{leg.TripLegId}.trip-leg-entry");
+            var marker = Assert.Single(entry.QuerySelectorAll(":scope > .trip-leg-marker"));
+            Assert.Equal("true", marker.GetAttribute("aria-hidden"));
+            Assert.Empty(marker.QuerySelectorAll("a, button, [tabindex]"));
+            var content = entry.QuerySelector(":scope > .trip-leg-content")!;
+            Assert.Null(content.QuerySelector(".trip-leg-mode"));
+            Assert.Equal(leg.Title, content.QuerySelector("h3")!.TextContent.Trim());
+            Assert.Equal($"{leg.StartText} \u2013 {leg.EndText}", content.QuerySelector(".trip-leg-dates")!.TextContent);
+            Assert.Equal(!string.IsNullOrWhiteSpace(leg.RouteText), content.QuerySelector("p.fw-semibold") is not null);
+            if (!string.IsNullOrWhiteSpace(leg.RouteText))
+                Assert.Equal(leg.RouteText, content.QuerySelector("p.fw-semibold")!.TextContent);
+        }
+    }
+
+    [Theory]
+    [InlineData(null, "Stay")]
+    [InlineData("car", "Car")]
+    [InlineData("flight", "Flight")]
+    [InlineData("train", "Train")]
+    [InlineData("bus", "Bus")]
+    [InlineData("boat", "Boat")]
+    public void OverviewTimelineShowsTheCorrectModeInTheLeftIcon(string? mode, string label)
+    {
+        var trip = mode is null ? TripFixtures.WithStayLeg() : TripFixtures.WithTravelLeg(mode);
+        var cut = RenderDetails(view: null, tripOverride: trip);
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".trip-leg-entry")));
+
+        var entry = cut.Find(".trip-leg-entry");
+        var icon = entry.QuerySelector(":scope > .trip-leg-mode")!;
+        Assert.Equal(label, icon.GetAttribute("aria-label"));
+        Assert.Equal(label, icon.GetAttribute("title"));
+        var expected = Render<TripPlanner.Web.Components.Shared.ActionIcon>(
+            parameters => parameters.Add(component => component.Name, mode ?? "map-pin"));
+        Assert.Equal(expected.Find("svg").InnerHtml, icon.QuerySelector("svg")!.InnerHtml);
+        Assert.Equal("trip-leg-mode", entry.FirstElementChild!.ClassName);
+        Assert.NotNull(entry.QuerySelector(":scope > .trip-leg-content h3"));
+        Assert.NotNull(entry.QuerySelector(":scope > .trip-leg-content .trip-leg-dates"));
     }
 
     [Fact]

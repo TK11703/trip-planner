@@ -74,6 +74,13 @@ adds the nullable draft amount.
 
 ## Itinerary tables
 
+The Overview tab presents travel legs as a vertical timeline with large,
+theme-aware travel-mode or stay icons on the left. Each icon connects through a
+central timeline dot to the leg's details on the right, with an accent border
+beneath the details. Names, dates/timezones, and routes stay grouped together;
+icon sizes and spacing adapt on mobile. Routes, chronological ordering, and permission-aware
+edit links are unchanged. The Details tab's table and day timeline are unaffected.
+
 Trip pages open on **Overview**, with the description (or an explicit
 missing-description message) in an About card aligned to the travel legs' left-column
 width, with Sharing beside it in the right column. Both stack on mobile.
