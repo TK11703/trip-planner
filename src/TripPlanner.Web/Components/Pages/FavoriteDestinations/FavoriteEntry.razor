@@ -33,6 +33,7 @@
 @code {
     private bool _isDirty;
     private bool _isSubmitting;
+    private bool _returnAfterSuccess;
     private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
     private Task SetSubmitting(bool value) { _isSubmitting = value; return Task.CompletedTask; }
     [Parameter] public Guid? FavoriteId { get; set; }
@@ -80,7 +81,7 @@
                 if (!result.Succeeded) { _error = result.ErrorMessage ?? "The favorite destination could not be saved."; return; }
                 _isDirty = false;
                 _isSubmitting = false;
-                Nav.NavigateTo(Destination);
+                _returnAfterSuccess = true;
             }, message => _error = message);
         }
         finally { _saving = false; _isSubmitting = false; }
@@ -98,7 +99,7 @@
                 if (!result.Succeeded) { _error = result.ErrorMessage ?? "The favorite destination could not be updated."; return; }
                 _isDirty = false;
                 _isSubmitting = false;
-                Nav.NavigateTo(Destination);
+                _returnAfterSuccess = true;
             }, message => _error = message);
         }
         finally { _saving = false; _isSubmitting = false; }
@@ -123,11 +124,19 @@
                 {
                     _isDirty = false;
                     _isSubmitting = false;
-                    Nav.NavigateTo(Destination);
+                    _returnAfterSuccess = true;
                 }
                 else _error = "The favorite could not be removed. Refresh and try again.";
             }, message => _error = message);
         }
         finally { _saving = false; _isSubmitting = false; }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!_returnAfterSuccess) return;
+        _returnAfterSuccess = false;
+        // Apply the clean guard state before navigating after a save or deletion.
+        Nav.NavigateTo(Destination);
     }
 }

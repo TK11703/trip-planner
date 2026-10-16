@@ -249,6 +249,8 @@ internal sealed class RecordingFavoriteDestinationApiClient : IFavoriteDestinati
     public int CreateCallCount { get; private set; }
     public string? CreateErrorMessage { get; init; }
     public CreateFavoriteDestinationRequest? LastCreateRequest { get; private set; }
+    public Func<Guid, UpdateFavoriteDestinationRequest, Task<FavoriteDestinationMutationResult>>? UpdateHandler { get; set; }
+    public Func<Guid, Task<bool>>? DeleteHandler { get; set; }
 
     public Task<IReadOnlyList<FavoriteDestinationDto>> GetAsync(string? search = null, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<FavoriteDestinationDto>>(_favorites);
@@ -274,10 +276,10 @@ internal sealed class RecordingFavoriteDestinationApiClient : IFavoriteDestinati
     }
 
     public Task<FavoriteDestinationMutationResult> UpdateAsync(Guid id, UpdateFavoriteDestinationRequest request, CancellationToken ct = default)
-        => throw new NotSupportedException();
+        => UpdateHandler?.Invoke(id, request) ?? throw new NotSupportedException();
 
     public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
-        => throw new NotSupportedException();
+        => DeleteHandler?.Invoke(id) ?? throw new NotSupportedException();
 
     public Task<int?> DeleteManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
         => throw new NotSupportedException();

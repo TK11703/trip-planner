@@ -48,6 +48,7 @@ Expected: correct data and parent context in the new tab; no dependency on old-t
 3. From timeline mode on a non-first day, open Add item from both a leg slot and the generic add action in a new tab. Verify same leg/start defaults as the legacy behavior; Save/Cancel returns to timeline on that day.
 4. Attempt an item placement on an ineligible leg and a leg from another trip; verify recoverable validation without silently changing parent or bypassing server rules.
 5. Double-tap Save with a delayed response. Check one active mutation from the page and no duplicate resulting record. Do not assume this proves deduplication across two different tabs.
+6. From the Details tab, edit a leg or item, change a field, then confirm deletion. Repeat with an unchanged form and with delayed API responses. Verify a successful delete returns to the trip with Details selected and the original view/date preserved, without an unsaved-changes prompt. Repeat with Save. A rejected delete must stay on the form with its error and allow retry.
 
 Expected: successful writes reload their parent data; rejected writes preserve all user-entered values and inline errors. Trip-list pagination, favorite search and trip view/date are restored when carried in a valid returnUrl.
 

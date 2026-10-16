@@ -17,6 +17,7 @@
 @code {
     private bool _isDirty;
     private bool _isSubmitting;
+    private string? _pendingDestination;
     private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
     [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
     private TripPlanner.Web.Components.Trips.TripForm.TripFormModel _model = new();
@@ -33,8 +34,16 @@
             var created = await TripApi.CreateAsync(request);
             _isDirty = false;
             _isSubmitting = false;
-            Nav.NavigateTo(HasExplicitReturn ? Destination : $"/trips/{created.TripId:D}");
+            _pendingDestination = HasExplicitReturn ? Destination : $"/trips/{created.TripId:D}";
         }
         finally { _isSubmitting = false; }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_pendingDestination is not { } destination) return;
+        _pendingDestination = null;
+        // Apply the clean guard state before navigating after a save.
+        Nav.NavigateTo(destination);
     }
 }

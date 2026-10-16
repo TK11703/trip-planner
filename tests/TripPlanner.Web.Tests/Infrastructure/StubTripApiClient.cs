@@ -31,6 +31,10 @@ public sealed class StubTripApiClient : ITripApiClient
     /// </summary>
     public Exception? DetailFailure { get; set; }
 
+    public Func<Task>? LegMutation { get; set; }
+    public Func<Task>? ItemMutation { get; set; }
+    public Func<Task<CreateTripResponse>>? TripMutation { get; set; }
+
     public Task<TripListResponse> GetTripsAsync(int page = 1, int pageSize = 12, CancellationToken ct = default) => Task.FromResult(new TripListResponse(_recent, page, pageSize, _recent.Count));
     public Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default) => RecentFailure is null
         ? Task.FromResult(_recent)
@@ -38,16 +42,16 @@ public sealed class StubTripApiClient : ITripApiClient
     public Task<TripDetail?> GetDetailAsync(Guid tripId, CancellationToken ct = default) => DetailFailure is not null
         ? Task.FromException<TripDetail?>(DetailFailure)
         : Task.FromResult(Details.TryGetValue(tripId, out var detail) ? detail : null);
-    public Task<CreateTripResponse> CreateAsync(CreateTripRequest request, CancellationToken ct = default) => throw new NotSupportedException();
-    public Task<CreateTripResponse> UpdateAsync(Guid tripId, UpdateTripRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<CreateTripResponse> CreateAsync(CreateTripRequest request, CancellationToken ct = default) => TripMutation?.Invoke() ?? throw new NotSupportedException();
+    public Task<CreateTripResponse> UpdateAsync(Guid tripId, UpdateTripRequest request, CancellationToken ct = default) => TripMutation?.Invoke() ?? throw new NotSupportedException();
     public Task DeleteTripAsync(Guid tripId, CancellationToken ct = default) => throw new NotSupportedException();
     public Task CreateLegAsync(Guid tripId, CreateTripLegRequest request, CancellationToken ct = default) => throw new NotSupportedException();
-    public Task UpdateLegAsync(Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct = default) => throw new NotSupportedException();
-    public Task DeleteLegAsync(Guid tripId, Guid tripLegId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task UpdateLegAsync(Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct = default) => LegMutation?.Invoke() ?? throw new NotSupportedException();
+    public Task DeleteLegAsync(Guid tripId, Guid tripLegId, CancellationToken ct = default) => LegMutation?.Invoke() ?? throw new NotSupportedException();
     public Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult<TripLegDefaultsResponse?>(null);
     public Task CreateItemAsync(Guid tripId, CreateTrackedItemRequest request, CancellationToken ct = default) => throw new NotSupportedException();
-    public Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default) => throw new NotSupportedException();
-    public Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default) => ItemMutation?.Invoke() ?? throw new NotSupportedException();
+    public Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default) => ItemMutation?.Invoke() ?? throw new NotSupportedException();
     public Task<TripTimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult<TripTimelineResponse?>(null);
     public Task<IReadOnlyList<TripShareMember>> GetSharesAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<TripShareMember>>(Array.Empty<TripShareMember>());
     public Task<IReadOnlyList<DirectoryUserResult>> SearchDirectoryUsersAsync(Guid tripId, string query, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DirectoryUserResult>>(Array.Empty<DirectoryUserResult>());

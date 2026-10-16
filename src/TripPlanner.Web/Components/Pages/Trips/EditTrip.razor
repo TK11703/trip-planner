@@ -27,6 +27,7 @@
 @code {
     private bool _isDirty;
     private bool _isSubmitting;
+    private bool _returnAfterSuccess;
     private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
     [Parameter] public Guid TripId { get; set; }
     [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
@@ -62,8 +63,16 @@
             await TripApi.UpdateAsync(TripId, new UpdateTripRequest(model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), DateOnly.FromDateTime(model.StartDate), DateOnly.FromDateTime(model.EndDate)));
             _isDirty = false;
             _isSubmitting = false;
-            Nav.NavigateTo(Destination);
+            _returnAfterSuccess = true;
         }
         finally { _isSubmitting = false; }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!_returnAfterSuccess) return;
+        _returnAfterSuccess = false;
+        // Apply the clean guard state before navigating after a save.
+        Nav.NavigateTo(Destination);
     }
 }

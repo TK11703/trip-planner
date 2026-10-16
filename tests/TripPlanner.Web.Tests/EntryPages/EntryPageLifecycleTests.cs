@@ -11,6 +11,8 @@ using TripPlanner.Web.Tests.TripItems;
 using TripPlanner.Web.Features.Timezones;
 using TripPlanner.Web.Features.FavoriteDestinations;
 using TripPlanner.Web.Tests.FavoriteDestinations;
+using TripPlanner.Contracts.FavoriteDestinations;
+using TripPlanner.Web.Components.Pages.FavoriteDestinations;
 
 namespace TripPlanner.Web.Tests.EntryPages;
 
@@ -186,6 +188,206 @@ public sealed class EntryPageLifecycleTests : BunitContext
         Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
         Services.AddSingleton<IFavoriteDestinationApiClient>(new RecordingFavoriteDestinationApiClient());
         return trip;
+    }
+
+    [Theory]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, true, true, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(true, true, false, true)]
+    [InlineData(true, true, true, true)]
+    [InlineData(true, false, false, true)]
+    [InlineData(true, false, true, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, true, true, true)]
+    [InlineData(false, false, false, true)]
+    [InlineData(false, false, true, true)]
+    public async Task SuccessfulLegOrItemMutation_ReturnsAfterGuardIsClean(bool isLeg, bool delete, bool delayed, bool dirty)
+    {
+        var trip = RegisterTrip();
+        var api = (StubTripApiClient)Services.GetRequiredService<TripPlanner.Web.Features.Trips.ITripApiClient>();
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        Task Mutate()
+        {
+            calls++;
+            return delayed ? completion.Task : Task.CompletedTask;
+        }
+        api.LegMutation = Mutate;
+        api.ItemMutation = Mutate;
+        var nav = Services.GetRequiredService<NavigationManager>();
+        var destination = EntryPageUrls.TripDetails(trip.TripId, "timeline", new DateOnly(2026, 7, 16), tab: "details");
+        var entryUrl = isLeg
+            ? EntryPageUrls.LegEdit(trip.TripId, trip.Legs[0].TripLegId, destination)
+            : EntryPageUrls.ItemEdit(trip.TripId, trip.TrackedItems[0].TrackedItemId, destination);
+        nav.NavigateTo(entryUrl);
+        var originalUri = nav.Uri;
+        IRenderedComponent<IComponent> cut = isLeg
+            ? Render<TripLegEntry>(parameters => parameters.Add(page => page.TripId, trip.TripId).Add(page => page.LegId, trip.Legs[0].TripLegId))
+            : Render<TrackedItemEntry>(parameters => parameters.Add(page => page.TripId, trip.TripId).Add(page => page.ItemId, trip.TrackedItems[0].TrackedItemId));
+        var prefix = isLeg ? "leg" : "item";
+        var guard = cut.FindComponent<EntryNavigationGuard>().Instance;
+        if (dirty) await cut.InvokeAsync(guard.MarkDirtyAsync);
+        Assert.Equal(dirty, guard.HasUnsavedChanges);
+        if (delete) cut.Find($"#{prefix}-delete").Click();
+
+        var mutation = delete
+            ? cut.Find($"#{prefix}-delete-confirm").ClickAsync(new())
+            : cut.Find("form").SubmitAsync();
+        if (delayed)
+        {
+            cut.WaitForAssertion(() => Assert.True(guard.IsSubmitting));
+            await cut.InvokeAsync(() => nav.NavigateTo("/trips"));
+            Assert.Equal(originalUri, nav.Uri);
+            Assert.False(await guard.CanNavigateAwayAsync());
+            completion.SetResult();
+        }
+        await mutation;
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal(nav.ToAbsoluteUri(destination).AbsoluteUri, nav.Uri);
+            Assert.False(guard.HasUnsavedChanges);
+            Assert.False(guard.IsSubmitting);
+        });
+        Assert.Equal(1, calls);
+        Assert.DoesNotContain(JSInterop.Invocations, invocation => invocation.Identifier == "confirm");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task FailedLegOrItemDeletion_PreservesDirtyGuardAndAllowsRetry(bool isLeg)
+    {
+        var trip = RegisterTrip();
+        var api = (StubTripApiClient)Services.GetRequiredService<TripPlanner.Web.Features.Trips.ITripApiClient>();
+        Task Refuse() => Task.FromException(new InvalidOperationException("Delete refused."));
+        api.LegMutation = Refuse;
+        api.ItemMutation = Refuse;
+        var nav = Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo(isLeg
+            ? EntryPageUrls.LegEdit(trip.TripId, trip.Legs[0].TripLegId)
+            : EntryPageUrls.ItemEdit(trip.TripId, trip.TrackedItems[0].TrackedItemId));
+        var originalUri = nav.Uri;
+        IRenderedComponent<IComponent> cut = isLeg
+            ? Render<TripLegEntry>(parameters => parameters.Add(page => page.TripId, trip.TripId).Add(page => page.LegId, trip.Legs[0].TripLegId))
+            : Render<TrackedItemEntry>(parameters => parameters.Add(page => page.TripId, trip.TripId).Add(page => page.ItemId, trip.TrackedItems[0].TrackedItemId));
+        var guard = cut.FindComponent<EntryNavigationGuard>().Instance;
+        await cut.InvokeAsync(guard.MarkDirtyAsync);
+        var prefix = isLeg ? "leg" : "item";
+        cut.Find($"#{prefix}-delete").Click();
+        cut.Find(".modal .btn-outline-secondary").Click();
+        Assert.Empty(cut.FindAll(".modal"));
+        Assert.True(guard.HasUnsavedChanges);
+        Assert.Equal(originalUri, nav.Uri);
+
+        cut.Find($"#{prefix}-delete").Click();
+        await cut.Find($"#{prefix}-delete-confirm").ClickAsync(new());
+
+        Assert.Contains("Delete refused.", cut.Find(".modal").TextContent);
+        Assert.False(cut.Find($"#{prefix}-delete-confirm").HasAttribute("disabled"));
+        Assert.True(guard.HasUnsavedChanges);
+        Assert.False(guard.IsSubmitting);
+        Assert.Equal(originalUri, nav.Uri);
+        Assert.False(await guard.CanNavigateAwayAsync());
+
+        api.LegMutation = () => Task.CompletedTask;
+        api.ItemMutation = () => Task.CompletedTask;
+        await cut.Find($"#{prefix}-delete-confirm").ClickAsync(new());
+        cut.WaitForAssertion(() => Assert.NotEqual(originalUri, nav.Uri));
+        Assert.False(guard.HasUnsavedChanges);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task SuccessfulTripSave_ReturnsAfterGuardIsClean(bool edit, bool explicitReturn, bool delayed)
+    {
+        var trip = RegisterTrip();
+        var api = (StubTripApiClient)Services.GetRequiredService<TripPlanner.Web.Features.Trips.ITripApiClient>();
+        var response = new CreateTripResponse(trip.TripId, trip.Name, trip.Description, trip.StartDate, trip.EndDate);
+        var completion = new TaskCompletionSource<CreateTripResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.TripMutation = () => delayed ? completion.Task : Task.FromResult(response);
+        var nav = Services.GetRequiredService<NavigationManager>();
+        var returnUrl = "/trips?page=2&pageSize=24";
+        nav.NavigateTo(edit ? EntryPageUrls.TripEdit(trip.TripId, explicitReturn ? returnUrl : null)
+            : explicitReturn ? EntryPageUrls.TripCreate(returnUrl) : "/trips/new");
+        var originalUri = nav.Uri;
+        IRenderedComponent<IComponent> cut = edit
+            ? Render<EditTrip>(parameters => parameters.Add(page => page.TripId, trip.TripId))
+            : Render<NewTrip>();
+        cut.Find("#name").Change("Saved trip");
+        var guard = cut.FindComponent<EntryNavigationGuard>().Instance;
+        await cut.InvokeAsync(guard.MarkDirtyAsync);
+
+        var save = cut.Find("form").SubmitAsync();
+        if (delayed)
+        {
+            cut.WaitForAssertion(() => Assert.True(guard.IsSubmitting));
+            await cut.InvokeAsync(() => nav.NavigateTo("/trips"));
+            Assert.Equal(originalUri, nav.Uri);
+            completion.SetResult(response);
+        }
+        await save;
+
+        var destination = explicitReturn ? returnUrl : $"/trips/{trip.TripId:D}";
+        cut.WaitForAssertion(() => Assert.Equal(nav.ToAbsoluteUri(destination).AbsoluteUri, nav.Uri));
+        Assert.False(guard.HasUnsavedChanges);
+        Assert.False(guard.IsSubmitting);
+        Assert.DoesNotContain(JSInterop.Invocations, invocation => invocation.Identifier == "confirm");
+    }
+
+    [Theory]
+    [InlineData("create")]
+    [InlineData("update")]
+    [InlineData("delete")]
+    public async Task SuccessfulFavoriteMutation_ReturnsAfterGuardIsClean(string operation)
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var favorite = new FavoriteDestinationDto(Guid.NewGuid(), "Museum", "Museum address", null, null, null, null, null,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var api = new RecordingFavoriteDestinationApiClient([favorite])
+        {
+            UpdateHandler = (_, _) => Task.FromResult(new FavoriteDestinationMutationResult(favorite, null, null)),
+            DeleteHandler = _ => Task.FromResult(true)
+        };
+        Services.AddSingleton<IFavoriteDestinationApiClient>(api);
+        var nav = Services.GetRequiredService<NavigationManager>();
+        var destination = EntryPageUrls.Favorites("museum");
+        nav.NavigateTo(operation == "create" ? EntryPageUrls.FavoriteCreate(destination)
+            : EntryPageUrls.FavoriteEdit(favorite.FavoriteDestinationId, destination));
+        var cut = Render<FavoriteEntry>(parameters => parameters.Add(page => page.FavoriteId,
+            operation == "create" ? null : favorite.FavoriteDestinationId));
+        cut.Find("#favorite-name").Change("Updated museum");
+        cut.Find("#favorite-address").Change("Updated museum address");
+        var guard = cut.FindComponent<EntryNavigationGuard>().Instance;
+        await cut.InvokeAsync(guard.MarkDirtyAsync);
+
+        if (operation == "delete")
+        {
+            cut.Find("#favorite-delete").Click();
+            await cut.Find(".modal .btn-danger").ClickAsync(new());
+        }
+        else
+        {
+            await cut.Find("form").SubmitAsync();
+        }
+
+        cut.WaitForAssertion(() => Assert.Equal(nav.ToAbsoluteUri(destination).AbsoluteUri, nav.Uri));
+        Assert.False(guard.HasUnsavedChanges);
+        Assert.False(guard.IsSubmitting);
+        Assert.DoesNotContain(JSInterop.Invocations, invocation => invocation.Identifier == "confirm");
     }
 
     private static void AssertFooter<TComponent>(IRenderedComponent<TComponent> cut) where TComponent : IComponent

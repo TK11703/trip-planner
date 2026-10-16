@@ -23,6 +23,7 @@
 @code {
     private bool _isDirty;
     private bool _isSubmitting;
+    private bool _returnAfterSuccess;
     private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
     private Task SetSubmitting(bool value) { _isSubmitting = value; return Task.CompletedTask; }
     [Parameter] public Guid TripId { get; set; }
@@ -102,6 +103,15 @@
         if (IsReauthenticating) _state = EntryPageShell.EntryLoadState.Loading;
     }
 
-    private void SavedAsync() { _isDirty = false; _isSubmitting = false; Nav.NavigateTo(Destination); }
+    private void SavedAsync() { _isDirty = false; _isSubmitting = false; _returnAfterSuccess = true; }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!_returnAfterSuccess) return;
+        _returnAfterSuccess = false;
+        // Apply the clean guard state before navigating after a save or deletion.
+        Nav.NavigateTo(Destination);
+    }
+
     private void CancelAsync() => Nav.NavigateTo(Destination);
 }
