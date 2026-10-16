@@ -4,14 +4,14 @@ INSERT INTO parsed_item_drafts (
     start_local, start_timezone_id, end_local, end_timezone_id,
     confirmation_code, notes, confidence, review_status,
     proposed_outcome, origin, destination, transportation_mode,
-    travel_cost, travel_cost_currency)
+    travel_cost, travel_cost_currency, estimated_cost, leg_kind)
 VALUES (
     @ParsedItemDraftId, @InboxEmailId, @UserId, @TripId, @TripLegId,
     @ItemType, @Title, @Location,
     @StartLocal, @StartTimeZoneId, @EndLocal, @EndTimeZoneId,
     @ConfirmationCode, @Notes, @Confidence, 'pending_review',
     @ProposedOutcome, @Origin, @Destination, @TransportationMode,
-    @TravelCost, @TravelCostCurrency)
+    @TravelCost, @TravelCostCurrency, @EstimatedCost, @LegKind)
 RETURNING parsed_item_draft_id AS ParsedItemDraftId,
           inbox_email_id AS InboxEmailId,
           user_id AS UserId,
@@ -38,4 +38,6 @@ RETURNING parsed_item_draft_id AS ParsedItemDraftId,
           travel_cost_currency AS TravelCostCurrency,
           created_trip_leg_id AS CreatedTripLegId,
           transport_recognition_state AS TransportRecognitionState,
-          traveler_edited_fields AS TravelerEditedFields;
+          traveler_edited_fields AS TravelerEditedFields,
+          estimated_cost AS EstimatedCost,
+          leg_kind AS LegKind;

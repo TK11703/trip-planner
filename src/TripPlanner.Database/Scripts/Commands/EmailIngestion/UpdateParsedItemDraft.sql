@@ -19,6 +19,8 @@ SET trip_id = @TripId,
     destination = @Destination,
     transportation_mode = @TransportationMode,
     travel_cost = @TravelCost,
+    estimated_cost = @EstimatedCost,
+    leg_kind = @LegKind,
     traveler_edited_fields = ARRAY(
         SELECT DISTINCT unnest(
             traveler_edited_fields
@@ -61,4 +63,6 @@ RETURNING parsed_item_draft_id AS ParsedItemDraftId,
           travel_cost_currency AS TravelCostCurrency,
           created_trip_leg_id AS CreatedTripLegId,
           transport_recognition_state AS TransportRecognitionState,
-          traveler_edited_fields AS TravelerEditedFields;
+          traveler_edited_fields AS TravelerEditedFields,
+          estimated_cost AS EstimatedCost,
+          leg_kind AS LegKind;

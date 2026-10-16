@@ -44,7 +44,9 @@ internal static class EmailIngestionMapping
         record.TravelCost,
         record.TravelCostCurrency,
         record.CreatedTripLegId,
-        ParseRecognitionState(record.TransportRecognitionState));
+        ParseRecognitionState(record.TransportRecognitionState),
+        record.EstimatedCost,
+        record.LegKind);
 
     /// <summary>The persisted outcome, defaulting to Item so an unreadable value cannot turn a
     /// draft into a leg the traveler never asked for.</summary>

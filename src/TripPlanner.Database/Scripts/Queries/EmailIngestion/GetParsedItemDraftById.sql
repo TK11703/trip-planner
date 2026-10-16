@@ -24,7 +24,9 @@ SELECT d.parsed_item_draft_id AS ParsedItemDraftId,
        d.travel_cost_currency AS TravelCostCurrency,
        d.created_trip_leg_id AS CreatedTripLegId,
        d.transport_recognition_state AS TransportRecognitionState,
-       d.traveler_edited_fields AS TravelerEditedFields
+       d.traveler_edited_fields AS TravelerEditedFields,
+       d.estimated_cost AS EstimatedCost,
+       d.leg_kind AS LegKind
 FROM parsed_item_drafts d
 WHERE d.parsed_item_draft_id = @ParsedItemDraftId
   AND d.user_id = @UserId;

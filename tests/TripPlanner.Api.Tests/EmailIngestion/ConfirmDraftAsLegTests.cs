@@ -99,6 +99,65 @@ public sealed class ConfirmDraftAsLegTests : IDisposable
         Assert.Equal("America/New_York", created.Request.EndTimeZoneId);
     }
 
+    [Theory]
+    [InlineData(TripLegKinds.Travel)]
+    [InlineData(TripLegKinds.Stay)]
+    public async Task EditedLegKindSurvivesSavingAndControlsConfirmation(string kind)
+    {
+        var tripId = SeedTrip();
+        var draftId = await SeedTransportDraftAsync(tripId);
+        var client = CreateTravelerClient();
+        var request = new UpdateParsedItemDraftRequest(
+            tripId, null, "flight", "Reviewed leg", "SEA",
+            new DateTime(2026, 8, 12, 9, 30, 0), "America/Los_Angeles",
+            new DateTime(2026, 8, 12, 17, 45, 0), "America/New_York",
+            "ABC123", null, DraftOutcome.Leg, "SEA", "JFK", "flight", 412.50m, LegKind: kind);
+
+        var saved = await client.PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal(kind, (await saved.Content.ReadFromJsonAsync<ParsedItemDraftDto>(Web))!.LegKind);
+        var drafts = await client.GetFromJsonAsync<ParsedItemDraftListResponse>("/api/email-ingestion/drafts", Web);
+        Assert.Equal(kind, Assert.Single(drafts!.Items).LegKind);
+
+        var confirmed = await client.PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+        var created = Assert.Single(_factory.TripItems.CreatedLegs).Request;
+        Assert.Equal(kind, created.LegKind);
+        Assert.Equal(kind == TripLegKinds.Travel ? "flight" : null, created.TransportationMode);
+        Assert.Equal(kind == TripLegKinds.Travel ? "SEA" : null, created.Origin);
+        Assert.Equal(kind == TripLegKinds.Travel ? "JFK" : null, created.Destination);
+        Assert.Equal(kind == TripLegKinds.Travel ? 412.50m : (decimal?)null, created.TravelCost);
+        Assert.Equal(kind == TripLegKinds.Travel ? "ABC123" : null, created.ConfirmationCode);
+        Assert.Empty(_factory.TripItems.Rows);
+    }
+
+    [Theory]
+    [InlineData(TripLegKinds.Stay, HttpStatusCode.OK)]
+    [InlineData(TripLegKinds.Travel, HttpStatusCode.BadRequest)]
+    public async Task ExplicitTravelCannotBeConfirmedWithoutARouteButStayCan(string kind, HttpStatusCode expected)
+    {
+        var tripId = SeedTrip();
+        var draftId = await SeedTransportDraftAsync(tripId, origin: null, destination: null, mode: null);
+        await _factory.Drafts.UpdateAsync(draftId, EmailIngestionApiFactory.TravelerUserId,
+            new DraftUpdate(tripId, null, "hotel", "Seattle", null,
+                new DateTime(2026, 8, 12, 9, 30, 0), "America/Los_Angeles",
+                new DateTime(2026, 8, 12, 17, 45, 0), "America/New_York",
+                null, null, DraftOutcomes.Leg, LegKind: kind));
+
+        var response = await CreateTravelerClient().PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", null);
+        Assert.Equal(expected, response.StatusCode);
+        if (kind == TripLegKinds.Travel)
+        {
+            var error = (await response.Content.ReadFromJsonAsync<ApiError>(Web))!;
+            Assert.Equal("transportationMode", error.Details!["field"]);
+            Assert.Empty(_factory.TripItems.CreatedLegs);
+        }
+        else
+        {
+            Assert.Equal(TripLegKinds.Stay, Assert.Single(_factory.TripItems.CreatedLegs).Request.LegKind);
+        }
+    }
+
     /// <summary>
     /// The draft records which leg it became, the leg-outcome counterpart of the item trace
     /// feature 024 established (FR-038).

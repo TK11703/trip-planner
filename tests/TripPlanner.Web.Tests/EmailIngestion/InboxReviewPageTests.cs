@@ -1,4 +1,6 @@
 using Bunit;
+using System.Globalization;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Contracts.EmailIngestion;
 using TripPlanner.Contracts.Errors;
@@ -6,6 +8,7 @@ using TripPlanner.Contracts.TripItems;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Web.Components.Pages.EmailIngestion;
 using TripPlanner.Web.Components.EmailIngestion;
+using TripPlanner.Web.Components.Shared;
 using TripPlanner.Web.Features.EmailIngestion;
 using TripPlanner.Web.Features.InboxHistory;
 using TripPlanner.Web.Features.Timezones;
@@ -41,6 +44,25 @@ public class InboxReviewPageTests : BunitContext
 
         cut.WaitForAssertion(() =>
         {
+            Assert.Equal("Review parsed items", cut.Find("header.entry-page-heading h1").TextContent);
+            Assert.Single(cut.FindAll("h1"));
+            Assert.Equal("-1", cut.Find("h1").GetAttribute("tabindex"));
+            Assert.Equal("inbox", cut.FindComponent<EntryPageHeading>().Instance.Icon);
+            Assert.NotNull(cut.Find(".entry-page-icon svg[aria-hidden='true'] rect"));
+            Assert.Equal("Refresh", cut.Find(".entry-page-actions button").TextContent);
+            Assert.Equal("/inbox/history", cut.Find(".entry-page-actions a").GetAttribute("href"));
+            Assert.Equal(["Refresh pending inbox items", "View received emails and their processing status",
+                "Confirm this parsed item and add it to its trip", "Edit this parsed item before confirming",
+                "Discard this parsed item without adding it to a trip"],
+                cut.FindAll(".btn").Select(control => control.GetAttribute("title")));
+            Assert.All(cut.FindAll(".btn"), control =>
+            {
+                Assert.NotNull(control.QuerySelector("svg[aria-hidden='true']"));
+                var label = control.QuerySelector(".visually-hidden");
+                Assert.NotNull(label);
+                Assert.False(string.IsNullOrWhiteSpace(label.TextContent));
+                Assert.Equal(label.TextContent.Trim(), control.TextContent.Trim());
+            });
             Assert.Contains("Flight ABC123", cut.Markup, StringComparison.Ordinal);
             Assert.Contains("ABC123", cut.Markup, StringComparison.Ordinal);
             Assert.Contains("Confirm", cut.Markup, StringComparison.Ordinal);
@@ -115,7 +137,7 @@ public class InboxReviewPageTests : BunitContext
     {
         var candidate = Candidate("West Coast, August", "San Francisco", 12, 16);
         var draft = Draft(start: new DateTime(2026, 8, 13, 15, 0, 0), placement: new DraftPlacement(
-            DraftPlacementStatus.Matched, candidate.TripId, candidate.TripLegId, [candidate]));
+            DraftPlacementStatus.Matched, candidate.TripId, candidate.TripLegId, [candidate])) with { EstimatedCost = 75.25m };
         var client = new StubEmailIngestionApiClient([draft]);
         Services.AddSingleton<IEmailIngestionApiClient>(client);
 
@@ -132,6 +154,7 @@ public class InboxReviewPageTests : BunitContext
             Assert.Equal(draft.ParsedItemDraftId, draftId);
             Assert.Equal(candidate.TripId, request.TripId);
             Assert.Equal(candidate.TripLegId, request.TripLegId);
+            Assert.Equal(75.25m, request.EstimatedCost);
         });
     }
 
@@ -279,6 +302,38 @@ public class InboxReviewPageTests : BunitContext
         return (cut, ingestion, tripClient);
     }
 
+    [Theory]
+    [InlineData("Flight ABC123")]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void EditPageBreadcrumbEndsAtDraftNameOrShortId(string? title)
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var draft = Draft() with { Title = title };
+        Services.AddSingleton<IEmailIngestionApiClient>(new StubEmailIngestionApiClient([draft]));
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
+        Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
+
+        var cut = Render<EditDraft>(parameters => parameters.Add(page => page.DraftId, draft.ParsedItemDraftId));
+        var expectedName = string.IsNullOrWhiteSpace(title)
+            ? $"Draft {draft.ParsedItemDraftId.ToString("N")[..8]}"
+            : title;
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotNull(cut.Find("#draft-title"));
+            Assert.Equal(["Home", "Inbox", "Drafts", expectedName],
+                cut.FindAll(".breadcrumb-item").Select(item => item.TextContent.Trim()));
+            var current = cut.Find(".breadcrumb-item[aria-current='page']");
+            Assert.Equal(expectedName, current.TextContent);
+            Assert.Null(current.QuerySelector("a"));
+            Assert.Equal(["/", "/inbox/drafts", "/inbox/drafts"],
+                cut.FindAll(".breadcrumb-item a").Select(link => link.GetAttribute("href")));
+            Assert.Equal("Edit draft", cut.Find("h1").TextContent);
+        });
+    }
+
     // FR-016: the traveler can reopen a draft and take the placement decision themselves.
     [Fact]
     public void EditFormLoadsFromAnAuthorizedDraft()
@@ -293,7 +348,205 @@ public class InboxReviewPageTests : BunitContext
         Assert.Contains("San Francisco", cut.Find("#draft-leg").InnerHtml, StringComparison.Ordinal);
         var actions = cut.Find(".card-footer .entry-form-actions");
         Assert.Contains("justify-content-start", actions.ClassList);
-        Assert.Equal(["Save", "Cancel"], actions.Children.Select(button => button.TextContent.Trim()));
+        Assert.Equal(["Save", "Cancel", "Delete"], actions.Children.Select(button => button.TextContent.Trim()));
+        Assert.Equal(["Save changes to this draft", "Cancel without saving changes to this draft", "Confirm deletion of this draft"],
+            actions.Children.Select(button => button.GetAttribute("title")));
+        Assert.Equal(["submit", "button", "button"], actions.Children.Select(button => button.GetAttribute("type")));
+        Assert.Contains("btn-outline-secondary", actions.Children[1].ClassList);
+        Assert.Contains("btn-outline-danger", cut.Find("#draft-delete").ClassList);
+        Assert.Contains("ms-auto", cut.Find("#draft-delete").ClassList);
+        Assert.Equal(["save", "cancel", "delete"], cut.FindComponents<ActionIcon>().Select(icon => icon.Instance.Name));
+        Assert.All(actions.Children, button =>
+        {
+            Assert.NotNull(button.QuerySelector("svg.me-1.align-text-bottom[aria-hidden='true']"));
+            Assert.False(button.HasAttribute("disabled"));
+        });
+    }
+
+    private IRenderedComponent<EditDraft> RenderDraftDeletionPage(ParsedItemDraftDto draft, StubEmailIngestionApiClient client)
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton<IEmailIngestionApiClient>(client);
+        Services.AddSingleton<ITripApiClient>(new StubTripApiClient());
+        Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
+        Services.GetRequiredService<NavigationManager>().NavigateTo($"/inbox/drafts/{draft.ParsedItemDraftId:D}/edit");
+        return Render<EditDraft>(parameters => parameters.Add(page => page.DraftId, draft.ParsedItemDraftId));
+    }
+
+    [Fact]
+    public void CancellingDraftDeletionKeepsTheDraftAndUnsavedValues()
+    {
+        var draft = Draft();
+        var client = new StubEmailIngestionApiClient([draft]);
+        var cut = RenderDraftDeletionPage(draft, client);
+        cut.Find("#draft-title").Change("Corrected title");
+
+        cut.Find("#draft-delete").Click();
+        Assert.NotNull(cut.Find("[role='dialog'][aria-labelledby='draft-delete-title']"));
+        Assert.Empty(client.Discarded);
+        cut.Find(".modal-footer .btn-outline-secondary").Click();
+
+        Assert.Empty(cut.FindAll(".modal"));
+        Assert.Empty(client.Discarded);
+        Assert.Equal("Corrected title", cut.Find("#draft-title").GetAttribute("value"));
+    }
+
+    [Fact]
+    public async Task DeletingADraftClearsTheDirtyGuardAndReturnsToInboxWithoutSaving()
+    {
+        var draft = Draft();
+        var client = new StubEmailIngestionApiClient([draft]);
+        var cut = RenderDraftDeletionPage(draft, client);
+        var guard = cut.FindComponent<EntryNavigationGuard>().Instance;
+        await cut.InvokeAsync(guard.MarkDirtyAsync);
+        Assert.True(guard.HasUnsavedChanges);
+
+        cut.Find("#draft-delete").Click();
+        cut.Find("#draft-delete-confirm").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal(draft.ParsedItemDraftId, Assert.Single(client.Discarded));
+            Assert.False(guard.HasUnsavedChanges);
+            Assert.False(guard.IsSubmitting);
+            Assert.EndsWith("/inbox/drafts", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
+        });
+        Assert.Empty(client.Updated);
+        Assert.Empty(await client.GetDraftsAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FailedDraftDeletionKeepsTheFormAndAllowsRetry(bool throws)
+    {
+        var draft = Draft();
+        var client = new StubEmailIngestionApiClient([draft])
+        {
+            DiscardResult = throws
+                ? Task.FromException<bool>(new HttpRequestException("The service is unavailable."))
+                : Task.FromResult(false)
+        };
+        var cut = RenderDraftDeletionPage(draft, client);
+        var originalUri = Services.GetRequiredService<NavigationManager>().Uri;
+        cut.Find("#draft-title").Change("Corrected title");
+        cut.Find("#draft-delete").Click();
+        cut.Find("#draft-delete-confirm").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(throws ? "The service is unavailable." : "The draft could not be deleted.",
+                cut.Find(".modal [role='alert']").TextContent, StringComparison.Ordinal);
+            Assert.False(cut.Find("#draft-delete-confirm").HasAttribute("disabled"));
+        });
+        Assert.Equal(originalUri, Services.GetRequiredService<NavigationManager>().Uri);
+        Assert.Empty(client.Discarded);
+        Assert.Equal("Corrected title", cut.Find("#draft-title").GetAttribute("value"));
+        Assert.False(cut.FindComponent<EntryNavigationGuard>().Instance.IsSubmitting);
+
+        client.DiscardResult = Task.FromResult(true);
+        cut.Find("#draft-delete-confirm").Click();
+        cut.WaitForAssertion(() => Assert.Equal(draft.ParsedItemDraftId, Assert.Single(client.Discarded)));
+    }
+
+    [Fact]
+    public async Task PendingDraftDeletionDisablesActionsAndBlocksConcurrentSaveAndNavigation()
+    {
+        var draft = Draft();
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new StubEmailIngestionApiClient([draft]) { DiscardResult = completion.Task };
+        var cut = RenderDraftDeletionPage(draft, client);
+        cut.Find("#draft-delete").Click();
+
+        var deletion = cut.Find("#draft-delete-confirm").ClickAsync(new());
+        cut.WaitForAssertion(() => Assert.All(cut.FindAll(".entry-form-actions button, .modal button"),
+            button => Assert.True(button.HasAttribute("disabled"))));
+        Assert.Equal("Deleting...", cut.Find("#draft-delete-confirm").TextContent.Trim());
+        Assert.False(await cut.FindComponent<EntryNavigationGuard>().Instance.CanNavigateAwayAsync());
+        cut.Find("form").Submit();
+        Assert.Empty(client.Updated);
+
+        completion.SetResult(true);
+        await deletion;
+        cut.WaitForAssertion(() => Assert.Single(client.Discarded));
+    }
+
+    [Fact]
+    public void MissingDraftDoesNotOfferDeletion()
+    {
+        var draft = Draft();
+        var cut = RenderDraftDeletionPage(draft, new StubEmailIngestionApiClient([]));
+
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("#draft-delete")));
+        Assert.Empty(cut.FindAll("form"));
+    }
+
+    [Theory]
+    [InlineData(DraftOutcome.Item)]
+    [InlineData(DraftOutcome.Leg)]
+    public void TripSelectorIsFirstFieldBeforeBookingOutcome(DraftOutcome outcome)
+    {
+        var draft = Draft() with { ProposedOutcome = outcome };
+        var (cut, _, _) = RenderQueueWithEditableTrips(draft);
+
+        var rows = cut.FindAll("form > .card-body > .mb-3");
+        Assert.Same(rows[0], cut.Find("#draft-trip").ParentElement);
+        Assert.NotNull(rows[1].QuerySelector("#draft-outcome-leg"));
+        Assert.Equal("draft-trip", cut.FindAll("form input, form select, form textarea")[0].Id);
+
+        cut.Find(outcome == DraftOutcome.Item ? "#draft-outcome-leg" : "#draft-outcome-item").Change(true);
+
+        Assert.NotNull(cut.Find("form > .card-body > .mb-3").QuerySelector("#draft-trip"));
+    }
+
+    [Theory]
+    [InlineData(DraftOutcome.Item)]
+    [InlineData(DraftOutcome.Leg)]
+    public void DraftFormGroupsDateAndTimezoneRowsInScheduleCard(DraftOutcome outcome)
+    {
+        var draft = Draft() with { ProposedOutcome = outcome };
+        var (cut, _, _) = RenderQueueWithEditableTrips(draft);
+
+        var schedule = cut.Find("#draft-schedule.card.bg-body-tertiary.shadow-none.mb-3[role='group'][aria-label='Schedule']");
+        var body = Assert.Single(schedule.Children);
+        Assert.Contains("card-body", body.ClassList);
+        Assert.Contains("p-3", body.ClassList);
+        Assert.Equal(2, body.Children.Length);
+        Assert.Empty(cut.FindAll("form > .card-body .mb-2, form > .card-body .row.g-2"));
+        Assert.All(cut.FindAll("form > .card-body > .row"), row =>
+        {
+            Assert.Contains("gx-2", row.ClassList);
+            Assert.Contains("gy-3", row.ClassList);
+            Assert.Contains("mb-3", row.ClassList);
+        });
+        var startRow = cut.Find("#draft-start").Closest(".row");
+        var endRow = cut.Find("#draft-end").Closest(".row");
+        Assert.NotNull(startRow);
+        Assert.NotNull(endRow);
+        Assert.NotSame(startRow, endRow);
+        Assert.Same(body, startRow.ParentElement);
+        Assert.Same(body, endRow.ParentElement);
+        Assert.Contains("mb-3", startRow.ClassList);
+
+        foreach (var (row, dateId, zoneId) in new[]
+        {
+            (startRow, "draft-start", "draft-start-tz"),
+            (endRow, "draft-end", "draft-end-tz")
+        })
+        {
+            Assert.Equal(2, row.Children.Length);
+            Assert.Contains("gx-2", row.ClassList);
+            Assert.Contains("gy-3", row.ClassList);
+            Assert.All(row.Children, column =>
+            {
+                Assert.Contains("col-12", column.ClassList);
+                Assert.Contains("col-md-6", column.ClassList);
+            });
+            Assert.NotNull(row.Children[0].QuerySelector($"#{dateId}"));
+            Assert.NotNull(row.Children[1].QuerySelector($"#{zoneId}"));
+            Assert.NotNull(row.Children[0].QuerySelector($"label[for='{dateId}']"));
+            Assert.NotNull(row.Children[1].QuerySelector($"label[for='{zoneId}']"));
+        }
     }
 
     // FR-018: a leg belonging to the trip the traveler just left would send the item somewhere
@@ -348,6 +601,46 @@ public class InboxReviewPageTests : BunitContext
             Assert.Equal("2026-08-10T17:00:00", end.GetAttribute("min"));
             Assert.Equal("2026-08-14T16:59:00", end.GetAttribute("max"));
         });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SelectedLegShowsScheduleNoticeThatUpdatesAndClears(bool preselected)
+    {
+        var tripId = Guid.NewGuid();
+        var first = Leg(tripId, "San Francisco", 11, 14);
+        var second = Leg(tripId, "Napa", 15, 18);
+        var draft = Draft(tripId, preselected ? first.TripLegId : null,
+            new DateTime(2026, 8, 12, 9, 30, 0));
+        var (cut, _, _) = RenderQueueWithEditableTrips(draft,
+            (Trip(tripId, "West Coast"), Detail(tripId, "West Coast", first, second)));
+
+        if (!preselected)
+        {
+            Assert.Empty(cut.FindAll("#draft-leg-window-hint"));
+            cut.Find("#draft-leg").Change(first.TripLegId.ToString());
+        }
+
+        var hint = cut.Find("#draft-schedule > .card-body > #draft-leg-window-hint.alert.alert-primary[role='note']");
+        Assert.Equal("draft-leg-window-hint", cut.Find("#draft-schedule > .card-body").Children[0].Id);
+        Assert.NotNull(hint.QuerySelector("svg.flex-shrink-0[aria-hidden='true']"));
+        var start = new DateTime(2026, 8, 10, 17, 0, 0).ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture);
+        var end = new DateTime(2026, 8, 14, 16, 59, 0).ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture);
+        Assert.Equal(["San Francisco", $"{start} \u2013 {end}"],
+            hint.QuerySelectorAll(".badge.text-bg-primary.text-wrap").Select(badge => badge.TextContent));
+        Assert.Contains("Must fall within the", hint.TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("#draft-start + .form-text"));
+
+        cut.Find("#draft-leg").Change(second.TripLegId.ToString());
+        Assert.Equal("Napa", cut.Find("#draft-leg-window-hint .badge").TextContent);
+        Assert.DoesNotContain("San Francisco", cut.Find("#draft-leg-window-hint").TextContent, StringComparison.Ordinal);
+        cut.Find("#draft-leg").Change("");
+        Assert.Empty(cut.FindAll("#draft-leg-window-hint"));
+
+        cut.Find("#draft-leg").Change(first.TripLegId.ToString());
+        cut.Find("#draft-outcome-leg").Change(true);
+        Assert.Empty(cut.FindAll("#draft-leg-window-hint"));
     }
 
     // A parser that found no date leaves the picker sitting on today, which is never inside the
@@ -525,6 +818,24 @@ public class InboxReviewPageTests : BunitContext
 
         cut.WaitForAssertion(() =>
         {
+            Assert.Equal("Inbox history", cut.Find("header.entry-page-heading h1").TextContent);
+            Assert.Single(cut.FindAll("h1"));
+            Assert.Equal("-1", cut.Find("h1").GetAttribute("tabindex"));
+            Assert.Equal("inbox", cut.FindComponent<EntryPageHeading>().Instance.Icon);
+            Assert.NotNull(cut.Find(".entry-page-icon svg[aria-hidden='true'] rect"));
+            Assert.Equal("Refresh", cut.Find(".entry-page-actions button").TextContent);
+            Assert.Equal("/inbox/drafts", cut.Find(".entry-page-actions a").GetAttribute("href"));
+            Assert.Equal(["Refresh inbox email history", "Review parsed items waiting for confirmation",
+                "Try processing this email again"],
+                cut.FindAll(".btn").Select(control => control.GetAttribute("title")));
+            Assert.All(cut.FindAll(".btn"), control =>
+            {
+                Assert.NotNull(control.QuerySelector("svg[aria-hidden='true']"));
+                var label = control.QuerySelector(".visually-hidden");
+                Assert.NotNull(label);
+                Assert.False(string.IsNullOrWhiteSpace(label.TextContent));
+                Assert.Equal(label.TextContent.Trim(), control.TextContent.Trim());
+            });
             Assert.Contains("Flight confirmation", cut.Markup, StringComparison.Ordinal);
             Assert.Contains("Newsletter", cut.Markup, StringComparison.Ordinal);
             Assert.Contains("Parsed", cut.Markup, StringComparison.Ordinal);

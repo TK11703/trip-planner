@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using TripPlanner.Api.Security;
+using TripPlanner.Api.Features.TripItems;
 using TripPlanner.Contracts.EmailIngestion;
 using TripPlanner.Contracts.Errors;
 using TripPlanner.Contracts.TripItems;
@@ -29,6 +30,13 @@ public static class UpdateDraftEndpoint
         // detail about it should leak.
         if (await draftRepository.GetByIdAsync(id, currentUser.UserId, cancellationToken) is null)
             return TypedResults.NotFound();
+
+        if (request.LegKind is not null && !TripLegKinds.IsValid(request.LegKind))
+            return TypedResults.BadRequest(ApiError.ValidationFailed("Choose Travel or Stay.", "legKind"));
+
+        var costValidation = TrackedItemValidator.ValidateEstimatedCost(request.EstimatedCost);
+        if (!costValidation.IsValid)
+            return TypedResults.BadRequest(costValidation.Error!);
 
         // The candidate legs double as the authority on which legs the caller may point a draft
         // at, so one read covers both the check below and the placement returned afterwards.
@@ -66,7 +74,8 @@ public static class UpdateDraftEndpoint
             request.ConfirmationCode, request.Notes,
             request.ProposedOutcome.ToPersisted(),
             request.Origin, request.Destination,
-            TransportationModes.Normalize(request.TransportationMode), request.TravelCost);
+            TransportationModes.Normalize(request.TransportationMode), request.TravelCost, request.EstimatedCost,
+            request.LegKind is null ? null : TripLegKinds.Normalize(request.LegKind));
 
         var record = await draftRepository.UpdateAsync(id, currentUser.UserId, update, cancellationToken);
         if (record is null) return TypedResults.NotFound();

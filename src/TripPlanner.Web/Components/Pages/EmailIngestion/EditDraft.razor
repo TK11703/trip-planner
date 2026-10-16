@@ -14,7 +14,7 @@
 <EntryPageShell Title="Edit draft" Context="Review imported travel details before adding them to your itinerary." Icon="draft" Breadcrumbs="Breadcrumbs" LoadState="_state" ErrorMessage="@_error" SafeBackHref="@Destination">
     @if (_draft is not null && _state == EntryPageShell.EntryLoadState.Ready)
     {
-        <DraftEditForm @key="DraftId" Draft="_draft" OnClose="Cancel" OnSaved="Saved" OnSubmittingChanged="SetSubmitting" />
+        <DraftEditForm @key="DraftId" Draft="_draft" OnClose="Cancel" OnSaved="Saved" OnDeleted="Deleted" OnSubmittingChanged="SetSubmitting" />
     }
 </EntryPageShell>
 </EntryNavigationGuard>
@@ -22,6 +22,7 @@
 @code {
     private bool _isDirty;
     private bool _isSubmitting;
+    private bool _returnAfterDelete;
     private Task SetDirty(bool value) { _isDirty = value; return Task.CompletedTask; }
     private Task SetSubmitting(bool value) { _isSubmitting = value; return Task.CompletedTask; }
     [Parameter] public Guid DraftId { get; set; }
@@ -31,7 +32,7 @@
     private string? _error;
     private EntryPageShell.EntryLoadState _state = EntryPageShell.EntryLoadState.Loading;
     private string Destination => EntryPageUrls.NormalizeReturnUrl(ReturnUrl, "/inbox/drafts");
-    private IReadOnlyList<BreadcrumbItem> Breadcrumbs => [new("Home", "/"), new("Inbox", "/inbox/drafts"), new("Drafts", "/inbox/drafts"), new(_draft?.Title ?? $"Draft {DraftId.ToString("N")[..8]}", $"/inbox/drafts#draft-{DraftId:D}"), new("Edit draft", IsCurrent: true)];
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs => [new("Home", "/"), new("Inbox", "/inbox/drafts"), new("Drafts", "/inbox/drafts"), new(string.IsNullOrWhiteSpace(_draft?.Title) ? $"Draft {DraftId.ToString("N")[..8]}" : _draft.Title, IsCurrent: true)];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -48,4 +49,19 @@
     }
     private void Cancel() => Nav.NavigateTo(Destination);
     private Task Saved() { _isDirty = false; _isSubmitting = false; return Task.CompletedTask; }
+    private Task Deleted()
+    {
+        _isDirty = false;
+        _isSubmitting = false;
+        _returnAfterDelete = true;
+        return Task.CompletedTask;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!_returnAfterDelete) return;
+        _returnAfterDelete = false;
+        // Apply the clean guard state before navigating away from the deleted draft.
+        Nav.NavigateTo(Destination);
+    }
 }

@@ -15,6 +15,7 @@ internal sealed class StubEmailIngestionApiClient(IReadOnlyList<ParsedItemDraftD
     private readonly List<ParsedItemDraftDto> _drafts = [.. drafts];
 
     public List<Guid> Discarded { get; } = [];
+    public Task<bool> DiscardResult { get; set; } = Task.FromResult(true);
 
     public List<(Guid DraftId, UpdateParsedItemDraftRequest Request)> Updated { get; } = [];
 
@@ -61,7 +62,9 @@ internal sealed class StubEmailIngestionApiClient(IReadOnlyList<ParsedItemDraftD
             Origin = request.Origin,
             Destination = request.Destination,
             TransportationMode = request.TransportationMode,
-            TravelCost = request.TravelCost
+            TravelCost = request.TravelCost,
+            EstimatedCost = request.EstimatedCost,
+            LegKind = request.LegKind
         };
         _drafts[index] = updated;
         return Task.FromResult(new DraftMutationResult<ParsedItemDraftDto>(updated, null));
@@ -84,11 +87,12 @@ internal sealed class StubEmailIngestionApiClient(IReadOnlyList<ParsedItemDraftD
         return Task.FromResult(new DraftMutationResult<ConfirmParsedItemDraftResponse>(response, null));
     }
 
-    public Task<bool> DiscardDraftAsync(Guid draftId, CancellationToken ct = default)
+    public async Task<bool> DiscardDraftAsync(Guid draftId, CancellationToken ct = default)
     {
+        if (!await DiscardResult) return false;
         Discarded.Add(draftId);
         _drafts.RemoveAll(d => d.ParsedItemDraftId == draftId);
-        return Task.FromResult(true);
+        return true;
     }
 
     /// <summary>How many times re-recognition was asked for, so a test can assert "exactly once".</summary>

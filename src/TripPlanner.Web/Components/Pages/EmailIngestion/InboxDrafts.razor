@@ -43,7 +43,7 @@
                                 @if (draft.ProposedOutcome == DraftOutcome.Leg)
                                 {
                                     <span class="badge text-bg-primary me-1" data-testid="draft-outcome-badge">Trip leg</span>
-                                    @if (!string.IsNullOrWhiteSpace(draft.TransportationMode))
+                                    @if (IsTravelLeg(draft) && !string.IsNullOrWhiteSpace(draft.TransportationMode))
                                     {
                                         <span class="badge text-bg-secondary me-1">@TransportationModes.Label(draft.TransportationMode)</span>
                                     }
@@ -53,6 +53,7 @@
                                     <span class="badge text-bg-secondary me-1">@draft.ItemType</span>
                                 }
                                 @if (draft.ProposedOutcome == DraftOutcome.Leg
+                                     && IsTravelLeg(draft)
                                      && !string.IsNullOrWhiteSpace(draft.Origin)
                                      && !string.IsNullOrWhiteSpace(draft.Destination))
                                 {
@@ -259,7 +260,7 @@
     // A trip is not: an item has to belong somewhere (FR-011).
     //
     // A leg outcome asks a different question. It is never placed inside a leg, and it needs the
-    // end, the route, and the mode the API will demand, so offering Confirm before those exist
+    // end, and for travel the route and mode the API will demand, so offering Confirm before those exist
     // would only produce a refusal the traveler cannot act on from here (FR-011, FR-031).
     private bool CanConfirm(ParsedItemDraftDto draft)
     {
@@ -271,9 +272,10 @@
                 && draft.EndLocal is not null
                 && !string.IsNullOrWhiteSpace(draft.StartTimeZoneId)
                 && !string.IsNullOrWhiteSpace(draft.EndTimeZoneId)
-                && !string.IsNullOrWhiteSpace(draft.TransportationMode)
-                && !string.IsNullOrWhiteSpace(draft.Origin)
-                && !string.IsNullOrWhiteSpace(draft.Destination);
+                && (!IsTravelLeg(draft)
+                    || (!string.IsNullOrWhiteSpace(draft.TransportationMode)
+                        && !string.IsNullOrWhiteSpace(draft.Origin)
+                        && !string.IsNullOrWhiteSpace(draft.Destination)));
         }
 
         if (ChosenCandidate(draft) is not null) return true;
@@ -284,6 +286,9 @@
         => candidate.LegEnd is { } end
             ? $"{candidate.LegStart:MMM d} – {end:MMM d, yyyy}"
             : $"{candidate.LegStart:MMM d, yyyy} onward";
+
+    private static bool IsTravelLeg(ParsedItemDraftDto draft) =>
+        DraftClassification.IsTravelLeg(draft.LegKind, draft.TransportationMode, draft.Origin, draft.Destination);
 
     /// <summary>The draft's own dates, named back to the traveler when nothing covers them.</summary>
     private static string DraftDates(ParsedItemDraftDto draft)
@@ -319,7 +324,7 @@
                     draft.StartLocal, draft.StartTimeZoneId, draft.EndLocal, draft.EndTimeZoneId,
                     draft.ConfirmationCode, draft.Notes,
                     draft.ProposedOutcome, draft.Origin, draft.Destination,
-                    draft.TransportationMode, draft.TravelCost, draft.EstimatedCost));
+                    draft.TransportationMode, draft.TravelCost, draft.EstimatedCost, draft.LegKind));
 
                 if (!saved.Succeeded)
                 {

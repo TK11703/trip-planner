@@ -1,6 +1,7 @@
 using Bunit;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using TripPlanner.Web.Components.Shared;
 using TripPlanner.Web.Features.Profile;
 using TripPlanner.Web.Features.Timezones;
 using TripPlanner.Web.Tests.Auth;
@@ -20,6 +21,11 @@ public class ProfileEditTests : BunitContext
         Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(isAuthenticated: true));
         var cut = Render<ProfilePage>();
 
+        Assert.Equal("Profile", cut.Find("header.entry-page-heading h1").TextContent);
+        Assert.Single(cut.FindAll("h1"));
+        Assert.Equal("-1", cut.Find("h1").GetAttribute("tabindex"));
+        Assert.Equal("profile", cut.FindComponent<EntryPageHeading>().Instance.Icon);
+        Assert.NotNull(cut.Find(".entry-page-icon svg[aria-hidden='true'] circle"));
         Assert.Contains("entry-form-card", cut.Find("form").GetAttribute("class"));
         var saveButton = Assert.Single(cut.FindAll("form > .card-footer.entry-form-footer > .entry-form-actions > button[type='submit']"));
         Assert.Equal("Save", saveButton.TextContent.Trim());

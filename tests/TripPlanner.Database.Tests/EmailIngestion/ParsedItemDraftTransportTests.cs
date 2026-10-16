@@ -1,4 +1,5 @@
 using Dapper;
+using System.Globalization;
 using Npgsql;
 using TripPlanner.Database.EmailIngestion;
 using TripPlanner.Database.Sql;
@@ -89,6 +90,123 @@ public class ParsedItemDraftTransportTests
         Assert.Equal(DraftOutcomes.Item, inserted!.ProposedOutcome);
         Assert.Null(inserted.Origin);
         Assert.Null(inserted.TransportationMode);
+        Assert.Null(inserted.EstimatedCost);
+        Assert.Null(inserted.LegKind);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("travel")]
+    [InlineData("stay")]
+    public async Task DraftLegKindRoundTripsAndSurvivesRecognition(string? kind)
+    {
+        var (emailId, userId) = await SeedEmailAsync();
+        var inserted = await _repository.InsertAsync(new NewParsedItemDraft(
+            emailId, userId, null, null, "hotel", "Seattle", null,
+            null, null, null, null, null, null, 0.9, LegKind: kind));
+        Assert.Equal(kind, inserted!.LegKind);
+        Assert.Equal(kind, (await _repository.GetByIdAsync(inserted.ParsedItemDraftId, userId))!.LegKind);
+        Assert.Equal(kind, Assert.Single(await _repository.GetPendingAsync(userId)).LegKind);
+
+        var update = new DraftUpdate(null, null, "hotel", "Seattle", null,
+            null, null, null, null, null, null, DraftOutcomes.Leg, LegKind: "stay");
+        Assert.Null(await _repository.UpdateAsync(inserted.ParsedItemDraftId, "another-owner", update));
+        Assert.Equal(kind, (await _repository.GetByIdAsync(inserted.ParsedItemDraftId, userId))!.LegKind);
+        var updated = await _repository.UpdateAsync(inserted.ParsedItemDraftId, userId, update);
+        Assert.Equal("stay", updated!.LegKind);
+        Assert.Equal("stay", (await _repository.GetByIdAsync(inserted.ParsedItemDraftId, userId))!.LegKind);
+        Assert.Equal("stay", Assert.Single(await _repository.GetPendingAsync(userId)).LegKind);
+
+        var merged = await _repository.MergeRecognitionAsync(inserted.ParsedItemDraftId, userId,
+            new DraftRecognitionMerge(DraftOutcomes.Leg, "SEA", "JFK", "flight", null, null,
+                null, null, null, null, null, DraftRecognitionStates.Current));
+        Assert.Equal("stay", merged!.LegKind);
+        Assert.Equal("flight", merged.TransportationMode);
+
+        var changed = await _repository.UpdateAsync(inserted.ParsedItemDraftId, userId, update with { LegKind = "travel" });
+        Assert.Equal("travel", changed!.LegKind);
+        await _repository.SetReviewStatusAsync(inserted.ParsedItemDraftId, userId, "discarded");
+        Assert.Null(await _repository.UpdateAsync(inserted.ParsedItemDraftId, userId, update));
+    }
+
+    [Fact]
+    public async Task TheDatabaseRejectsAnUnknownDraftLegKind()
+    {
+        var (emailId, userId) = await SeedEmailAsync();
+        var exception = await Assert.ThrowsAsync<PostgresException>(() => _repository.InsertAsync(new NewParsedItemDraft(
+            emailId, userId, null, null, "hotel", "Seattle", null,
+            null, null, null, null, null, null, 0.9, LegKind: "flight")));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, exception.SqlState);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0")]
+    [InlineData("123.45")]
+    [InlineData("9999999999.99")]
+    public async Task ItemEstimateRoundTripsIndependentlyOfTravelCostAndCanBeCleared(string? amount)
+    {
+        var expected = amount is null ? (decimal?)null : decimal.Parse(amount, CultureInfo.InvariantCulture);
+        var (emailId, userId) = await SeedEmailAsync();
+        var inserted = await _repository.InsertAsync(new NewParsedItemDraft(
+            emailId, userId, null, null, "activity", "Museum", null,
+            null, null, null, null, "ABC123", null, 0.9,
+            TravelCost: 412.50m, EstimatedCost: expected));
+        Assert.Equal(expected, inserted!.EstimatedCost);
+
+        var read = await _repository.GetByIdAsync(inserted.ParsedItemDraftId, userId);
+        Assert.Equal(expected, read!.EstimatedCost);
+        Assert.Equal(expected, Assert.Single(await _repository.GetPendingAsync(userId)).EstimatedCost);
+        Assert.Equal(412.50m, read.TravelCost);
+
+        var update = new DraftUpdate(null, null, "activity", "Museum", null,
+            null, null, null, null, "ABC123", null, TravelCost: 412.50m, EstimatedCost: 25.75m);
+        var updated = await _repository.UpdateAsync(inserted.ParsedItemDraftId, userId, update);
+        Assert.Equal(25.75m, updated!.EstimatedCost);
+
+        var merged = await _repository.MergeRecognitionAsync(inserted.ParsedItemDraftId, userId,
+            new DraftRecognitionMerge(null, null, null, null, null, null, null, null, null, null, null,
+                DraftRecognitionStates.Current));
+        Assert.Equal(25.75m, merged!.EstimatedCost);
+
+        var cleared = await _repository.UpdateAsync(inserted.ParsedItemDraftId, userId, update with { EstimatedCost = null });
+        Assert.Null(cleared!.EstimatedCost);
+        Assert.Null((await _repository.GetByIdAsync(inserted.ParsedItemDraftId, userId))!.EstimatedCost);
+        Assert.Equal(412.50m, cleared.TravelCost);
+    }
+
+    [Fact]
+    public async Task AnotherOwnerCannotReadOrChangeAnEstimateAndResolvedDraftsCannotBeEdited()
+    {
+        var (emailId, userId) = await SeedEmailAsync();
+        var inserted = await _repository.InsertAsync(new NewParsedItemDraft(
+            emailId, userId, null, null, "activity", "Museum", null,
+            null, null, null, null, null, null, 0.9, EstimatedCost: 25.75m));
+        var update = new DraftUpdate(null, null, "activity", "Museum", null,
+            null, null, null, null, null, null, EstimatedCost: 100m);
+
+        Assert.Null(await _repository.GetByIdAsync(inserted!.ParsedItemDraftId, "another-owner"));
+        Assert.Null(await _repository.UpdateAsync(inserted.ParsedItemDraftId, "another-owner", update));
+        Assert.Equal(25.75m, (await _repository.GetByIdAsync(inserted.ParsedItemDraftId, userId))!.EstimatedCost);
+        await _repository.SetReviewStatusAsync(inserted.ParsedItemDraftId, userId, "discarded");
+        Assert.Null(await _repository.UpdateAsync(inserted.ParsedItemDraftId, userId, update));
+    }
+
+    [Fact]
+    public async Task TheDatabaseRefusesANegativeEstimatedCost()
+    {
+        var (emailId, userId) = await SeedEmailAsync();
+        var inserted = await _repository.InsertAsync(new NewParsedItemDraft(
+            emailId, userId, null, null, "activity", "Museum", null,
+            null, null, null, null, null, null, 0.9));
+        await using var conn = await OpenAsync();
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => conn.ExecuteAsync(
+            "UPDATE parsed_item_drafts SET estimated_cost = @cost WHERE parsed_item_draft_id = @id",
+            new { cost = -1m, id = inserted!.ParsedItemDraftId }));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);
     }
 
     /// <summary>

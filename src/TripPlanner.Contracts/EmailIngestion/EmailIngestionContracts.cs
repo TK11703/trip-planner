@@ -1,3 +1,5 @@
+using TripPlanner.Contracts.TripItems;
+
 namespace TripPlanner.Contracts.EmailIngestion;
 
 /// <summary>A raw email received by the trip inbox, as returned to the API consumer.</summary>
@@ -60,6 +62,28 @@ public enum DraftOutcome
     Leg = 1
 }
 
+/// <summary>Resolves recognized draft classifications consistently during review and confirmation.</summary>
+public static class DraftClassification
+{
+    /// <summary>Honors an explicit leg kind, retaining route-based inference for older drafts.</summary>
+    public static bool IsTravelLeg(string? legKind, string? mode, string? origin, string? destination) =>
+        legKind is not null
+            ? TripLegKinds.IsTravel(legKind)
+            : !string.IsNullOrWhiteSpace(mode)
+              || !string.IsNullOrWhiteSpace(origin)
+              || !string.IsNullOrWhiteSpace(destination);
+
+    /// <summary>Maps recognizer types to the itinerary types offered by the item editor.</summary>
+    public static string NormalizeItemType(string? raw)
+    {
+        var value = raw?.Trim().ToLowerInvariant();
+        if (value is not null && TrackedItemTypes.All.Contains(value)) return value;
+        return value is "flight" or "hotel" or "car_rental"
+            ? TrackedItemTypes.Reservation
+            : TrackedItemTypes.Event;
+    }
+}
+
 /// <summary>
 /// Whether a draft has been through transport recognition. Drafts that predate transport
 /// recognition are <see cref="Pending"/> until the review screen asks for them to be
@@ -107,7 +131,9 @@ public sealed record ParsedItemDraftDto(
     // The leg this draft became, once confirmed as a leg (FR-038). Null until then, and null
     // again if that leg is later deleted.
     Guid? CreatedTripLegId = null,
-    DraftRecognitionState TransportRecognitionState = DraftRecognitionState.Current);
+    DraftRecognitionState TransportRecognitionState = DraftRecognitionState.Current,
+    decimal? EstimatedCost = null,
+    string? LegKind = null);
 
 /// <summary>Request to update editable fields of a parsed item draft.</summary>
 public sealed record UpdateParsedItemDraftRequest(
@@ -126,7 +152,9 @@ public sealed record UpdateParsedItemDraftRequest(
     string? Origin = null,
     string? Destination = null,
     string? TransportationMode = null,
-    decimal? TravelCost = null);
+    decimal? TravelCost = null,
+    decimal? EstimatedCost = null,
+    string? LegKind = null);
 
 /// <summary>
 /// What a confirmed draft became. Exactly one of <paramref name="TrackedItemId"/> and

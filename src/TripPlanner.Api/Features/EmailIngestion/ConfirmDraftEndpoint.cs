@@ -117,7 +117,7 @@ public static class ConfirmDraftEndpoint
         // checks now sit in a branch, which flow analysis does not carry across.
         var request = new CreateTrackedItemRequest(
             TripLegId: draft.TripLegId,
-            ItemType: NormalizeItemType(draft.ItemType),
+            ItemType: DraftClassification.NormalizeItemType(draft.ItemType),
             Title: draft.Title!,
             Location: draft.Location,
             StartLocal: draft.StartLocal!.Value,
@@ -127,7 +127,7 @@ public static class ConfirmDraftEndpoint
             DisplayColor: TrackedItemColors.Default,
             ConfirmationCode: draft.ConfirmationCode,
             Notes: draft.Notes,
-            EstimatedCost: null);
+            EstimatedCost: draft.EstimatedCost);
 
         // The same validator the item form runs, so an out-of-window leg is refused here exactly
         // as it is there — and nothing is written when it is (FR-019, FR-020, FR-022).
@@ -209,21 +209,4 @@ public static class ConfirmDraftEndpoint
             DraftOutcome.Leg, tripId, null, null, createdLegId.Value));
     }
 
-    /// <summary>
-    /// A draft holds either a recognizer type ("flight", "hotel", "car_rental", "other") or one of
-    /// the tracked types the traveler picked in the draft editor. A tracked type is honoured as
-    /// chosen; a recognizer type maps onto the closest one.
-    /// </summary>
-    private static string NormalizeItemType(string? raw)
-    {
-        var value = raw?.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(value)) return TrackedItemTypes.Event;
-        if (TrackedItemTypes.All.Contains(value)) return value;
-
-        return value switch
-        {
-            "flight" or "hotel" or "car_rental" => TrackedItemTypes.Reservation,
-            _ => TrackedItemTypes.Event
-        };
-    }
 }

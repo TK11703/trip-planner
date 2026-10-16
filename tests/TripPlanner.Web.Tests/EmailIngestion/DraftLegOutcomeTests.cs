@@ -1,10 +1,12 @@
 using Bunit;
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Contracts.EmailIngestion;
 using TripPlanner.Contracts.TripItems;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Web.Components.Pages.EmailIngestion;
 using TripPlanner.Web.Components.EmailIngestion;
+using TripPlanner.Web.Components.Shared;
 using TripPlanner.Web.Features.EmailIngestion;
 using TripPlanner.Web.Features.Timezones;
 using TripPlanner.Web.Features.Trips;
@@ -172,10 +174,221 @@ public class DraftLegOutcomeTests : BunitContext
         {
             Assert.NotNull(cut.Find("#draft-type"));
             Assert.NotNull(cut.Find("#draft-leg"));
+            Assert.NotNull(cut.Find("#draft-estimated-cost"));
             Assert.Empty(cut.FindAll("#draft-mode"));
             Assert.Empty(cut.FindAll("#draft-origin"));
             Assert.Empty(cut.FindAll("#draft-destination"));
         });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DraftNameLabelAndRequiredValidationUseName(bool leg)
+    {
+        var (cut, ingestion) = RenderEditor(leg ? LegDraft() : ItemDraft());
+
+        Assert.Equal("Name", cut.Find("label[for='draft-title']").TextContent);
+        cut.Find("#draft-title").Change("");
+        cut.Find("form").Submit();
+
+        Assert.Contains("Name is required.", cut.Markup, StringComparison.Ordinal);
+        Assert.Empty(ingestion.Updated);
+    }
+
+    [Theory]
+    [InlineData("activity")]
+    [InlineData("reservation")]
+    [InlineData("event")]
+    [InlineData("reminder")]
+    public void ItineraryNamePrecedesTypeWithMatchingIconAndSavesTheSelection(string type)
+    {
+        var (cut, ingestion) = RenderEditor(ItemDraft());
+        var row = cut.Find("#draft-title").Closest(".row")!;
+        Assert.NotNull(row.Children[0].QuerySelector("#draft-title"));
+        Assert.NotNull(row.Children[1].QuerySelector("#draft-type"));
+        Assert.NotNull(row.QuerySelector(".input-group > .tp-type-icon-addon > svg[aria-hidden='true']"));
+        Assert.Equal("reservation", cut.Find("#draft-type").GetAttribute("value"));
+
+        cut.Find("#draft-type").Change(type);
+        Assert.Equal(type, cut.FindComponent<TrackedItemIcon>().Instance.Type);
+        cut.Find("form").Submit();
+
+        Assert.Equal(type, Assert.Single(ingestion.Updated).Request.ItemType);
+    }
+
+    [Theory]
+    [InlineData(null, null, null, null, "stay")]
+    [InlineData(null, "flight", null, null, "travel")]
+    [InlineData(null, null, "SEA", null, "travel")]
+    [InlineData("stay", "flight", "SEA", "JFK", "stay")]
+    [InlineData("travel", null, null, null, "travel")]
+    public void LegTypeIsPreselectedFromTheSavedChoiceOrLegacyRoute(
+        string? kind, string? mode, string? origin, string? destination, string expectedKind)
+    {
+        var (cut, _) = RenderEditor(LegDraft(mode: mode, origin: origin, destination: destination) with { LegKind = kind });
+
+        Assert.Equal("Leg type", cut.Find("#draft-kind legend").TextContent);
+        Assert.True(cut.Find($"#draft-kind-{expectedKind}").HasAttribute("checked"));
+        Assert.Equal(expectedKind == "travel", cut.FindAll("#draft-mode").Count == 1);
+        Assert.Equal(expectedKind == "travel", cut.FindAll("#draft-origin").Count == 1);
+        Assert.Equal(expectedKind == "travel", cut.FindAll("#draft-destination").Count == 1);
+        Assert.Equal(expectedKind == "travel", cut.FindAll("#draft-travel-cost").Count == 1);
+        Assert.Equal(["Travel", "Stay"], cut.FindAll("#draft-kind label").Select(label => label.TextContent));
+        if (expectedKind == "travel")
+        {
+            var row = cut.Find("#draft-kind").Closest(".row")!;
+            Assert.NotNull(row.Children[0].QuerySelector("#draft-kind"));
+            Assert.NotNull(row.Children[1].QuerySelector("#draft-mode"));
+        }
+    }
+
+    [Fact]
+    public async Task SwitchingLegTypeKeepsTravelDetailsAndTheSavedChoiceSurvivesReopening()
+    {
+        var (cut, ingestion) = RenderEditor(LegDraft());
+        cut.Find("#draft-kind-stay").Change("stay");
+        Assert.Empty(cut.FindAll("#draft-mode"));
+        cut.Find("#draft-outcome-item").Change(true);
+        Assert.Empty(cut.FindAll("#draft-kind"));
+        cut.Find("#draft-outcome-leg").Change(true);
+        Assert.True(cut.Find("#draft-kind-stay").HasAttribute("checked"));
+
+        cut.Find("#draft-kind-travel").Change("travel");
+        Assert.True(cut.Find("#draft-mode-flight").HasAttribute("checked"));
+        Assert.Equal("SEA", cut.Find("#draft-origin").GetAttribute("value"));
+        Assert.Equal("JFK", cut.Find("#draft-destination").GetAttribute("value"));
+        Assert.Equal("412.50", cut.Find("#draft-travel-cost").GetAttribute("value"));
+        cut.Find("#draft-kind-stay").Change("stay");
+        cut.Find("form").Submit();
+
+        Assert.Equal("stay", Assert.Single(ingestion.Updated).Request.LegKind);
+        var saved = (await ingestion.GetDraftsAsync()).Single();
+        var reopened = Render<DraftEditForm>(parameters => parameters.Add(component => component.Draft, saved));
+        Assert.True(reopened.Find("#draft-kind-stay").HasAttribute("checked"));
+        Assert.Empty(reopened.FindAll("#draft-mode"));
+    }
+
+    [Fact]
+    public void StayCanBeSavedWithoutTravelDetails()
+    {
+        var (cut, ingestion) = RenderEditor(LegDraft(mode: null, origin: null, destination: null, travelCost: null));
+        Assert.True(cut.Find("#draft-kind-stay").HasAttribute("checked"));
+        cut.Find("form").Submit();
+
+        Assert.Equal("stay", Assert.Single(ingestion.Updated).Request.LegKind);
+    }
+
+    [Theory]
+    [InlineData("stay", true)]
+    [InlineData("travel", false)]
+    public void QueueConfirmationRequiresTravelDetailsOnlyForTravel(string kind, bool canConfirm)
+    {
+        var (cut, _) = RenderQueue(LegDraft(mode: null, origin: null, destination: null) with { LegKind = kind });
+        var confirm = cut.FindAll("button").Single(button => button.TextContent.Trim() == "Confirm");
+
+        Assert.Equal(!canConfirm, confirm.HasAttribute("disabled"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0")]
+    [InlineData("123.45")]
+    [InlineData("9999999999.99")]
+    public async Task ItemEstimateFollowsConfirmationCodeAndRoundTripsThroughSave(string? amount)
+    {
+        var (cut, ingestion) = RenderEditor(ItemDraft() with { EstimatedCost = 25.50m });
+        Assert.Equal(25.50m, decimal.Parse(cut.Find("#draft-estimated-cost").GetAttribute("value")!, CultureInfo.InvariantCulture));
+        var row = cut.Find("#draft-code").Closest(".row")!;
+        Assert.Equal(["draft-code", "draft-estimated-cost"],
+            row.QuerySelectorAll("input").Select(input => input.Id));
+        Assert.Equal("0", cut.Find("#draft-estimated-cost").GetAttribute("min"));
+        Assert.Equal("0.01", cut.Find("#draft-estimated-cost").GetAttribute("step"));
+        Assert.Contains("Optional estimate", row.TextContent, StringComparison.Ordinal);
+        cut.Find("#draft-estimated-cost").Change(amount ?? "");
+        cut.Find("form").Submit();
+
+        var expected = amount is null ? (decimal?)null : decimal.Parse(amount, CultureInfo.InvariantCulture);
+        cut.WaitForAssertion(() => Assert.Equal(expected, Assert.Single(ingestion.Updated).Request.EstimatedCost));
+        Assert.Equal(expected, Assert.Single(await ingestion.GetDraftsAsync()).EstimatedCost);
+    }
+
+    [Theory]
+    [InlineData("-1", "Estimated cost cannot be negative.")]
+    [InlineData("10000000000", "Estimated cost is too large.")]
+    [InlineData("1.001", "Enter an estimated cost with up to two decimal places.")]
+    public void InvalidItemEstimatePreventsSaveAndRetainsInput(string amount, string error)
+    {
+        var (cut, ingestion) = RenderEditor(ItemDraft());
+        cut.Find("#draft-estimated-cost").Change(amount);
+        cut.Find("form").Submit();
+
+        Assert.Contains(error, cut.Markup, StringComparison.Ordinal);
+        Assert.Empty(ingestion.Updated);
+        Assert.Equal(decimal.Parse(amount, CultureInfo.InvariantCulture),
+            decimal.Parse(cut.Find("#draft-estimated-cost").GetAttribute("value")!, CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public void SwitchingOutcomesPreservesIndependentItemAndLegCosts()
+    {
+        var (cut, _) = RenderEditor(LegDraft() with { EstimatedCost = 30.25m });
+        Assert.Empty(cut.FindAll("#draft-estimated-cost"));
+        cut.Find("#draft-outcome-item").Change(true);
+        Assert.Equal("30.25", cut.Find("#draft-estimated-cost").GetAttribute("value"));
+        cut.Find("#draft-estimated-cost").Change("45.50");
+        cut.Find("#draft-outcome-leg").Change(true);
+        Assert.Equal("412.50", cut.Find("#draft-travel-cost").GetAttribute("value"));
+        cut.Find("#draft-outcome-item").Change(true);
+        Assert.Equal(45.50m, decimal.Parse(cut.Find("#draft-estimated-cost").GetAttribute("value")!, CultureInfo.InvariantCulture));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(TransportationModes.Flight)]
+    [InlineData(TransportationModes.Train)]
+    [InlineData(TransportationModes.Bus)]
+    [InlineData(TransportationModes.Boat)]
+    [InlineData(TransportationModes.Car)]
+    public void TravelModePickerShowsLabeledIconsAndPreservesSelection(string? selectedMode)
+    {
+        var (cut, _) = RenderEditor(LegDraft(mode: selectedMode));
+
+        Assert.Equal("Travel Mode", cut.Find("#draft-mode legend").TextContent);
+        Assert.Empty(cut.FindAll("#draft-mode select"));
+        Assert.NotNull(cut.Find("#draft-mode .btn-group.leg-travel-modes"));
+        var radios = cut.FindAll("#draft-mode input[type='radio']");
+        Assert.Equal(TransportationModes.All.Count, radios.Count);
+        Assert.Single(radios.Select(radio => radio.GetAttribute("name")).Distinct());
+        foreach (var mode in TransportationModes.All)
+        {
+            var label = cut.Find($"label[for='draft-mode-{mode}']");
+            Assert.Equal(TransportationModes.Label(mode), label.TextContent.Trim());
+            Assert.NotNull(label.QuerySelector("svg[aria-hidden='true']"));
+        }
+        Assert.Equal(selectedMode is null ? [] : new[] { selectedMode },
+            cut.FindAll("#draft-mode input:checked").Select(radio => radio.GetAttribute("value")));
+    }
+
+    [Theory]
+    [InlineData(TransportationModes.Flight)]
+    [InlineData(TransportationModes.Train)]
+    [InlineData(TransportationModes.Bus)]
+    [InlineData(TransportationModes.Boat)]
+    [InlineData(TransportationModes.Car)]
+    public void SelectingATravelModeSavesItAndPreservesItAcrossOutcomeChanges(string mode)
+    {
+        var (cut, ingestion) = RenderEditor(LegDraft(mode: null));
+
+        cut.Find($"#draft-mode-{mode}").Change(mode);
+        cut.Find("#draft-outcome-item").Change(true);
+        Assert.Empty(cut.FindAll("#draft-mode"));
+        cut.Find("#draft-outcome-leg").Change(true);
+
+        Assert.True(cut.Find($"#draft-mode-{mode}").HasAttribute("checked"));
+        cut.Find("form").Submit();
+
+        cut.WaitForAssertion(() => Assert.Equal(mode, Assert.Single(ingestion.Updated).Request.TransportationMode));
     }
 
     /// <summary>The recognized currency labels the amount without being editable (research D9).</summary>
@@ -238,7 +451,7 @@ public class DraftLegOutcomeTests : BunitContext
         {
             Assert.Equal("SEA", cut.Find("#draft-origin").GetAttribute("value"));
             Assert.Equal("JFK", cut.Find("#draft-destination").GetAttribute("value"));
-            Assert.Equal(TransportationModes.Flight, cut.Find("#draft-mode").GetAttribute("value"));
+            Assert.True(cut.Find("#draft-mode-flight").HasAttribute("checked"));
             Assert.Equal("412.50", cut.Find("#draft-travel-cost").GetAttribute("value"));
         });
     }
@@ -270,6 +483,7 @@ public class DraftLegOutcomeTests : BunitContext
     {
         var (cut, ingestion) = RenderEditor(LegDraft(endZone: null, origin: null, destination: null, mode: null));
 
+        cut.Find("#draft-kind-travel").Change("travel");
         cut.FindAll("button").Single(b => b.TextContent.Trim() == "Save").Click();
 
         cut.WaitForAssertion(() =>

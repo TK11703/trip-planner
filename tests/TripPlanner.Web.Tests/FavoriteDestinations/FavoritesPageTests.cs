@@ -2,6 +2,7 @@ using Bunit;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Contracts.FavoriteDestinations;
+using TripPlanner.Web.Components.Shared;
 using TripPlanner.Web.Features.FavoriteDestinations;
 using FavoriteEntryPage = TripPlanner.Web.Components.Pages.FavoriteDestinations.FavoriteEntry;
 using TripPlanner.Web.Tests.Auth;
@@ -24,6 +25,12 @@ public sealed class FavoritesPageTests : BunitContext
         var cut = Render<FavoritesPage>();
 
         cut.WaitForAssertion(() => Assert.Contains("No favorite destinations yet", cut.Markup));
+        Assert.Equal("Favorites", cut.Find("header.entry-page-heading h1").TextContent);
+        Assert.Single(cut.FindAll("h1"));
+        Assert.Equal("-1", cut.Find("h1").GetAttribute("tabindex"));
+        Assert.Equal("Places you want to remember for a future trip.", cut.Find(".entry-page-subtitle").TextContent);
+        Assert.Equal("favorite", cut.FindComponent<EntryPageHeading>().Instance.Icon);
+        Assert.NotNull(cut.Find(".entry-page-icon svg[aria-hidden='true']"));
         Assert.Equal("/favorites/new?returnUrl=%2Ffavorites", cut.Find("#favorite-add").GetAttribute("href"));
         Assert.Equal("/favorites/new?returnUrl=%2Ffavorites", cut.Find("#favorite-add-empty").GetAttribute("href"));
     }

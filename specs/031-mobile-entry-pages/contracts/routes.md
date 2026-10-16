@@ -65,7 +65,7 @@ Every entry page displays a semantic `<nav aria-label="Breadcrumb"><ol>...` with
 | Favorite edit | Home > Favorites > {Favorite name} (current) |
 | Import upload | Home > Favorites > Import favorites (current) |
 | Import job review | Home > Favorites > Import (`/favorites/import`) > {Job/file label} (current) |
-| Draft edit | Home > Inbox (`/inbox/drafts`) > Drafts (`/inbox/drafts`) > {Draft title or short ID} (`/inbox/drafts#draft-{draftId}`) > Edit draft (current) |
+| Draft edit | Home > Inbox (`/inbox/drafts`) > Drafts (`/inbox/drafts`) > {Draft title or short ID} (current) |
 | Sharing | Home > Trips > {Trip name} > Share trip (current) |
 
 Entry pages place a compact semantic header banner above one solid form card, not inside a card header. The banner uses theme brand/surface/text tokens, rounded corners, a decorative contextual icon, a short heading, and a helpful subtitle without repeating the record name. It has 1.25-2rem of responsive space before the card. Trip, leg, item, favorite, sharing, import, and draft entry pages all use this banner, with wrapping text on narrow screens. Form fields remain in the card body and bottom actions in its footer. Create/edit form footer actions wrap with the primary Save/Create action first on the left, followed by Cancel. Delete, when present, is last in DOM order and pushed to the right. Import/Finish and Cancel/Close follow the same order, with Discard import on the right; their staged behavior is unchanged. Sharing retains its single Return action. Submit buttons remain inside their EditForm to preserve validation and keyboard submission. The card retains the profile form's surface, border, spacing, and control styling.

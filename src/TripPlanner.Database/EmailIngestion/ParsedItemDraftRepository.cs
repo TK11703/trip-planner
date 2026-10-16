@@ -41,7 +41,9 @@ public sealed class ParsedItemDraftRepository : IParsedItemDraftRepository
             draft.Destination,
             draft.TransportationMode,
             draft.TravelCost,
-            draft.TravelCostCurrency
+            draft.TravelCostCurrency,
+            draft.EstimatedCost,
+            draft.LegKind
         }, cancellationToken: ct));
         return row?.ToRecord();
     }
@@ -85,7 +87,9 @@ public sealed class ParsedItemDraftRepository : IParsedItemDraftRepository
             update.Origin,
             update.Destination,
             update.TransportationMode,
-            update.TravelCost
+            update.TravelCost,
+            update.EstimatedCost,
+            update.LegKind
         }, cancellationToken: ct));
         return row?.ToRecord();
     }
@@ -180,6 +184,8 @@ public sealed class ParsedItemDraftRepository : IParsedItemDraftRepository
         public string? Destination { get; init; }
         public string? TransportationMode { get; init; }
         public decimal? TravelCost { get; init; }
+        public decimal? EstimatedCost { get; init; }
+        public string? LegKind { get; init; }
         public string? TravelCostCurrency { get; init; }
         public Guid? CreatedTripLegId { get; init; }
         public string TransportRecognitionState { get; init; } = DraftRecognitionStates.Current;
@@ -192,6 +198,6 @@ public sealed class ParsedItemDraftRepository : IParsedItemDraftRepository
             ConfirmationCode, Notes, Confidence, ReviewStatus, CreatedAtUtc, TrackedItemId,
             ProposedOutcome, Origin, Destination, TransportationMode,
             TravelCost, TravelCostCurrency, CreatedTripLegId, TransportRecognitionState,
-            TravelerEditedFields ?? []);
+            TravelerEditedFields ?? [], EstimatedCost, LegKind);
     }
 }

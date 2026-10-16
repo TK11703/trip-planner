@@ -2,6 +2,7 @@ using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using TripPlanner.Contracts.Trips;
 using TripPlanner.Web.Components.Pages.Trips;
+using TripPlanner.Web.Components.Shared;
 using TripPlanner.Web.Components.Trips;
 using TripPlanner.Web.Features.Trips;
 using TripPlanner.Web.Tests.Infrastructure;
@@ -24,6 +25,14 @@ public class TripsIndexMotivationTests : BunitContext
 
         cut.WaitForAssertion(() =>
         {
+            Assert.Equal("Trips", cut.Find("header.entry-page-heading h1").TextContent);
+            Assert.Single(cut.FindAll("h1"));
+            Assert.Equal("-1", cut.Find("h1").GetAttribute("tabindex"));
+            Assert.Equal("trip", cut.FindComponent<EntryPageHeading>().Instance.Icon);
+            Assert.NotNull(cut.Find(".entry-page-icon svg[aria-hidden='true']"));
+            var createLink = cut.Find(".entry-page-actions a");
+            Assert.Equal("New trip", createLink.TextContent);
+            Assert.Equal("/trips/new?returnUrl=%2Ftrips", createLink.GetAttribute("href"));
             Assert.Contains("organized", cut.Markup, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("trips you own", cut.Markup, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("shared with you", cut.Markup, StringComparison.OrdinalIgnoreCase);

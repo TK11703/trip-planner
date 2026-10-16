@@ -1,4 +1,5 @@
 using System.Net;
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using TripPlanner.Api.Features.Notifications;
@@ -30,7 +31,7 @@ public sealed class DraftReviewEndpointTests : IDisposable
         return client;
     }
 
-    private async Task<Guid> SeedDraftAsync(string userId, Guid? tripId = null, Guid? tripLegId = null, DateTime? startLocal = null)
+    private async Task<Guid> SeedDraftAsync(string userId, Guid? tripId = null, Guid? tripLegId = null, DateTime? startLocal = null, decimal? estimatedCost = null)
     {
         var email = await _factory.Emails.InsertAsync(new NewInboxEmail(
             userId, $"seed-{Guid.NewGuid()}", "traveler@contoso.com", "trips@contoso.com", "Booking",
@@ -38,7 +39,7 @@ public sealed class DraftReviewEndpointTests : IDisposable
 
         var draft = await _factory.Drafts.InsertAsync(new NewParsedItemDraft(
             email!.InboxEmailId, userId, tripId, tripLegId, "flight", "Flight ABC123", "SEA",
-            startLocal, "America/Los_Angeles", null, null, "ABC123", null, 0.9));
+            startLocal, "America/Los_Angeles", null, null, "ABC123", null, 0.9, EstimatedCost: estimatedCost));
 
         return draft!.ParsedItemDraftId;
     }
@@ -99,12 +100,42 @@ public sealed class DraftReviewEndpointTests : IDisposable
     {
         var draftId = await SeedDraftAsync("someone-else");
         var request = new UpdateParsedItemDraftRequest(
-            Guid.NewGuid(), Guid.NewGuid(), "flight", "Hijacked", null, null, null, null, null, null, null);
+            Guid.NewGuid(), Guid.NewGuid(), "flight", "Hijacked", null, null, null, null, null, null, null, EstimatedCost: -1);
 
         var response = await CreateTravelerClient().PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("Flight ABC123", _factory.Drafts.Rows.Single().Title);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("flight")]
+    public async Task UnknownLegKindIsRejectedWithoutChangingTheDraft(string kind)
+    {
+        var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId);
+        var request = new UpdateParsedItemDraftRequest(
+            null, null, "hotel", "Stay", null, null, null, null, null, null, null, LegKind: kind);
+
+        var response = await CreateTravelerClient().PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<ApiError>(Web))!;
+        Assert.Equal("legKind", error.Details!["field"]);
+        Assert.Null(Assert.Single(_factory.Drafts.Rows).LegKind);
+    }
+
+    [Fact]
+    public async Task AnotherTravelersDraftLegKindCannotBeChanged()
+    {
+        var draftId = await SeedDraftAsync("someone-else");
+        var request = new UpdateParsedItemDraftRequest(
+            null, null, "hotel", "Stay", null, null, null, null, null, null, null, LegKind: "invalid");
+
+        var response = await CreateTravelerClient().PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Null(Assert.Single(_factory.Drafts.Rows).LegKind);
     }
 
     [Fact]
@@ -148,6 +179,60 @@ public sealed class DraftReviewEndpointTests : IDisposable
         Assert.Equal("Flight ABC123 (corrected)", stored.Title);
         Assert.Equal(leg.TripId, stored.TripId);
         Assert.Equal(leg.TripLegId, stored.TripLegId);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0")]
+    [InlineData("123.45")]
+    [InlineData("9999999999.99")]
+    public async Task DraftEstimateSurvivesSaveReloadAndItemConfirmation(string? amount)
+    {
+        var cost = amount is null ? (decimal?)null : decimal.Parse(amount, CultureInfo.InvariantCulture);
+        var tripId = SeedTrip();
+        var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId, tripId, estimatedCost: 25.50m);
+        var client = CreateTravelerClient();
+        var request = new UpdateParsedItemDraftRequest(tripId, null, "activity", "Museum", null,
+            new DateTime(2026, 8, 12, 10, 0, 0), "UTC", null, null, "ABC123", null,
+            TravelCost: 412.50m, EstimatedCost: cost);
+
+        var saved = await client.PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal(cost, (await saved.Content.ReadFromJsonAsync<ParsedItemDraftDto>(Web))!.EstimatedCost);
+        var drafts = await client.GetFromJsonAsync<ParsedItemDraftListResponse>("/api/email-ingestion/drafts", Web);
+        Assert.Equal(cost, Assert.Single(drafts!.Items).EstimatedCost);
+        Assert.Equal(412.50m, Assert.Single(drafts.Items).TravelCost);
+
+        var confirmed = await client.PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+        Assert.Equal(cost, Assert.Single(_factory.TripItems.Rows).Request.EstimatedCost);
+        Assert.Empty(_factory.TripItems.CreatedLegs);
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("10000000000")]
+    [InlineData("1.001")]
+    public async Task InvalidEstimateIsRefusedOnSaveAndConfirmation(string amount)
+    {
+        var cost = decimal.Parse(amount, CultureInfo.InvariantCulture);
+        var tripId = SeedTrip();
+        var draftId = await SeedDraftAsync(EmailIngestionApiFactory.TravelerUserId, tripId,
+            startLocal: new DateTime(2026, 8, 12, 10, 0, 0), estimatedCost: cost);
+        var client = CreateTravelerClient();
+        var request = new UpdateParsedItemDraftRequest(tripId, null, "activity", "Changed", null,
+            new DateTime(2026, 8, 12, 10, 0, 0), "UTC", null, null, null, null, EstimatedCost: cost);
+
+        var save = await client.PutAsJsonAsync($"/api/email-ingestion/drafts/{draftId}", request);
+        Assert.Equal(HttpStatusCode.BadRequest, save.StatusCode);
+        Assert.Equal("estimatedCost", (await save.Content.ReadFromJsonAsync<ApiError>(Web))!.Details!["field"]);
+        Assert.Equal("Flight ABC123", Assert.Single(_factory.Drafts.Rows).Title);
+
+        var confirm = await client.PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", null);
+        Assert.Equal(HttpStatusCode.BadRequest, confirm.StatusCode);
+        Assert.Equal("estimatedCost", (await confirm.Content.ReadFromJsonAsync<ApiError>(Web))!.Details!["field"]);
+        Assert.Empty(_factory.TripItems.Rows);
+        Assert.Equal("pending_review", Assert.Single(_factory.Drafts.Rows).ReviewStatus);
     }
 
     // FR-012, FR-022, FR-025: the route and the outcome are traveler-editable, and switching the

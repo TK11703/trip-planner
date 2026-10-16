@@ -225,7 +225,9 @@ internal sealed class InMemoryParsedItemDraftRepository : IParsedItemDraftReposi
             TravelCostCurrency: draft.TravelCostCurrency,
             CreatedTripLegId: null,
             TransportRecognitionState: DraftRecognitionStates.Current,
-            TravelerEditedFields: []);
+            TravelerEditedFields: [],
+            EstimatedCost: draft.EstimatedCost,
+            LegKind: draft.LegKind);
         lock (_rows) { _rows.Add(record); }
         return Task.FromResult<ParsedItemDraftRecord?>(record);
     }
@@ -286,6 +288,8 @@ internal sealed class InMemoryParsedItemDraftRepository : IParsedItemDraftReposi
                 Destination = update.Destination,
                 TransportationMode = update.TransportationMode,
                 TravelCost = update.TravelCost,
+                EstimatedCost = update.EstimatedCost,
+                LegKind = update.LegKind,
                 TravelerEditedFields = edited.ToArray()
             };
             return Task.FromResult<ParsedItemDraftRecord?>(_rows[index]);

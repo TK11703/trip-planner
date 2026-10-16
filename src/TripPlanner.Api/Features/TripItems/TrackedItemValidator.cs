@@ -59,15 +59,8 @@ public sealed class TrackedItemValidator
             return ValidationResult.Fail($"Confirmation/Reservation Code must be {ConfirmationCodeMaxLength} characters or fewer.", "confirmationCode");
         if (notes is not null && notes.Length > NotesMaxLength)
             return ValidationResult.Fail($"Notes must be {NotesMaxLength} characters or fewer.", "notes");
-        if (estimatedCost is { } cost)
-        {
-            if (cost < 0)
-                return ValidationResult.Fail("Estimated cost cannot be negative.", "estimatedCost");
-            if (cost > EstimatedCostMax)
-                return ValidationResult.Fail("Estimated cost is too large.", "estimatedCost");
-            if (decimal.Round(cost, 2) != cost)
-                return ValidationResult.Fail("Enter an estimated cost with up to two decimal places.", "estimatedCost");
-        }
+        var costValidation = ValidateEstimatedCost(estimatedCost);
+        if (!costValidation.IsValid) return costValidation;
         // A leg is optional: an item the traveler cannot place yet lands in the timeline's
         // unassigned area. But once a leg is chosen, the leg's travel window is binding.
         if (tripLegId is not { } legId || legId == Guid.Empty)
@@ -108,6 +101,20 @@ public sealed class TrackedItemValidator
                 if (itemEndInstant < legStart || itemEndInstant > legEnd)
                     return ValidationResult.Fail("End must fall within the selected trip leg's travel dates.", "endLocal");
             }
+        }
+        return ValidationResult.Success;
+    }
+
+    public static ValidationResult ValidateEstimatedCost(decimal? estimatedCost)
+    {
+        if (estimatedCost is { } cost)
+        {
+            if (cost < 0)
+                return ValidationResult.Fail("Estimated cost cannot be negative.", "estimatedCost");
+            if (cost > EstimatedCostMax)
+                return ValidationResult.Fail("Estimated cost is too large.", "estimatedCost");
+            if (decimal.Round(cost, 2) != cost)
+                return ValidationResult.Fail("Enter an estimated cost with up to two decimal places.", "estimatedCost");
         }
         return ValidationResult.Success;
     }

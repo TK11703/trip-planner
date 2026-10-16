@@ -35,7 +35,9 @@ public sealed record ParsedItemDraftRecord(
     // Fields the traveler has supplied by hand, which re-recognition must not overwrite. A field
     // named here is left alone even when null, so a deliberately cleared value stays cleared
     // (FR-046).
-    IReadOnlyList<string>? TravelerEditedFields = null);
+    IReadOnlyList<string>? TravelerEditedFields = null,
+    decimal? EstimatedCost = null,
+    string? LegKind = null);
 
 /// <summary>The values <c>proposed_outcome</c> may take, matching the database check.</summary>
 public static class DraftOutcomes
@@ -73,7 +75,9 @@ public sealed record NewParsedItemDraft(
     string? Destination = null,
     string? TransportationMode = null,
     decimal? TravelCost = null,
-    string? TravelCostCurrency = null);
+    string? TravelCostCurrency = null,
+    decimal? EstimatedCost = null,
+    string? LegKind = null);
 
 /// <summary>
 /// What re-recognition proposes for a draft that predates transport recognition. Applied under
@@ -113,7 +117,9 @@ public sealed record DraftUpdate(
     string? Origin = null,
     string? Destination = null,
     string? TransportationMode = null,
-    decimal? TravelCost = null);
+    decimal? TravelCost = null,
+    decimal? EstimatedCost = null,
+    string? LegKind = null);
 
 /// <summary>
 /// A trip the caller can add items to, paired with one of its legs. The leg fields are null when

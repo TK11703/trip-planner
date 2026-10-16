@@ -1,5 +1,6 @@
 using TripPlanner.Contracts.Common;
 using TripPlanner.Contracts.Errors;
+using TripPlanner.Contracts.EmailIngestion;
 using TripPlanner.Contracts.TripItems;
 using TripPlanner.Database.EmailIngestion;
 
@@ -66,13 +67,10 @@ internal static class LegConfirmationGaps
     }
 
     /// <summary>
-    /// A draft confirmed as a leg is travel whenever it names a mode or a route. Only a draft
-    /// that names none of them is treated as a stay.
+    /// Honors the traveler's choice, falling back to route-based classification for older drafts.
     /// </summary>
     public static bool IsTravel(ParsedItemDraftRecord draft) =>
-        !string.IsNullOrWhiteSpace(draft.TransportationMode)
-        || !string.IsNullOrWhiteSpace(draft.Origin)
-        || !string.IsNullOrWhiteSpace(draft.Destination);
+        DraftClassification.IsTravelLeg(draft.LegKind, draft.TransportationMode, draft.Origin, draft.Destination);
 
     /// <summary>
     /// Builds the leg creation request from a draft that has already cleared <see cref="Find"/>,

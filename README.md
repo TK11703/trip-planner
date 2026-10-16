@@ -32,6 +32,46 @@ tests/
   TripPlanner.E2E.Tests/        # Playwright end-to-end (run against AppHost)
 ```
 
+## Page headers
+
+Trips, Profile, Favorites, Notifications, and Inbox (review and history) use the
+same responsive, icon-led title banner as trip details. Trips keeps its New trip
+action in the banner; Notifications and Inbox keep their refresh and related
+actions there. Notifications and Inbox use icon-only action controls with
+explanatory hover titles and screen-reader labels. Existing page descriptions,
+forms, and favorites actions remain available.
+When Notifications is empty, the caught-up message appears in a green success
+alert with a checked-box icon.
+The draft edit form starts with the Trip selector, before the booking-outcome
+picker, and keeps visible Save and Cancel labels with matching action icons and
+explanatory hover titles.
+Its Start and Start timezone fields share a responsive row, followed by End and
+End timezone in a second row, grouped in a Schedule card matching Edit leg;
+each pair stacks on smaller screens.
+When an itinerary-item draft has a selected trip leg, the Schedule card shows the
+same blue date-range notice as Edit trip item, including the leg name and allowed
+window in the draft's start timezone.
+Draft edit also uses the same icon-and-label travel-mode radio picker and
+consistent field spacing as Edit leg.
+Both draft outcomes label the title field Name. Itinerary drafts put Name before
+Type and show the selected type's icon, matching Edit itinerary item. Leg drafts
+offer Travel and Stay before the travel-mode picker; mode, route, and travel cost
+are shown and validated only for Travel. Switching type keeps
+entered travel details for switching back, but confirming a Stay never creates a
+travel route. The choice persists across saves using migration
+[023_draft_leg_kind.sql](src/TripPlanner.Database/Scripts/Schema/023_draft_leg_kind.sql);
+drafts without a saved choice retain their previous route-based classification.
+Its footer has Save and outline Cancel on the left and an outline red Delete
+action on the right. Deleting requires confirmation and discards the draft
+without adding it to a trip; failures leave the form open for retry.
+For itinerary-item drafts, optional Estimated cost follows Confirmation/Reservation
+Code. Estimates are stored separately from leg travel costs and carried into the
+itinerary item on confirmation. Blank means unknown; zero is an explicit zero
+estimate. Estimates must be non-negative, at most 9,999,999,999.99, and have no more
+than two decimal places. Existing drafts start without an estimate; database
+migration [022_draft_estimated_cost.sql](src/TripPlanner.Database/Scripts/Schema/022_draft_estimated_cost.sql)
+adds the nullable draft amount.
+
 ## Itinerary tables
 
 Trip pages open on **Overview**, with the description (or an explicit
