@@ -14,6 +14,7 @@ using TripPlanner.Database.Audit;
 using TripPlanner.Database.EmailIngestion;
 using TripPlanner.Database.TripItems;
 using TripPlanner.Database.Trips;
+using TripPlanner.Database.UserProfiles;
 
 namespace TripPlanner.Api.Features.EmailIngestion;
 
@@ -44,6 +45,7 @@ public static class ConfirmDraftEndpoint
         TripLegValidator legValidator,
         ITripReadRepository tripReads,
         ITripItemRepository items,
+        IUserProfileRepository profiles,
         IAuditRepository audit,
         IItineraryNotificationService itineraryNotifications,
         IClock clock,
@@ -115,16 +117,18 @@ public static class ConfirmDraftEndpoint
         // The three ! below are the item-branch guards above: title, start, and start zone were
         // all checked and refused before this point. They read as suppressions only because the
         // checks now sit in a branch, which flow analysis does not carry across.
+        var itemType = DraftClassification.NormalizeItemType(draft.ItemType);
+        var profile = await profiles.GetAsync(callerId, cancellationToken);
         var request = new CreateTrackedItemRequest(
             TripLegId: draft.TripLegId,
-            ItemType: DraftClassification.NormalizeItemType(draft.ItemType),
+            ItemType: itemType,
             Title: draft.Title!,
             Location: draft.Location,
             StartLocal: draft.StartLocal!.Value,
             StartTimeZoneId: draft.StartTimeZoneId!,
             EndLocal: draft.EndLocal,
             EndTimeZoneId: draft.EndTimeZoneId,
-            DisplayColor: TrackedItemColors.Default,
+            DisplayColor: profile?.PersonalizationPreferences.GetItemColor(itemType) ?? TrackedItemColors.All[0],
             ConfirmationCode: draft.ConfirmationCode,
             Notes: draft.Notes,
             EstimatedCost: draft.EstimatedCost);

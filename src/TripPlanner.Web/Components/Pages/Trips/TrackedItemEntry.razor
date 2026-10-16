@@ -5,7 +5,9 @@
 @inherits ApiComponentBase
 @using System.Globalization
 @using TripPlanner.Web.Features.EntryPages
+@using TripPlanner.Contracts.Profile
 @inject ITripApiClient TripApi
+@inject IProfileApiClient ProfileApi
 @inject NavigationManager Nav
 
 <div class="tracked-item-entry">
@@ -14,7 +16,7 @@
 <EntryPageShell Title="@Title" Context="Organize an activity, reservation, or other detail for your trip." Icon="item" Breadcrumbs="Breadcrumbs" LoadState="_state" ErrorMessage="@_loadError" SafeBackHref="@TripHref">
     @if (_trip is not null && _state == EntryPageShell.EntryLoadState.Ready)
     {
-        <TrackedItemForm @key="FormKey" TripId="@TripId" Item="_item" Legs="_trip.Legs" InitialTripLegId="_initialLegId" InitialStartsAt="_initialStart" CanEditContent="true" OnSaved="SavedAsync" OnCancel="CancelAsync" OnSubmittingChanged="SetSubmitting" />
+        <TrackedItemForm @key="FormKey" TripId="@TripId" Item="_item" Legs="_trip.Legs" Personalization="_personalization" InitialTripLegId="_initialLegId" InitialStartsAt="_initialStart" CanEditContent="true" OnSaved="SavedAsync" OnCancel="CancelAsync" OnSubmittingChanged="SetSubmitting" />
     }
 </EntryPageShell>
 </EntryNavigationGuard>
@@ -34,6 +36,7 @@
 
     private TripDetail? _trip;
     private TrackedItemDto? _item;
+    private PersonalizationPreferences? _personalization;
     private Guid? _initialLegId;
     private DateTime? _initialStart;
     private EntryPageShell.EntryLoadState _state = EntryPageShell.EntryLoadState.Loading;
@@ -98,6 +101,14 @@
                     _initialStart = parsed;
                 }
             }
+            var profile = await ProfileApi.GetAsync();
+            if (profile is null)
+            {
+                _state = EntryPageShell.EntryLoadState.Error;
+                _loadError = "We couldn't load your item color preferences right now.";
+                return;
+            }
+            _personalization = profile.PersonalizationPreferences;
             _state = EntryPageShell.EntryLoadState.Ready;
         }, error => { _loadError = error; _state = EntryPageShell.EntryLoadState.Error; });
         if (IsReauthenticating) _state = EntryPageShell.EntryLoadState.Loading;

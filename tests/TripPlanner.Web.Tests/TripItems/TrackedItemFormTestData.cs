@@ -52,6 +52,7 @@ internal static class TrackedItemFormTestData
 
 internal sealed class FormStubTripApiClient : ITripApiClient
 {
+    public CreateTrackedItemRequest? CreatedItem { get; private set; }
     public List<Guid> DeletedItems { get; } = new();
     public Exception? DeleteFailure { get; set; }
     public Task<TripTimelineResponse?> GetTimelineAsync(Guid tripId, CancellationToken ct = default) => throw new NotSupportedException();
@@ -65,7 +66,11 @@ internal sealed class FormStubTripApiClient : ITripApiClient
     public Task UpdateLegAsync(Guid tripId, Guid tripLegId, UpdateTripLegRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     public Task DeleteLegAsync(Guid tripId, Guid tripLegId, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<TripLegDefaultsResponse?> GetLegDefaultsAsync(Guid tripId, CancellationToken ct = default) => throw new NotSupportedException();
-    public Task CreateItemAsync(Guid tripId, CreateTrackedItemRequest request, CancellationToken ct = default) => Task.CompletedTask;
+    public Task CreateItemAsync(Guid tripId, CreateTrackedItemRequest request, CancellationToken ct = default)
+    {
+        CreatedItem = request;
+        return Task.CompletedTask;
+    }
     public Task UpdateItemAsync(Guid tripId, Guid trackedItemId, UpdateTrackedItemRequest request, CancellationToken ct = default) => Task.CompletedTask;
     public Task DeleteItemAsync(Guid tripId, Guid trackedItemId, CancellationToken ct = default)
     {

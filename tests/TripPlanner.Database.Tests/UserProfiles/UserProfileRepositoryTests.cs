@@ -169,6 +169,35 @@ public class UserProfileRepositoryTests
     // ---- Notification preferences ----
 
     [Fact]
+    public async Task ItemTypeColors_PersistPerUser_SurviveSignInAndOlderClients_AndClear()
+    {
+        var mine = NewUser();
+        var theirs = NewUser();
+        var now = DateTimeOffset.UtcNow;
+        await _profiles.EnsureFromAuthenticatedUserAsync(mine, null, null, null, null, now);
+        await _profiles.EnsureFromAuthenticatedUserAsync(theirs, null, null, null, null, now);
+        Assert.Empty((await _profiles.GetAsync(mine))!.PersonalizationPreferences.ItemTypeColors!);
+
+        await _profiles.UpdateAsync(mine, Update(personalization: new(null, null, null, null,
+            new Dictionary<string, string> { ["Activity"] = "PURPLE", ["event"] = "teal" })), now);
+        var saved = await _profiles.GetAsync(mine);
+        Assert.Equal("purple", saved!.PersonalizationPreferences.ItemTypeColors!["activity"]);
+        Assert.Equal("teal", saved.PersonalizationPreferences.GetItemColor("event"));
+        Assert.Equal("slate", (await _profiles.GetAsync(theirs))!.PersonalizationPreferences.GetItemColor("activity"));
+
+        var signedIn = await _profiles.EnsureFromAuthenticatedUserAsync(mine, null, null, null, null, now.AddMinutes(1));
+        Assert.Equal("purple", signedIn.PersonalizationPreferences.GetItemColor("activity"));
+        await _profiles.UpdateAsync(mine, Update(), now.AddMinutes(2));
+        Assert.Equal("purple", (await _profiles.GetAsync(mine))!.PersonalizationPreferences.GetItemColor("activity"));
+
+        await _profiles.UpdateAsync(mine, Update(personalization: new(null, null, null, null,
+            new Dictionary<string, string>())), now.AddMinutes(3));
+        var cleared = await _profiles.GetAsync(mine);
+        Assert.Empty(cleared!.PersonalizationPreferences.ItemTypeColors!);
+        Assert.Equal("slate", cleared.PersonalizationPreferences.GetItemColor("activity"));
+    }
+
+    [Fact]
     public async Task UpdateAsync_PersistsNotificationPreferences()
     {
         var userId = NewUser();

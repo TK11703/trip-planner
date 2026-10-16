@@ -72,6 +72,24 @@ public sealed class ConfirmDraftAsLegTests : IDisposable
     }
 
     [Fact]
+    public async Task ItemConfirmation_UsesConfirmingUsersColorPreference()
+    {
+        var tripId = SeedTrip();
+        var draftId = await SeedTransportDraftAsync(tripId, proposedOutcome: DraftOutcomes.Item);
+        var now = DateTimeOffset.UtcNow;
+        _factory.Profiles.Profiles[EmailIngestionApiFactory.TravelerUserId] = new(
+            EmailIngestionApiFactory.TravelerUserId, null, null, "Traveler", EmailIngestionApiFactory.TravelerEmail,
+            "UTC", Contracts.Profile.MapProviders.Bing, true, Contracts.Profile.NotificationPreferences.Default,
+            new(null, null, null, null, new Dictionary<string, string> { ["reservation"] = "purple" }),
+            now, now, now);
+
+        var response = await CreateTravelerClient().PostAsync($"/api/email-ingestion/drafts/{draftId}/confirm", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("purple", Assert.Single(_factory.TripItems.Rows).Request.DisplayColor);
+    }
+
+    [Fact]
     public async Task AForwardedFlightBecomesATravelLegAndNotATrackedItem()
     {
         var tripId = SeedTrip();

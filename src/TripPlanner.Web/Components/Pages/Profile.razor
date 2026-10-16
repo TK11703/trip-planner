@@ -4,6 +4,7 @@
 @inherits ApiComponentBase
 @using System.ComponentModel.DataAnnotations
 @using TripPlanner.Contracts.Profile
+@using TripPlanner.Contracts.TripItems
 @using TripPlanner.Web.Features.Timezones
 @inject IProfileApiClient ProfileApi
 @inject TripPlanner.Web.Features.Maps.IMapPreferenceProvider MapPreference
@@ -94,6 +95,25 @@ else if (_model is not null)
             </div>
 
             <h2 class="h4 mt-4">Personalization</h2>
+            <fieldset class="mb-4">
+                <legend class="h6">Default item colors</legend>
+                <p class="text-secondary small">Selecting an item type uses your preferred color. Without a preference, the first color in the list is selected. Existing item colors are kept until you change the type or color.</p>
+                <div class="row g-3">
+                    @foreach (var preference in _model.ItemTypeColors)
+                    {
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="@($"color-{preference.ItemType}")">@preference.DisplayName</label>
+                            <InputSelect id="@($"color-{preference.ItemType}")" class="form-select" @bind-Value="preference.Color">
+                                <option value="">No preference (@TrackedItemColors.All[0])</option>
+                                @foreach (var color in TrackedItemColors.All)
+                                {
+                                    <option value="@color">@color</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    }
+                </div>
+            </fieldset>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label" for="travelInterests">Travel interests</label>
@@ -172,7 +192,9 @@ else if (_model is not null)
                     new NotificationPreferences(_model.NotificationCategories
                         .Select(c => new NotificationCategoryPreference(c.Category, c.DisplayName, c.InAppEnabled, c.EmailEnabled))
                         .ToArray()),
-                    new PersonalizationPreferences(_model.TravelInterests, _model.HomeAirport, _model.PreferredTravelStyle, _model.AccessibilityNotes));
+                    new PersonalizationPreferences(_model.TravelInterests, _model.HomeAirport, _model.PreferredTravelStyle, _model.AccessibilityNotes,
+                        _model.ItemTypeColors.Where(preference => !string.IsNullOrEmpty(preference.Color))
+                            .ToDictionary(preference => preference.ItemType, preference => preference.Color)));
 
                 var saved = await ProfileApi.SaveAsync(request);
                 MapPreference.Invalidate();
@@ -207,7 +229,15 @@ else if (_model is not null)
             TravelInterests = profile.PersonalizationPreferences.TravelInterests,
             HomeAirport = profile.PersonalizationPreferences.HomeAirport,
             PreferredTravelStyle = profile.PersonalizationPreferences.PreferredTravelStyle,
-            AccessibilityNotes = profile.PersonalizationPreferences.AccessibilityNotes
+            AccessibilityNotes = profile.PersonalizationPreferences.AccessibilityNotes,
+            ItemTypeColors = new[] { TrackedItemTypes.Activity, TrackedItemTypes.Reservation, TrackedItemTypes.Event, TrackedItemTypes.Reminder }
+                .Select(type => new ItemTypeColorModel
+                {
+                    ItemType = type,
+                    DisplayName = char.ToUpperInvariant(type[0]) + type[1..],
+                    Color = profile.PersonalizationPreferences.ItemTypeColors?.FirstOrDefault(pair =>
+                        string.Equals(pair.Key, type, StringComparison.OrdinalIgnoreCase)).Value ?? string.Empty
+                }).ToList()
         };
     }
 
@@ -245,6 +275,14 @@ else if (_model is not null)
         public string? HomeAirport { get; set; }
         public string? PreferredTravelStyle { get; set; }
         public string? AccessibilityNotes { get; set; }
+        public List<ItemTypeColorModel> ItemTypeColors { get; set; } = new();
+    }
+
+    private sealed class ItemTypeColorModel
+    {
+        public string ItemType { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string Color { get; set; } = string.Empty;
     }
 
     private sealed class CategoryPreferenceModel

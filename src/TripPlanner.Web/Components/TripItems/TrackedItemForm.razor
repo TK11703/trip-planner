@@ -48,7 +48,7 @@
             <label class="form-label" for="item-type">Type</label>
             <div class="input-group">
                 <span class="input-group-text tp-type-icon-addon"><TrackedItemIcon Type="@_model.ItemType" /></span>
-                <InputSelect id="item-type" class="form-select" @bind-Value="_model.ItemType">
+                <InputSelect id="item-type" class="form-select" @bind-Value="_model.ItemType" @bind-Value:after="OnTypeChanged">
                     <option value="activity">Activity</option>
                     <option value="reservation">Reservation</option>
                     <option value="event">Event</option>
@@ -246,9 +246,13 @@
 }
 
 @code {
+    [Parameter] public PersonalizationPreferences? Personalization { get; set; }
     [CascadingParameter] private EntryNavigationGuard? NavigationGuard { get; set; }
     private bool _colorOpen;
     private ElementReference _colorSummary;
+
+    private void OnTypeChanged()
+        => _model.DisplayColor = Personalization?.GetItemColor(_model.ItemType) ?? TrackedItemColors.All[0];
 
     private async Task SelectColorAsync(string color)
     {
@@ -630,6 +634,7 @@
 
             if (!_appliedInitial)
             {
+                OnTypeChanged();
                 if (InitialTripLegId is { } initialLeg)
                 {
                     _model.TripLegId = initialLeg;
@@ -830,6 +835,7 @@
         {
             await TripApi.CreateItemAsync(TripId, request);
             _model = new ItemModel { TripLegId = Legs.FirstOrDefault(l => l.CanContainItems)?.TripLegId };
+            OnTypeChanged();
             _tzInitialized = false;
             _clampedLegId = null;
         }

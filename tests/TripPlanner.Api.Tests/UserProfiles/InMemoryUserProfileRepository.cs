@@ -69,7 +69,10 @@ internal sealed class InMemoryUserProfileRepository : IUserProfileRepository
                 Normalize(request.PersonalizationPreferences.TravelInterests),
                 Normalize(request.PersonalizationPreferences.HomeAirport),
                 Normalize(request.PersonalizationPreferences.PreferredTravelStyle),
-                Normalize(request.PersonalizationPreferences.AccessibilityNotes)),
+                Normalize(request.PersonalizationPreferences.AccessibilityNotes),
+                request.PersonalizationPreferences.ItemTypeColors is { } colors
+                    ? colors.ToDictionary(pair => pair.Key.ToLowerInvariant(), pair => pair.Value.ToLowerInvariant())
+                    : existing.PersonalizationPreferences.ItemTypeColors),
             UpdatedAtUtc = nowUtc,
             LastSeenAtUtc = nowUtc
         };

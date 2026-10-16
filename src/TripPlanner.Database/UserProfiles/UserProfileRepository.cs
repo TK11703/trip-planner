@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using Dapper;
 using TripPlanner.Contracts.Notifications;
 using TripPlanner.Contracts.Profile;
@@ -82,6 +83,9 @@ public sealed class UserProfileRepository : IUserProfileRepository
             HomeAirport = Normalize(request.PersonalizationPreferences.HomeAirport),
             PreferredTravelStyle = Normalize(request.PersonalizationPreferences.PreferredTravelStyle),
             AccessibilityNotes = Normalize(request.PersonalizationPreferences.AccessibilityNotes),
+            ItemTypeColors = request.PersonalizationPreferences.ItemTypeColors is { } colors
+                ? JsonSerializer.Serialize(colors.ToDictionary(pair => pair.Key.ToLowerInvariant(), pair => pair.Value.ToLowerInvariant()))
+                : null,
             NowUtc = nowUtc
         }, cancellationToken: cancellationToken));
 
@@ -180,6 +184,7 @@ public sealed class UserProfileRepository : IUserProfileRepository
         string? HomeAirport,
         string? PreferredTravelStyle,
         string? AccessibilityNotes,
+        string ItemTypeColors,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset UpdatedAtUtc,
         DateTimeOffset LastSeenAtUtc)
@@ -194,7 +199,9 @@ public sealed class UserProfileRepository : IUserProfileRepository
             MapProviders.Normalize(MapProvider),
             IsComplete: !string.IsNullOrWhiteSpace(DisplayName) && !string.IsNullOrWhiteSpace(Email),
             notificationPreferences,
-            new PersonalizationPreferences(TravelInterests, HomeAirport, PreferredTravelStyle, AccessibilityNotes),
+            new PersonalizationPreferences(TravelInterests, HomeAirport, PreferredTravelStyle, AccessibilityNotes,
+                JsonSerializer.Deserialize<Dictionary<string, string>>(ItemTypeColors)
+                    ?? throw new JsonException("Item type colors must be an object.")),
             CreatedAtUtc,
             UpdatedAtUtc,
             LastSeenAtUtc);

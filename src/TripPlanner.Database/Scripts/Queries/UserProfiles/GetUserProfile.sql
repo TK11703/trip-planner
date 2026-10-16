@@ -10,6 +10,7 @@ SELECT
     home_airport AS HomeAirport,
     preferred_travel_style AS PreferredTravelStyle,
     accessibility_notes AS AccessibilityNotes,
+    item_type_colors::text AS ItemTypeColors,
     created_at_utc AS CreatedAtUtc,
     updated_at_utc AS UpdatedAtUtc,
     last_seen_at_utc AS LastSeenAtUtc

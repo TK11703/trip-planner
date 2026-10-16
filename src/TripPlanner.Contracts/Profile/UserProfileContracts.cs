@@ -1,4 +1,5 @@
 using TripPlanner.Contracts.Notifications;
+using TripPlanner.Contracts.TripItems;
 
 namespace TripPlanner.Contracts.Profile;
 
@@ -84,4 +85,15 @@ public sealed record PersonalizationPreferences(
     string? TravelInterests,
     string? HomeAirport,
     string? PreferredTravelStyle,
-    string? AccessibilityNotes);
+    string? AccessibilityNotes,
+    IReadOnlyDictionary<string, string>? ItemTypeColors = null)
+{
+    public string GetItemColor(string itemType)
+    {
+        var color = ItemTypeColors?.FirstOrDefault(pair =>
+            string.Equals(pair.Key, itemType, StringComparison.OrdinalIgnoreCase)).Value;
+        return TrackedItemColors.IsValid(color)
+            ? TrackedItemColors.Normalize(color)
+            : TrackedItemColors.All[0];
+    }
+}

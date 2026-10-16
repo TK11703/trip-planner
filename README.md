@@ -57,6 +57,14 @@ including existing notifications whose source email is still available. Subjects
 are visible only to the email's owner; blank or unavailable subjects are omitted.
 The Profile page's three notification preference groups share one row on medium
 and larger screens and stack vertically on smaller screens.
+Profile also lets each user save or clear a default color for Activity,
+Reservation, Event, and Reminder. New items and explicit type changes select that
+user's preferred color, or the first palette color (slate) when no preference is
+saved. Users can still choose another color for any item. Opening an existing item
+preserves its saved color. Defaults belong to the signed-in user, including when
+editing shared trips, and do not recolor existing items.
+Confirming an emailed item also uses the confirming user's preferred color for
+the resulting item type.
 The draft edit form starts with the Trip selector, before the booking-outcome
 picker, and keeps visible Save and Cancel labels with matching action icons and
 explanatory hover titles.

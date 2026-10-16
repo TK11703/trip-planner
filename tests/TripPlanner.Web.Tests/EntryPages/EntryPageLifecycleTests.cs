@@ -13,6 +13,8 @@ using TripPlanner.Web.Features.FavoriteDestinations;
 using TripPlanner.Web.Tests.FavoriteDestinations;
 using TripPlanner.Contracts.FavoriteDestinations;
 using TripPlanner.Web.Components.Pages.FavoriteDestinations;
+using TripPlanner.Web.Features.Profile;
+using TripPlanner.Web.Tests.Profile;
 
 namespace TripPlanner.Web.Tests.EntryPages;
 
@@ -105,6 +107,7 @@ public sealed class EntryPageLifecycleTests : BunitContext
             Assert.Equal($"/trips/{trip.TripId:D}#leg-{trip.Legs[0].TripLegId:D}", cut.FindAll(".breadcrumb-item a")[^1].GetAttribute("href"));
         }
         AssertBanner(cut, "item", "Organize an activity, reservation, or other detail for your trip.");
+        Assert.Equal(isEdit ? "blue" : "purple", cut.Find("#item-color-name").TextContent);
         Assert.Equal("Save", cut.Find(".card-footer button[type='submit']").TextContent.Trim());
         Assert.Equal(isEdit ? "Save changes to this trip item" : "Save this new item to the trip", cut.Find(".card-footer button[type='submit']").GetAttribute("title"));
         Assert.Contains(cut.FindComponents<ActionIcon>(), icon => icon.Instance.Name == "save");
@@ -185,6 +188,8 @@ public sealed class EntryPageLifecycleTests : BunitContext
         api.Details[tripId] = trip;
         Services.AddSingleton<TripPlanner.Web.Features.Trips.ITripApiClient>(api);
         Services.AddSingleton<TripPlanner.Web.Features.Maps.IMapPreferenceProvider>(new StubMapPreferenceProvider());
+        Services.AddSingleton<IProfileApiClient>(new RecordingProfileApiClient(ProfileTestData.CompleteProfile(
+            personalization: new(null, null, null, null, new Dictionary<string, string> { ["activity"] = "purple" }))));
         Services.AddSingleton<ITimezoneOptionsProvider>(new TimezoneOptionsProvider());
         Services.AddSingleton<IFavoriteDestinationApiClient>(new RecordingFavoriteDestinationApiClient());
         return trip;

@@ -451,6 +451,7 @@ internal sealed class RecordingNotificationService : INotificationService
 /// <summary>A profile directory seeded with one traveler; tests can add ambiguous duplicates.</summary>
 internal sealed class StubProfileDirectory : IUserProfileRepository
 {
+    public Dictionary<string, Contracts.Profile.UserProfileResponse> Profiles { get; } = new(StringComparer.Ordinal);
     private readonly List<(string UserId, string Email)> _entries = [];
 
     public StubProfileDirectory(string userId, string email) => _entries.Add((userId, email));
@@ -467,7 +468,7 @@ internal sealed class StubProfileDirectory : IUserProfileRepository
     }
 
     public Task<Contracts.Profile.UserProfileResponse?> GetAsync(string userId, CancellationToken cancellationToken = default)
-        => Task.FromResult<Contracts.Profile.UserProfileResponse?>(null);
+        => Task.FromResult(Profiles.GetValueOrDefault(userId));
 
     public Task<Contracts.Profile.UserProfileResponse> EnsureFromAuthenticatedUserAsync(string userId, string? firstName, string? lastName, string? displayName, string? email, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
         => throw new NotSupportedException();

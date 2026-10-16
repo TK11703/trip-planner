@@ -3,6 +3,7 @@ using TripPlanner.Api.Features.Timezones;
 using TripPlanner.Contracts.Errors;
 using TripPlanner.Contracts.Notifications;
 using TripPlanner.Contracts.Profile;
+using TripPlanner.Contracts.TripItems;
 
 namespace TripPlanner.Api.Features.UserProfiles;
 
@@ -51,6 +52,19 @@ public sealed class UserProfileValidator
         if (!_timezones.IsValid(request.TimeZoneId))
         {
             return (false, ApiError.ValidationFailed("Select a valid timezone.", nameof(request.TimeZoneId)));
+        }
+
+        if (request.PersonalizationPreferences?.ItemTypeColors is { } colors)
+        {
+            var types = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (type, color) in colors)
+            {
+                if (!TrackedItemTypes.All.Contains(type) || !TrackedItemColors.IsValid(color) || !types.Add(type))
+                {
+                    return (false, ApiError.ValidationFailed(
+                        "Choose one supported color per known item type.", nameof(PersonalizationPreferences.ItemTypeColors)));
+                }
+            }
         }
 
         return (true, null);
