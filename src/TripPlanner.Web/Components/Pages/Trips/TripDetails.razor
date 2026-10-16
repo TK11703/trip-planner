@@ -70,15 +70,15 @@ else
                     <div class="d-flex flex-wrap align-items-center gap-3">
                         <h2 class="h6 mb-0">@(_planningView == TripPlanningView.Timeline ? "Trip timeline" : "Itinerary table")</h2>
                         <div class="btn-group btn-group-sm" role="group" aria-label="Itinerary view">
-                            <a class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Table ? "page" : null)" href="@TripViewHref(TripPlanningView.Table)">Table</a>
-                            <a class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Timeline ? "page" : null)" href="@TripViewHref(TripPlanningView.Timeline)">Timeline</a>
+                            <a class="btn @(_planningView == TripPlanningView.Table ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Table ? "page" : null)" title="View itinerary as a table" href="@TripViewHref(TripPlanningView.Table)">Table</a>
+                            <a class="btn @(_planningView == TripPlanningView.Timeline ? "btn-primary" : "btn-outline-primary")" aria-current="@(_planningView == TripPlanningView.Timeline ? "page" : null)" title="View itinerary as a timeline" href="@TripViewHref(TripPlanningView.Timeline)">Timeline</a>
                         </div>
                     </div>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
                         @if (CanEditContent && itinerary.HasContent)
                         {
-                            <a id="tp-table-add-leg" class="btn btn-sm btn-outline-primary" aria-label="Add leg" href="@EntryPageUrls.LegCreate(TripId, CurrentTripReturn)"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add leg</a>
-                            <a id="tp-table-add-item" class="btn btn-sm btn-outline-primary" aria-label="Add item" href="@EntryPageUrls.ItemCreate(TripId, startLocal: _planningView == TripPlanningView.Timeline ? (_timeline?.CurrentDate ?? InitialDate)?.ToDateTime(TimeOnly.MinValue) : null, returnUrl: CurrentTripReturn)"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add item</a>
+                            <a id="tp-table-add-leg" class="btn btn-sm btn-outline-primary" aria-label="Add leg" title="Add a new travel leg" href="@EntryPageUrls.LegCreate(TripId, CurrentTripReturn)"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add leg</a>
+                            <a id="tp-table-add-item" class="btn btn-sm btn-outline-primary" aria-label="Add item" title="Add a new itinerary item" href="@EntryPageUrls.ItemCreate(TripId, startLocal: _planningView == TripPlanningView.Timeline ? (_timeline?.CurrentDate ?? InitialDate)?.ToDateTime(TimeOnly.MinValue) : null, returnUrl: CurrentTripReturn)"><ActionIcon Name="add" CssClass="me-1 align-text-bottom" />Add item</a>
                         }
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 @onclick="OpenMapModal" disabled="@(!CanOpenMap)"
@@ -229,7 +229,7 @@ else
                     <h2 id="trip-legs-heading" class="h5 mb-0">Travel legs</h2>
                     @if (CanEditContent)
                     {
-                        <a class="btn btn-sm btn-outline-primary" aria-label="Add leg" href="@EntryPageUrls.LegCreate(TripId, CurrentTripReturn)"><ActionIcon Name="add" CssClass="me-1" />Add leg</a>
+                        <a class="btn btn-sm btn-outline-primary" aria-label="Add leg" title="Add a new travel leg" href="@EntryPageUrls.LegCreate(TripId, CurrentTripReturn)"><ActionIcon Name="add" CssClass="me-1" />Add leg</a>
                     }
                 </div>
                 @if (itinerary.Legs.Count == 0)

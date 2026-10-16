@@ -18,7 +18,7 @@
 h1 { font-size: clamp(1.25rem, 4vw, 1.65rem); font-weight: 700; line-height: 1.25; margin: 0; }
 .entry-page-subtitle { margin: .25rem 0 0; line-height: 1.5; }
 .entry-page-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.entry-page-actions ::deep .btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.entry-page-actions ::deep .btn { display: inline-flex; align-items: center; justify-content: center; }
 @media (max-width: 575.98px) {
     .entry-page-actions { width: 100%; }
     .entry-page-actions ::deep > * { flex: 1 1 auto; }

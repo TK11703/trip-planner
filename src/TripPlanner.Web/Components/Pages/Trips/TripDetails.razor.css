@@ -6,7 +6,7 @@
 .trip-icon-widget .card-body { min-width: 0; }
 .trip-overview { min-width: 0; }
 .trip-overview .card-body { overflow-wrap: anywhere; }
-.trip-overview ::deep .btn { min-height: 44px; display: inline-flex; align-items: center; }
+.trip-overview ::deep .btn { display: inline-flex; align-items: center; }
 .trip-leg-list .card { border-inline-start: 4px solid var(--tp-brand); }
 .trip-leg-list .card-body { padding-block: .5rem; }
 .trip-leg-list a { display: inline-flex; align-items: center; min-height: 44px; padding-block: .25rem; text-underline-offset: .2em; }
@@ -15,4 +15,4 @@
     .trip-detail-tabs .nav-link { flex: 1; text-align: center; }
 }
 .trip-header-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; }
-.trip-header-actions .btn { width: 44px; height: 44px; padding: .5rem; }
+.trip-header-actions .btn {  padding: .5rem; }
