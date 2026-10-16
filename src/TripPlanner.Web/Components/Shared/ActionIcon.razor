@@ -1,5 +1,4 @@
-@* Maps a form action to an inline-SVG glyph for use inside buttons. Presentation-only:
-   the button text stays the accessible label, so the glyph is hidden from assistive tech. *@
+@* Presentation-only glyphs; the control supplies its accessible label. *@
 
 <svg class="@CssClass" viewBox="0 0 16 16" width="1em" height="1em"
      fill="currentColor" aria-hidden="true" focusable="false" role="img">
@@ -55,8 +54,31 @@
             <rect x="2" y="3" width="12" height="11" rx="1.5" fill="none" stroke="currentColor" />
             <path d="M2 6h12M5 1v4M11 1v4M5 10l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.5" />
             break;
+        case "profile":
+            <circle cx="8" cy="4.5" r="3" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <path d="M2 15v-1a6 6 0 0 1 12 0v1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            break;
         case "favorite":
             <path d="m8 1.5 2 4.1 4.5.7-3.3 3.2.8 4.5-4-2.1-4 2.1.8-4.5L1.5 6.3l4.5-.7Z" fill="none" stroke="currentColor" stroke-linejoin="round" />
+            break;
+        case "refresh":
+            <path d="M13.5 5A6 6 0 1 0 14 9M10 5h4V1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            break;
+        case "history":
+            <path d="M2 5a6 6 0 1 1-.5 4M2 1v4h4M8 4v4l3 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            break;
+        case "read":
+            <path d="m2 8 4 4 8-8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            break;
+        case "read-all":
+            <path d="m1 8 3 3 7-7M7 10l2 2 6-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            break;
+        case "notification":
+            <path d="M6 2a2 2 0 0 1 4 0M3 6a5 5 0 0 1 10 0v4l1.5 2h-13L3 10ZM6 14a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            break;
+        case "inbox":
+            <rect x="1" y="2.5" width="14" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <path d="m1.5 3 6.5 5 6.5-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
             break;
         case "draft":
             <path d="M3 1.5h7L13 5v9.5H3ZM10 1.5V5h3M5 8h6M5 11h4" fill="none" stroke="currentColor" stroke-linejoin="round" />
@@ -108,6 +130,10 @@
             @* exclamation-triangle-fill *@
             <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
             break;
+        case "check-square":
+            <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <path d="m4 8 3 3 5-6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            break;
         case "success":
             @* check-circle-fill *@
             <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z" />
@@ -121,7 +147,7 @@
 </svg>
 
 @code {
-    /// <summary>The action name (case-insensitive): flight, train, bus, boat, car, info, copy, trip, leg, item, favorite, draft, add, delete, cancel, import, back, print, share, edit, map, warning, success, or save.</summary>
+    /// <summary>The action name (case-insensitive): flight, train, bus, boat, car, info, copy, calendar, trip, leg, item, profile, favorite, refresh, history, read, read-all, notification, inbox, draft, add, delete, cancel, import, back, print, share, edit, map-pin, map, warning, check-square, success, or save.</summary>
     [Parameter] public string? Name { get; set; }
 
     /// <summary>Optional extra CSS classes for spacing/alignment in context.</summary>

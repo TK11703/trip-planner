@@ -8,13 +8,12 @@
 <PageTitle>Inbox history</PageTitle>
 
 <section class="inbox-history-page">
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <h1 class="mb-0">Inbox history</h1>
-        <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="LoadAsync" disabled="@(_isLoading || _isBusy)">Refresh</button>
-            <a class="btn btn-outline-primary btn-sm" href="/inbox/drafts">Review pending drafts</a>
-        </div>
-    </div>
+    <EntryPageHeading Title="Inbox history" Icon="inbox">
+        <Actions>
+            <button type="button" class="btn btn-outline-secondary btn-sm" title="Refresh inbox email history" @onclick="LoadAsync" disabled="@(_isLoading || _isBusy)"><ActionIcon Name="refresh" /><span class="visually-hidden">Refresh</span></button>
+            <a class="btn btn-outline-primary btn-sm" title="Review parsed items waiting for confirmation" href="/inbox/drafts"><ActionIcon Name="draft" /><span class="visually-hidden">Review pending drafts</span></a>
+        </Actions>
+    </EntryPageHeading>
 
     @if (_isLoading)
     {
@@ -55,10 +54,10 @@
                         <td>
                             @if (item.ParseStatus == ParseStatus.Failed || item.ParseStatus == ParseStatus.Unsupported)
                             {
-                                <button class="btn btn-sm btn-outline-secondary"
+                                <button type="button" class="btn btn-sm btn-outline-secondary" title="Try processing this email again"
                                         @onclick="() => ReprocessAsync(item.InboxEmailId)"
                                         disabled="@_isBusy">
-                                    Re-process
+                                    <ActionIcon Name="refresh" /><span class="visually-hidden">Re-process</span>
                                 </button>
                             }
                         </td>

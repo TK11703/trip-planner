@@ -6,16 +6,15 @@
 <PageTitle>Notifications</PageTitle>
 
 <section class="notifications-page">
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <h1 class="mb-0">Notifications</h1>
-        <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="LoadAsync" disabled="@(_isLoading || _isBusy)">Refresh</button>
+    <EntryPageHeading Title="Notifications" Icon="notification">
+        <Actions>
+            <button type="button" class="btn btn-outline-secondary btn-sm" title="Refresh notifications" @onclick="LoadAsync" disabled="@(_isLoading || _isBusy)"><ActionIcon Name="refresh" /><span class="visually-hidden">Refresh</span></button>
             @if (_notifications.Count > 0)
             {
-                <button class="btn btn-outline-secondary btn-sm" @onclick="MarkAllReadAsync" disabled="@_isBusy">Mark all as read</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" title="Mark all notifications as read" @onclick="MarkAllReadAsync" disabled="@_isBusy"><ActionIcon Name="read-all" /><span class="visually-hidden">Mark all as read</span></button>
             }
-        </div>
-    </div>
+        </Actions>
+    </EntryPageHeading>
 
     @if (_isLoading)
     {
@@ -27,7 +26,10 @@
     }
     else if (_notifications.Count == 0)
     {
-        <div class="alert alert-info" role="status">You're all caught up. There's nothing to review right now.</div>
+        <div class="alert alert-success d-flex align-items-center gap-2" role="status">
+            <ActionIcon Name="check-square" CssClass="flex-shrink-0" />
+            <span>You're all caught up. There's nothing to review right now.</span>
+        </div>
     }
     else
     {
@@ -61,8 +63,8 @@
                                     @if (item.CanOpenTrip)
                                     {
                                         <div class="mt-2">
-                                            <a class="btn btn-sm btn-outline-primary" href="@($"/trips/{tripId}")">
-                                                View @(string.IsNullOrWhiteSpace(item.RelatedTripName) ? "trip" : item.RelatedTripName)
+                                            <a class="btn btn-sm btn-outline-primary" title="Open the related trip" href="@($"/trips/{tripId}")">
+                                                <ActionIcon Name="trip" /><span class="visually-hidden">View @(string.IsNullOrWhiteSpace(item.RelatedTripName) ? "trip" : item.RelatedTripName)</span>
                                             </a>
                                         </div>
                                     }
@@ -77,7 +79,7 @@
                                 @if (string.Equals(item.Category, NotificationCategories.ParsedEmail, StringComparison.OrdinalIgnoreCase))
                                 {
                                     <div class="mt-2">
-                                        <a class="btn btn-sm btn-outline-primary" href="/inbox/drafts">Review in inbox</a>
+                                        <a class="btn btn-sm btn-outline-primary" title="Review parsed email items in your inbox" href="/inbox/drafts"><ActionIcon Name="inbox" /><span class="visually-hidden">Review in inbox</span></a>
                                     </div>
                                 }
 
@@ -96,13 +98,13 @@
                             <div class="d-flex flex-column gap-2 align-items-end">
                                 @if (item.Kind == NotificationKind.Actionable && item.ActionStatus == NotificationActionStatus.Pending)
                                 {
-                                    <button class="btn btn-sm btn-success" @onclick="() => CompleteAsync(item.NotificationId)" disabled="@_isBusy">Complete</button>
+                                    <button type="button" class="btn btn-sm btn-success" title="Mark this notification action as complete" @onclick="() => CompleteAsync(item.NotificationId)" disabled="@_isBusy"><ActionIcon Name="success" /><span class="visually-hidden">Complete</span></button>
                                 }
                                 @if (item.ReadAtUtc is null)
                                 {
-                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => MarkReadAsync(item.NotificationId)" disabled="@_isBusy">Mark read</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Mark this notification as read" @onclick="() => MarkReadAsync(item.NotificationId)" disabled="@_isBusy"><ActionIcon Name="read" /><span class="visually-hidden">Mark read</span></button>
                                 }
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.NotificationId)" disabled="@_isBusy">Delete</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete this notification" @onclick="() => DeleteAsync(item.NotificationId)" disabled="@_isBusy"><ActionIcon Name="delete" /><span class="visually-hidden">Delete</span></button>
                             </div>
                         </div>
                     </div>

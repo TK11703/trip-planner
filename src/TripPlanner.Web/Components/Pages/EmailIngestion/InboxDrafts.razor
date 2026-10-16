@@ -11,13 +11,12 @@
 <PageTitle>Review parsed items</PageTitle>
 
 <section class="inbox-drafts-page">
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <h1 class="mb-0">Review parsed items</h1>
-        <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="LoadAsync" disabled="@(_isLoading || _isBusy)">Refresh</button>
-            <a class="btn btn-outline-secondary btn-sm" href="/inbox/history">Inbox history</a>
-        </div>
-    </div>
+    <EntryPageHeading Title="Review parsed items" Icon="inbox">
+        <Actions>
+            <button type="button" class="btn btn-outline-secondary btn-sm" title="Refresh pending inbox items" @onclick="LoadAsync" disabled="@(_isLoading || _isBusy)"><ActionIcon Name="refresh" /><span class="visually-hidden">Refresh</span></button>
+            <a class="btn btn-outline-secondary btn-sm" title="View received emails and their processing status" href="/inbox/history"><ActionIcon Name="history" /><span class="visually-hidden">Inbox history</span></a>
+        </Actions>
+    </EntryPageHeading>
 
     @if (_isLoading)
     {
@@ -166,16 +165,16 @@
                                 }
                             </div>
                             <div class="d-flex flex-column gap-2 align-items-end">
-                                <button class="btn btn-sm btn-success"
+                                <button type="button" class="btn btn-sm btn-success" title="Confirm this parsed item and add it to its trip"
                                         @onclick="() => ConfirmAsync(draft)"
                                         disabled="@(_isBusy || !CanConfirm(draft))">
-                                    Confirm
+                                    <ActionIcon Name="success" /><span class="visually-hidden">Confirm</span>
                                 </button>
-                                <a class="btn btn-sm btn-outline-secondary" href="@DraftHref(draft)">Edit</a>
-                                <button class="btn btn-sm btn-outline-danger"
+                                <a class="btn btn-sm btn-outline-secondary" title="Edit this parsed item before confirming" href="@DraftHref(draft)"><ActionIcon Name="edit" /><span class="visually-hidden">Edit</span></a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Discard this parsed item without adding it to a trip"
                                         @onclick="() => DiscardAsync(draft.ParsedItemDraftId)"
                                         disabled="@_isBusy">
-                                    Discard
+                                    <ActionIcon Name="delete" /><span class="visually-hidden">Discard</span>
                                 </button>
                             </div>
                         </div>
@@ -320,7 +319,7 @@
                     draft.StartLocal, draft.StartTimeZoneId, draft.EndLocal, draft.EndTimeZoneId,
                     draft.ConfirmationCode, draft.Notes,
                     draft.ProposedOutcome, draft.Origin, draft.Destination,
-                    draft.TransportationMode, draft.TravelCost));
+                    draft.TransportationMode, draft.TravelCost, draft.EstimatedCost));
 
                 if (!saved.Succeeded)
                 {
@@ -355,6 +354,7 @@
 
     private static string FieldLabel(string field) => field switch
     {
+        "estimatedCost" => "Estimated cost",
         "tripId" => "Trip",
         "tripLegId" => "Trip leg",
         "title" => "Title",
