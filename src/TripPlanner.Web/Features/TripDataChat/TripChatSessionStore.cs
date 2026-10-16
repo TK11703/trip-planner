@@ -70,7 +70,7 @@ public sealed class TripChatSessionStore(IJSRuntime jsRuntime) : IAsyncDisposabl
     {
         if (_module is not null)
         {
-            await _module.InvokeVoidAsync("syncPane", element, isOpen);
+            await _module.InvokeVoidAsync("syncPane", isOpen ? element : null, isOpen);
         }
     }
 

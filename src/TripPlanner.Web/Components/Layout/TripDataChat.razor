@@ -122,6 +122,8 @@
             _restoreScroll = true;
             _loaded = true;
             StateHasChanged();
+            // Restored state can open the pane; its element references are available only after the next render.
+            return;
         }
 
         if (_loaded)

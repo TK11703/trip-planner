@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,50 @@ namespace TripPlanner.Web.Tests.TripDataChat;
 
 public sealed class TripDataChatComponentTests : BunitContext
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PaneSynchronizationUsesOnlyRenderedElementsAndNullWhenClosed(bool initiallyOpen)
+    {
+        const string epoch = "opaque-epoch-pane";
+        Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        Services.AddSingleton(new TripChatSessionStore(JSInterop.JSRuntime));
+        Services.AddSingleton<AuthenticationStateProvider>(new ChatAuthenticationStateProvider(true, epoch));
+        Services.AddSingleton<ITripDataChatApiClient>(new StubChatApiClient());
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var module = JSInterop.SetupModule("./js/tripDataChat.js");
+        module.Setup<TripChatSessionSnapshot>("load", epoch)
+            .SetResult(new TripChatSessionSnapshot([], initiallyOpen, 0));
+
+        var cut = Render<ChatComponent>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["syncPane"]));
+
+        if (!initiallyOpen)
+        {
+            await cut.Find(".trip-chat-activator").ClickAsync();
+        }
+        cut.Find("#trip-chat-message").Input("Find my trip");
+        await cut.Find(".trip-chat-close").ClickAsync();
+        Assert.Empty(cut.FindAll("#trip-data-chat-panel"));
+        await cut.InvokeAsync(() => cut.Instance.DisposeAsync().AsTask());
+
+        var invocations = module.Invocations["syncPane"];
+        Assert.Contains(invocations, invocation => Equals(invocation.Arguments[1], true));
+        Assert.Contains(invocations, invocation => Equals(invocation.Arguments[1], false));
+        Assert.All(invocations, invocation =>
+        {
+            if (Assert.IsType<bool>(invocation.Arguments[1]))
+            {
+                var pane = Assert.IsType<ElementReference>(invocation.Arguments[0]);
+                Assert.False(string.IsNullOrEmpty(pane.Id));
+            }
+            else
+            {
+                Assert.Null(invocation.Arguments[0]);
+            }
+        });
+    }
+
     [Fact]
     public void AnonymousUserGetsNoActivatorOrChatApiCalls()
     {
