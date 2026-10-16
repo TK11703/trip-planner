@@ -1,5 +1,4 @@
-using System.Reflection;
-using TripPlanner.Api.Features.EmailIngestion;
+using TripPlanner.Contracts.EmailIngestion;
 using TripPlanner.Contracts.TripItems;
 
 namespace TripPlanner.Api.Tests.EmailIngestion;
@@ -12,30 +11,24 @@ namespace TripPlanner.Api.Tests.EmailIngestion;
 /// </summary>
 public sealed class ConfirmDraftItemTypeTests
 {
-    private static readonly MethodInfo NormalizeMethod =
-        typeof(ConfirmDraftEndpoint).GetMethod("NormalizeItemType", BindingFlags.NonPublic | BindingFlags.Static)
-        ?? throw new InvalidOperationException("ConfirmDraftEndpoint.NormalizeItemType was renamed or removed.");
-
-    private static string Normalize(string? raw) => (string)NormalizeMethod.Invoke(null, [raw])!;
-
     [Theory]
     [InlineData(TrackedItemTypes.Activity)]
     [InlineData(TrackedItemTypes.Reservation)]
     [InlineData(TrackedItemTypes.Event)]
     [InlineData(TrackedItemTypes.Reminder)]
     public void EveryTypeTheDraftEditorOffersSurvivesConfirmation(string chosen)
-        => Assert.Equal(chosen, Normalize(chosen));
+        => Assert.Equal(chosen, DraftClassification.NormalizeItemType(chosen));
 
     [Fact]
     public void AnActivityStaysAnActivityRatherThanBecomingAReservation()
-        => Assert.Equal(TrackedItemTypes.Activity, Normalize("activity"));
+        => Assert.Equal(TrackedItemTypes.Activity, DraftClassification.NormalizeItemType("activity"));
 
     [Theory]
     [InlineData("flight")]
     [InlineData("hotel")]
     [InlineData("car_rental")]
     public void ABookingTheRecognizerNamedBecomesAReservation(string recognized)
-        => Assert.Equal(TrackedItemTypes.Reservation, Normalize(recognized));
+        => Assert.Equal(TrackedItemTypes.Reservation, DraftClassification.NormalizeItemType(recognized));
 
     [Theory]
     [InlineData(null)]
@@ -44,17 +37,17 @@ public sealed class ConfirmDraftItemTypeTests
     [InlineData("other")]
     [InlineData("something the model invented")]
     public void AnythingUnrecognizedFallsBackToAnEvent(string? raw)
-        => Assert.Equal(TrackedItemTypes.Event, Normalize(raw));
+        => Assert.Equal(TrackedItemTypes.Event, DraftClassification.NormalizeItemType(raw));
 
     [Fact]
     public void CasingFromTheModelDoesNotChangeTheOutcome()
-        => Assert.Equal(TrackedItemTypes.Reservation, Normalize("  Car_Rental "));
+        => Assert.Equal(TrackedItemTypes.Reservation, DraftClassification.NormalizeItemType("  Car_Rental "));
 
     [Fact]
     public void TheResultIsAlwaysATypeTheItemFormAccepts()
     {
         string?[] inputs = [null, "", "activity", "reservation", "event", "reminder", "flight", "hotel", "car_rental", "other", "nonsense"];
 
-        Assert.All(inputs, raw => Assert.Contains(Normalize(raw), TrackedItemTypes.All));
+        Assert.All(inputs, raw => Assert.Contains(DraftClassification.NormalizeItemType(raw), TrackedItemTypes.All));
     }
 }
