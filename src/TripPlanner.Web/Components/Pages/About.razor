@@ -1,6 +1,9 @@
 @page "/about"
+@using TripPlanner.Web.Features.EntryPages
 
 <PageTitle>Trip Planner — About</PageTitle>
+
+<EntryBreadcrumb Items="Breadcrumbs" />
 
 <BrandSurface Eyebrow="About Trip Planner" Title="A private home for your travel plans" Class="mb-4">
     <p class="lead mb-0">Trip Planner helps individual travelers turn scattered ideas into a clear, private itinerary without sharing personal trip data on public surfaces.</p>
@@ -18,6 +21,10 @@
                 <h2 class="h5">Your trips stay in your account</h2>
                 <p class="mb-0 text-secondary">Trips, legs, and tracked items stay tied to your account, and no personal data is shown on public pages.</p>
             </div>
+
+            @code {
+                private static readonly IReadOnlyList<BreadcrumbItem> Breadcrumbs = [new("Home", "/"), new("About", IsCurrent: true)];
+            }
         </div>
     </div>
     <div class="col-md-6">

@@ -34,6 +34,9 @@ tests/
 
 ## Page headers
 
+About and FAQ use the shared breadcrumb navigation above their page headers,
+with a Home link and the current page marked for assistive technology.
+
 The Trips listing includes a Home > Trips breadcrumb and lists owned and shared
 trips by start date descending, newest first, across all pages. Trips with the same
 start date use a stable trip-ID tie-breaker.

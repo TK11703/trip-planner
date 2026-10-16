@@ -20,6 +20,7 @@ public class PublicPageTests : BunitContext
     {
         var cut = Render<Faq>();
         Assert.Contains("Frequently asked questions", cut.Markup);
+        AssertBreadcrumbs(cut, "FAQ");
     }
 
     [Fact]
@@ -27,6 +28,21 @@ public class PublicPageTests : BunitContext
     {
         var cut = Render<About>();
         Assert.Contains("Trip Planner", cut.Markup);
+        AssertBreadcrumbs(cut, "About");
+    }
+
+    private static void AssertBreadcrumbs<TComponent>(IRenderedComponent<TComponent> cut, string currentPage)
+        where TComponent : Microsoft.AspNetCore.Components.IComponent
+    {
+        var breadcrumb = Assert.Single(cut.FindAll("nav[aria-label='Breadcrumb']"));
+        Assert.Equal(["Home", currentPage],
+            breadcrumb.QuerySelectorAll(".breadcrumb-item").Select(item => item.TextContent.Trim()));
+        var home = Assert.Single(breadcrumb.QuerySelectorAll("a"));
+        Assert.Equal("Home", home.TextContent);
+        Assert.Equal("/", home.GetAttribute("href"));
+        var current = Assert.Single(breadcrumb.QuerySelectorAll("[aria-current='page']"));
+        Assert.Equal(currentPage, current.TextContent);
+        Assert.Null(current.QuerySelector("a"));
     }
 
     [Fact]

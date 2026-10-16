@@ -1,6 +1,9 @@
 @page "/faq"
+@using TripPlanner.Web.Features.EntryPages
 
 <PageTitle>Trip Planner — FAQ</PageTitle>
+
+<EntryBreadcrumb Items="Breadcrumbs" />
 
 <BrandSurface Eyebrow="Help center" Title="Frequently asked questions" Class="mb-4">
     <p class="lead mb-0">Public help for planning trips confidently. This page does not load or display personal trip data.</p>
@@ -33,6 +36,8 @@ else
 }
 
 @code {
+    private static readonly IReadOnlyList<BreadcrumbItem> Breadcrumbs = [new("Home", "/"), new("FAQ", IsCurrent: true)];
+
     private record FaqEntry(string Question, string Answer);
 
     private readonly IReadOnlyList<FaqEntry> _entries = new List<FaqEntry>
