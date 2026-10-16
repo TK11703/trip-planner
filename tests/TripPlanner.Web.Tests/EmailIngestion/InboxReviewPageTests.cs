@@ -51,6 +51,7 @@ public class InboxReviewPageTests : BunitContext
             Assert.NotNull(cut.Find(".entry-page-icon svg[aria-hidden='true'] rect"));
             Assert.Equal("Refresh", cut.Find(".entry-page-actions button").TextContent);
             Assert.Equal("/inbox/history", cut.Find(".entry-page-actions a").GetAttribute("href"));
+            Assert.Equal("History", cut.Find(".entry-page-actions a svg + span:not(.visually-hidden)").TextContent);
             Assert.Equal(["Refresh pending inbox items", "View received emails and their processing status",
                 "Confirm this parsed item and add it to its trip", "Edit this parsed item before confirming",
                 "Discard this parsed item without adding it to a trip"],
@@ -58,7 +59,7 @@ public class InboxReviewPageTests : BunitContext
             Assert.All(cut.FindAll(".btn"), control =>
             {
                 Assert.NotNull(control.QuerySelector("svg[aria-hidden='true']"));
-                var label = control.QuerySelector(".visually-hidden");
+                var label = control.QuerySelector("span");
                 Assert.NotNull(label);
                 Assert.False(string.IsNullOrWhiteSpace(label.TextContent));
                 Assert.Equal(label.TextContent.Trim(), control.TextContent.Trim());
@@ -825,13 +826,14 @@ public class InboxReviewPageTests : BunitContext
             Assert.NotNull(cut.Find(".entry-page-icon svg[aria-hidden='true'] rect"));
             Assert.Equal("Refresh", cut.Find(".entry-page-actions button").TextContent);
             Assert.Equal("/inbox/drafts", cut.Find(".entry-page-actions a").GetAttribute("href"));
+            Assert.Equal("Drafts", cut.Find(".entry-page-actions a svg + span:not(.visually-hidden)").TextContent);
             Assert.Equal(["Refresh inbox email history", "Review parsed items waiting for confirmation",
                 "Try processing this email again"],
                 cut.FindAll(".btn").Select(control => control.GetAttribute("title")));
             Assert.All(cut.FindAll(".btn"), control =>
             {
                 Assert.NotNull(control.QuerySelector("svg[aria-hidden='true']"));
-                var label = control.QuerySelector(".visually-hidden");
+                var label = control.QuerySelector("span");
                 Assert.NotNull(label);
                 Assert.False(string.IsNullOrWhiteSpace(label.TextContent));
                 Assert.Equal(label.TextContent.Trim(), control.TextContent.Trim());

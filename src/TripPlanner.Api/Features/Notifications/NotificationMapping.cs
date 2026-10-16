@@ -27,6 +27,7 @@ public static class NotificationMapping
             record.CompletedAtUtc,
             completedBy,
             record.EmailDeliveryStatus,
-            canOpenTrip);
+            canOpenTrip,
+            record.RelatedEmailSubject);
     }
 }

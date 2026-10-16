@@ -9,6 +9,60 @@ namespace TripPlanner.Web.Tests.Notifications;
 
 public class NotificationsPageTests : BunitContext
 {
+    [Fact]
+    public void EmailSubjectsDistinguishOtherwiseIdenticalNotificationsAndRenderAsText()
+    {
+        string[] subjects = ["Flight ABC123 confirmation", "Hotel booking in Seattle", "<script>alert('booking')</script>"];
+        var client = new StubNotificationApiClient(true)
+        {
+            Items = subjects.Select(EmailNotification).ToArray()
+        };
+        Services.AddSingleton<INotificationApiClient>(client);
+
+        var cut = Render<NotificationsIndex>();
+
+        cut.WaitForAssertion(() =>
+        {
+            var cards = cut.FindAll(".notification-card");
+            Assert.Equal(subjects.Length, cards.Count);
+            for (var i = 0; i < subjects.Length; i++)
+            {
+                var subject = cards[i].QuerySelector("[data-testid='notification-email-subject']");
+                Assert.NotNull(subject);
+                Assert.Equal($"Email subject: {subjects[i]}", subject.TextContent.Trim());
+            }
+            Assert.Empty(cut.FindAll("script"));
+            Assert.Equal(subjects.Length, cut.FindAll("a[href='/inbox/drafts']").Count);
+        });
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void MissingOrBlankEmailSubjectDoesNotAddAnEmptyLine(string? subject)
+    {
+        Services.AddSingleton<INotificationApiClient>(new StubNotificationApiClient(true)
+        {
+            Items = [EmailNotification(subject)]
+        });
+
+        var cut = Render<NotificationsIndex>();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Single(cut.FindAll(".notification-card"));
+            Assert.Empty(cut.FindAll("[data-testid='notification-email-subject']"));
+            Assert.Contains("Review and confirm the extracted items.", cut.Markup, StringComparison.Ordinal);
+        });
+    }
+
+    private static NotificationResponse EmailNotification(string? subject) => new(
+        Guid.NewGuid(), NotificationCategories.ParsedEmail, NotificationKind.Actionable,
+        NotificationTargetType.Person, null, null, "New trip item ready to review",
+        "Review and confirm the extracted items.", DateTimeOffset.UtcNow, null,
+        NotificationActionStatus.Pending, null, null, NotificationEmailStatus.NotRequested, false, subject);
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -75,18 +129,19 @@ public class NotificationsPageTests : BunitContext
 
     private sealed class StubNotificationApiClient(bool hasNotifications) : INotificationApiClient
     {
+        public IReadOnlyList<NotificationResponse>? Items { get; init; }
         public int Fetches { get; private set; }
         public int MarkAllReadCalls { get; private set; }
 
         public Task<IReadOnlyList<NotificationResponse>> GetListAsync(CancellationToken ct = default)
         {
             Fetches++;
-            IReadOnlyList<NotificationResponse> items = hasNotifications
+            IReadOnlyList<NotificationResponse> items = Items ?? (hasNotifications
                 ? [new(Guid.NewGuid(), NotificationCategories.ParsedEmail, NotificationKind.Actionable,
                     NotificationTargetType.Trip, Guid.NewGuid(), "Summer trip", "Review parsed items", "An email is ready for review.",
                     DateTimeOffset.UtcNow, null, NotificationActionStatus.Pending, null, null,
                     NotificationEmailStatus.NotRequested, true)]
-                : [];
+                : []);
             return Task.FromResult(items);
         }
 

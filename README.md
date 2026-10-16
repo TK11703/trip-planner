@@ -34,6 +34,10 @@ tests/
 
 ## Page headers
 
+The Trips listing includes a Home > Trips breadcrumb and lists owned and shared
+trips by start date descending, newest first, across all pages. Trips with the same
+start date use a stable trip-ID tie-breaker.
+
 Trips, Profile, Favorites, Notifications, and Inbox (review and history) use the
 same responsive, icon-led title banner as trip details. Trips keeps its New trip
 action in the banner. The shared Aurora header uses a deep teal gradient,
@@ -48,6 +52,11 @@ explanatory hover titles and screen-reader labels. Existing page descriptions,
 forms, and favorites actions remain available.
 When Notifications is empty, the caught-up message appears in a green success
 alert with a checked-box icon.
+Emailed-trip-item notifications show the source email's subject beneath the message,
+including existing notifications whose source email is still available. Subjects
+are visible only to the email's owner; blank or unavailable subjects are omitted.
+The Profile page's three notification preference groups share one row on medium
+and larger screens and stack vertically on smaller screens.
 The draft edit form starts with the Trip selector, before the booking-outcome
 picker, and keeps visible Save and Cancel labels with matching action icons and
 explanatory hover titles.

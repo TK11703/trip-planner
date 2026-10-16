@@ -26,6 +26,12 @@ public class TripsIndexMotivationTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             Assert.Equal("Trips", cut.Find("header.entry-page-heading h1").TextContent);
+            var breadcrumbs = cut.Find("nav[aria-label='Breadcrumb']");
+            Assert.Equal(["Home", "Trips"],
+                breadcrumbs.QuerySelectorAll(".breadcrumb-item").Select(item => item.TextContent.Trim()));
+            Assert.Equal("/", breadcrumbs.QuerySelector("a")!.GetAttribute("href"));
+            Assert.Equal("Trips", breadcrumbs.QuerySelector("[aria-current='page']")!.TextContent.Trim());
+            Assert.Null(breadcrumbs.QuerySelector("[aria-current='page'] a"));
             Assert.Single(cut.FindAll("h1"));
             Assert.Equal("-1", cut.Find("h1").GetAttribute("tabindex"));
             Assert.Equal("trip", cut.FindComponent<EntryPageHeading>().Instance.Icon);
@@ -69,6 +75,8 @@ public class TripsIndexMotivationTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             Assert.Contains("Weekend away", cut.Markup);
+            Assert.Equal(["Home", "Trips"], cut.FindAll("nav[aria-label='Breadcrumb'] .breadcrumb-item")
+                .Select(item => item.TextContent.Trim()));
             Assert.Contains("Travel planning tips", cut.Markup);
             Assert.NotNull(cut.Find("section.motivational-facts.motivational-facts-secondary"));
         });

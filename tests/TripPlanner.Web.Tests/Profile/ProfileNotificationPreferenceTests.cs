@@ -18,7 +18,8 @@ public class ProfileNotificationPreferenceTests : BunitContext
         var preferences = new NotificationPreferences(new[]
         {
             new NotificationCategoryPreference(NotificationCategories.ItineraryChanges, "Itinerary changes", true, false, NotificationPreferenceSource.Saved),
-            new NotificationCategoryPreference(NotificationCategories.TripSharing, "Trip sharing", false, true, NotificationPreferenceSource.Saved)
+            new NotificationCategoryPreference(NotificationCategories.TripSharing, "Trip sharing", false, true, NotificationPreferenceSource.Saved),
+            new NotificationCategoryPreference(NotificationCategories.ParsedEmail, "Emailed trip items", true, false, NotificationPreferenceSource.Saved)
         });
         var profile = ProfileTestData.CompleteProfile(preferences);
         Services.AddSingleton<IProfileApiClient>(new RecordingProfileApiClient(profile));
@@ -32,6 +33,20 @@ public class ProfileNotificationPreferenceTests : BunitContext
         Assert.False(cut.Find("#notif-ItineraryChanges-email").HasAttribute("checked"));
         Assert.False(cut.Find("#notif-TripSharing-inapp").HasAttribute("checked"));
         Assert.True(cut.Find("#notif-TripSharing-email").HasAttribute("checked"));
+        Assert.True(cut.Find("#notif-ParsedEmail-inapp").HasAttribute("checked"));
+        Assert.False(cut.Find("#notif-ParsedEmail-email").HasAttribute("checked"));
+        var categories = cut.FindAll("fieldset.notification-category");
+        Assert.Equal(3, categories.Count);
+        var row = categories[0].ParentElement!.ParentElement;
+        Assert.NotNull(row);
+        Assert.Contains("row", row.ClassList);
+        Assert.All(categories, category =>
+        {
+            var column = category.ParentElement!;
+            Assert.Contains("col-12", column.ClassList);
+            Assert.Contains("col-md-4", column.ClassList);
+            Assert.Same(row, column.ParentElement);
+        });
     }
 
     [Fact]

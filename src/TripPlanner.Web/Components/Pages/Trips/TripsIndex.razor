@@ -7,6 +7,8 @@
 
 <PageTitle>Trips</PageTitle>
 
+<EntryBreadcrumb Items="Breadcrumbs" />
+
 <EntryPageHeading Title="Trips" Context="Keep your upcoming and shared travel plans organized in one place — trips you own and trips shared with you." Icon="trip">
     <Actions>
         <a class="btn btn-primary" href="@EntryPageUrls.TripCreate(OriginHref)">New trip</a>
@@ -55,6 +57,7 @@ else
 }
 
 @code {
+    private static readonly IReadOnlyList<BreadcrumbItem> Breadcrumbs = [new("Home", "/"), new("Trips", IsCurrent: true)];
     private const int DefaultPageSize = 12;
     [SupplyParameterFromQuery(Name = "page")] public int? RequestedPage { get; set; }
     [SupplyParameterFromQuery(Name = "pageSize")] public int? RequestedPageSize { get; set; }

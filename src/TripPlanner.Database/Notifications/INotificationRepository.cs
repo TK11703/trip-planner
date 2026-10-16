@@ -19,7 +19,8 @@ public sealed record NotificationRecord(
     DateTimeOffset? CompletedAtUtc,
     string? CompletedByUserId,
     string? CompletedByDisplayName,
-    NotificationEmailStatus EmailDeliveryStatus);
+    NotificationEmailStatus EmailDeliveryStatus,
+    string? RelatedEmailSubject = null);
 
 /// <summary>A new notification to create for a single recipient.</summary>
 public sealed record NewNotification(

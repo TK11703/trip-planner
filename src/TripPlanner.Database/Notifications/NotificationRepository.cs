@@ -190,7 +190,8 @@ public sealed class NotificationRepository : INotificationRepository
         DateTimeOffset? CompletedAtUtc,
         string? CompletedByUserId,
         string? CompletedByDisplayName,
-        string EmailDeliveryStatus)
+        string EmailDeliveryStatus,
+        string? RelatedEmailSubject)
     {
         public NotificationRecord ToRecord() => new(
             NotificationId,
@@ -208,7 +209,8 @@ public sealed class NotificationRepository : INotificationRepository
             CompletedAtUtc,
             CompletedByUserId,
             CompletedByDisplayName,
-            ParseEmail(EmailDeliveryStatus));
+            ParseEmail(EmailDeliveryStatus),
+            RelatedEmailSubject);
     }
 
     private sealed record PreferenceRow(string UserId, string Category, bool InAppEnabled, bool EmailEnabled, DateTimeOffset UpdatedAtUtc)

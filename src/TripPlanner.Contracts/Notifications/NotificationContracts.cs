@@ -51,7 +51,8 @@ public sealed record NotificationResponse(
     DateTimeOffset? CompletedAtUtc,
     NotificationCompletedBy? CompletedBy,
     NotificationEmailStatus EmailDeliveryStatus,
-    bool CanOpenTrip);
+    bool CanOpenTrip,
+    string? RelatedEmailSubject = null);
 
 /// <summary>A page of the recipient's notifications, newest first.</summary>
 public sealed record NotificationListResponse(

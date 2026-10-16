@@ -14,7 +14,7 @@
     <EntryPageHeading Title="Review parsed items" Icon="inbox">
         <Actions>
             <button type="button" class="btn btn-outline-secondary btn-sm" title="Refresh pending inbox items" @onclick="LoadAsync" disabled="@(_isLoading || _isBusy)"><ActionIcon Name="refresh" /><span class="visually-hidden">Refresh</span></button>
-            <a class="btn btn-outline-secondary btn-sm" title="View received emails and their processing status" href="/inbox/history"><ActionIcon Name="history" /><span class="visually-hidden">Inbox history</span></a>
+            <a class="btn btn-outline-secondary btn-sm" title="View received emails and their processing status" href="/inbox/history"><ActionIcon Name="history" CssClass="me-1 align-text-bottom" /><span>History</span></a>
         </Actions>
     </EntryPageHeading>
 

@@ -52,5 +52,5 @@ SELECT
 FROM accessible a
 LEFT JOIN item_counts c ON c.trip_id = a.trip_id
 GROUP BY a.trip_id, a.name, a.description, a.start_date, a.end_date, a.updated_at_utc, a.access_level, a.is_owner
-ORDER BY a.updated_at_utc DESC, a.end_date DESC, a.trip_id
+ORDER BY a.start_date DESC, a.trip_id
 LIMIT @Limit OFFSET @Offset;

@@ -24,4 +24,5 @@ RETURNING notification_id AS NotificationId,
           completed_at_utc AS CompletedAtUtc,
           completed_by_user_id AS CompletedByUserId,
           completed_by_display_name AS CompletedByDisplayName,
-          email_delivery_status AS EmailDeliveryStatus;
+          email_delivery_status AS EmailDeliveryStatus,
+          NULL::text AS RelatedEmailSubject;
