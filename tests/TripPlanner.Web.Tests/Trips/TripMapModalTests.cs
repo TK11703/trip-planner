@@ -23,6 +23,31 @@ public class TripMapModalTests : BunitContext
     }
 
     [Fact]
+    public void RequestFailure_ShowsAlertInsteadOfEmptyState()
+    {
+        Services.AddSingleton<ITripApiClient>(new MapStubTripApiClient(
+            new TripMapResponse(Array.Empty<TripMapLocation>()), new HttpRequestException("Unavailable")));
+
+        var cut = Render<TripMapModal>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+
+        Assert.Contains("couldn't load the trip map", cut.Find("[role='alert']").TextContent);
+        Assert.DoesNotContain("couldn't place", cut.Markup);
+        Assert.Empty(cut.FindAll(".tp-map-canvas"));
+    }
+
+    [Fact]
+    public void Timeout_ShowsAlertInsteadOfEmptyState()
+    {
+        Services.AddSingleton<ITripApiClient>(new MapStubTripApiClient(
+            new TripMapResponse(Array.Empty<TripMapLocation>()), new TaskCanceledException("Timed out")));
+
+        var cut = Render<TripMapModal>(p => p.Add(x => x.TripId, Guid.NewGuid()));
+
+        Assert.Contains("couldn't load the trip map", cut.Find("[role='alert']").TextContent);
+        Assert.DoesNotContain("couldn't place", cut.Markup);
+    }
+
+    [Fact]
     public void NoLocations_ShowsEmptyState_AndNoCanvas()
     {
         var cut = Render(new TripMapResponse(Array.Empty<TripMapLocation>()));
@@ -65,9 +90,15 @@ public class TripMapModalTests : BunitContext
     private sealed class MapStubTripApiClient : ITripApiClient
     {
         private readonly TripMapResponse _map;
-        public MapStubTripApiClient(TripMapResponse map) => _map = map;
+        private readonly Exception? _failure;
+        public MapStubTripApiClient(TripMapResponse map, Exception? failure = null)
+        {
+            _map = map;
+            _failure = failure;
+        }
 
-        public Task<TripMapResponse> GetTripMapAsync(Guid tripId, CancellationToken ct = default) => Task.FromResult(_map);
+        public Task<TripMapResponse> GetTripMapAsync(Guid tripId, CancellationToken ct = default)
+            => _failure is null ? Task.FromResult(_map) : Task.FromException<TripMapResponse>(_failure);
 
         public Task<TripListResponse> GetTripsAsync(int page = 1, int pageSize = 12, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<TripSummary>> GetRecentAsync(int? limit = null, CancellationToken ct = default) => throw new NotSupportedException();

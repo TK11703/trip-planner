@@ -6,7 +6,7 @@ A runnable validation guide for the three capabilities in this feature. For data
 
 - .NET 10 SDK and the repo building normally.
 - Local PostgreSQL provided by Aspire (the AppHost applies `TripPlanner.Database` migrations, including `009_user_profile_map_provider.sql`).
-- An Azure Maps subscription key set for the API so geocoding/typeahead work: `AzureMaps:SubscriptionKey` via user-secrets on `TripPlanner.Api` (or environment). Without it, the built-in map degrades to an empty state (still valid to test the disabled/empty paths).
+- Azure Maps Entra authentication configured on the API: set `AzureMaps:ClientId` to the Maps account's unique ID and optionally `AzureMaps:Endpoint` via user-secrets on `TripPlanner.Api` (or environment). The default endpoint is `https://atlas.microsoft.com/`. The identity selected by `DefaultAzureCredential` needs **Azure Maps Data Reader** on that account, including the local developer identity. Without a client ID, the built-in map degrades to an empty state.
 - A signed-in user with at least one trip.
 
 ## Run
@@ -56,13 +56,16 @@ Open the Web app from the Aspire dashboard and sign in.
 - On first launch the map is framed so **all** markers are visible at once.
 - You can drag to pan and scroll/buttons to zoom in and out freely afterward.
 - Events without a location do not appear.
+- Distinct location texts are resolved with at most four concurrent lookups per map request; repeated texts (ignoring case and surrounding whitespace) share a lookup. Marker order remains the item order.
+- The scoped Maps lookup reuses its Entra token until refresh is needed, avoiding a separate Azure CLI process for every location during local development.
 
 ## Scenario 5 — Graceful degradation (FR-006, edge cases)
 
-1. With Azure Maps **unconfigured** (empty `AzureMaps:SubscriptionKey`), open a trip that has location text and click **View map** (the button is still enabled because location text exists).
+1. With Azure Maps **unconfigured** (empty `AzureMaps:ClientId`), open a trip that has location text and click **View map** (the button is still enabled because location text exists).
    - **Expected**: the modal opens and shows a clear **empty state** rather than an error.
 2. With Azure Maps configured but one event's location is gibberish, open the map.
    - **Expected**: the resolvable markers still render; the unresolved one is silently omitted; the map does not fail.
+3. If the map API request fails or times out, the modal shows a loading-failure alert rather than incorrectly reporting no resolvable locations. Close and reopen the map to retry. Closing the modal cancels its pending request.
 
 ## Scenario 6 — Identify and open an event from a marker (P3 / FR-013, FR-014)
 
@@ -93,4 +96,4 @@ dotnet test tests/TripPlanner.E2E.Tests/TripPlanner.E2E.Tests.csproj
 - [ ] **View map** is disabled when the trip has no locations, enabled otherwise.
 - [ ] The built-in map fits all markers on first open, then pans/zooms freely.
 - [ ] Unresolved/unconfigured cases degrade to a partial/empty map, never an error.
-- [ ] The Azure Maps key is never sent to the browser (only OSM tiles load client-side).
+- [ ] Azure Maps credentials are never sent to the browser (only OSM tiles load client-side).

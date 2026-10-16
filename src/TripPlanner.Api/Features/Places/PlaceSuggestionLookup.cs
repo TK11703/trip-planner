@@ -50,7 +50,7 @@ public interface IPlaceTimeZoneLookup
     Task<string?> ResolveTimeZoneAsync(string query, CancellationToken ct);
 }
 
-public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPlaceGeocoder, IPlaceTimeZoneLookup
+public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLookup, IPlaceGeocoder, IPlaceTimeZoneLookup, IDisposable
 {
     public const string HttpClientName = "azuremaps";
 
@@ -63,6 +63,8 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
     private readonly TokenCredential _credential;
     private readonly ILogger<AzureMapsPlaceSuggestionLookup> _logger;
     private readonly string? _clientId;
+    private readonly SemaphoreSlim _tokenLock = new(1, 1);
+    private AccessToken _accessToken;
 
     public AzureMapsPlaceSuggestionLookup(
         IHttpClientFactory httpFactory,
@@ -82,13 +84,36 @@ public sealed partial class AzureMapsPlaceSuggestionLookup : IPlaceSuggestionLoo
     private async Task<HttpRequestMessage> CreateRequestAsync(string requestUri, CancellationToken ct)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-        // Azure.Identity caches the token internally, so this is a cheap lookup once warm.
-        var token = await _credential.GetTokenAsync(new TokenRequestContext(MapsScopes), ct);
+        var token = await GetAccessTokenAsync(ct);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
         request.Headers.TryAddWithoutValidation("x-ms-client-id", _clientId);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return request;
     }
+
+    private async Task<AccessToken> GetAccessTokenAsync(CancellationToken ct)
+    {
+        // AzureCliCredential starts a process for every acquisition; share one token within this scope.
+        await _tokenLock.WaitAsync(ct);
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (string.IsNullOrEmpty(_accessToken.Token)
+                || _accessToken.ExpiresOn <= now.AddMinutes(5)
+                || (_accessToken.RefreshOn is { } refreshOn && refreshOn <= now))
+            {
+                _accessToken = await _credential.GetTokenAsync(new TokenRequestContext(MapsScopes), ct);
+            }
+
+            return _accessToken;
+        }
+        finally
+        {
+            _tokenLock.Release();
+        }
+    }
+
+    public void Dispose() => _tokenLock.Dispose();
 
     public async Task<IReadOnlyList<PlaceSuggestion>> SearchAsync(string query, CancellationToken ct)
     {

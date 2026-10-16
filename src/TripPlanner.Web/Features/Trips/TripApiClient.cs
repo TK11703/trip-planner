@@ -114,10 +114,10 @@ public sealed class TripApiClient : ITripApiClient
 
     public async Task<TripMapResponse> GetTripMapAsync(Guid tripId, CancellationToken ct = default)
     {
-        var resp = await _http.GetAsync($"/api/trips/{tripId}/map", ct);
-        if (!resp.IsSuccessStatusCode) return new TripMapResponse(Array.Empty<TripMapLocation>());
+        using var resp = await _http.GetAsync($"/api/trips/{tripId}/map", ct);
+        await EnsureSuccessAsync(resp, ct);
         var result = await resp.Content.ReadFromJsonAsync<TripMapResponse>(cancellationToken: ct);
-        return result ?? new TripMapResponse(Array.Empty<TripMapLocation>());
+        return result ?? throw new InvalidOperationException("The map response was empty.");
     }
 
     public async Task<IReadOnlyList<TripShareMember>> GetSharesAsync(Guid tripId, CancellationToken ct = default)

@@ -34,6 +34,7 @@ using TripPlanner.Database.TripDataChat;
 using TripPlanner.Database.FavoriteDestinations;
 using TripPlanner.Api.Features.TripDataChat;
 using TripPlanner.Api.Features.FavoriteDestinations;
+using TripPlanner.Api.Features.TripMaps;
 
 namespace TripPlanner.Api.Extensions;
 
@@ -121,6 +122,7 @@ public static class WebApplicationBuilderExtensions
             sp.GetRequiredService<ILogger<AzureMapsPlaceSuggestionLookup>>()));
         builder.Services.AddScoped<IPlaceSuggestionLookup>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
         builder.Services.AddScoped<IPlaceGeocoder>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
+        builder.Services.AddScoped<TripMapLocationResolver>();
         builder.Services.AddScoped<IPlaceTimeZoneLookup>(sp => sp.GetRequiredService<AzureMapsPlaceSuggestionLookup>());
         builder.Services.AddHttpClient(GoogleMapsUrlResolver.HttpClientName, client =>
         {

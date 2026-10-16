@@ -67,6 +67,67 @@ public class AzureMapsPlaceGeocoderTests
         Assert.Equal(2.3376, point.Value.Longitude, 4);
     }
 
+    [Fact]
+    public async Task ConcurrentGeocoding_SharesOneTokenAcquisition()
+    {
+        var credential = new CountingTokenCredential();
+        using var geocoder = new AzureMapsPlaceSuggestionLookup(
+            new StubHttpClientFactory(new FakeHandler(HttpStatusCode.OK,
+                """{"results":[{"position":{"lat":20,"lon":-155}}]}""")),
+            Config("test-client-id"), credential, NullLogger<AzureMapsPlaceSuggestionLookup>.Instance);
+
+        var lookups = Enumerable.Range(0, 12)
+            .Select(i => geocoder.GeocodeAsync($"Place {i}", CancellationToken.None)).ToArray();
+        await credential.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        credential.Release.SetResult();
+        var points = await Task.WhenAll(lookups).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, credential.Calls);
+        Assert.All(points, point => Assert.Equal(new GeoPoint(20, -155), point));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TokenNeedingRefresh_IsReacquired(bool refreshOnElapsed)
+    {
+        var credential = new CountingTokenCredential();
+        credential.Release.SetResult();
+        credential.Token = refreshOnElapsed
+            ? new AccessToken("stub", DateTimeOffset.UtcNow.AddHours(1), DateTimeOffset.UtcNow.AddMinutes(-1))
+            : new AccessToken("stub", DateTimeOffset.UtcNow.AddMinutes(1));
+        using var geocoder = new AzureMapsPlaceSuggestionLookup(
+            new StubHttpClientFactory(new FakeHandler(HttpStatusCode.OK, """{"results":[]}""")),
+            Config("test-client-id"), credential, NullLogger<AzureMapsPlaceSuggestionLookup>.Instance);
+
+        await geocoder.GeocodeAsync("First place", CancellationToken.None);
+        credential.Token = new AccessToken("fresh", DateTimeOffset.UtcNow.AddHours(1));
+        await geocoder.GeocodeAsync("Second place", CancellationToken.None);
+        await geocoder.GeocodeAsync("Third place", CancellationToken.None);
+
+        Assert.Equal(2, credential.Calls);
+    }
+
+    private sealed class CountingTokenCredential : TokenCredential
+    {
+        private int _calls;
+        public int Calls => Volatile.Read(ref _calls);
+        public AccessToken Token { get; set; } = new("stub", DateTimeOffset.UtcNow.AddHours(1));
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public override async ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            Started.TrySetResult();
+            await Release.Task.WaitAsync(cancellationToken);
+            return Token;
+        }
+    }
+
     private sealed class StubTokenCredential : TokenCredential
     {
         public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
