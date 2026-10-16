@@ -57,6 +57,8 @@ including existing notifications whose source email is still available. Subjects
 are visible only to the email's owner; blank or unavailable subjects are omitted.
 The Profile page's three notification preference groups share one row on medium
 and larger screens and stack vertically on smaller screens.
+Successful profile saves show a check icon before the confirmation message, which
+automatically disappears after 10 seconds. Saving again restarts the countdown.
 Profile also lets each user save or clear a default color for Activity,
 Reservation, Event, and Reminder. Color dropdowns show a swatch beside the selected
 value and every option, using the same palette as trip items. New items and explicit type changes select that

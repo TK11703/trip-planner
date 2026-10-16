@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inherits ApiComponentBase
+@implements IDisposable
 @using System.ComponentModel.DataAnnotations
 @using TripPlanner.Contracts.Profile
 @using TripPlanner.Contracts.TripItems
@@ -26,7 +27,10 @@ else if (_model is not null)
 {
     @if (_saveMessage is not null)
     {
-        <div class="alert alert-success" role="status">@_saveMessage</div>
+        <div class="alert alert-success d-flex align-items-center gap-2" role="status">
+            <ActionIcon Name="success" CssClass="flex-shrink-0" />
+            <span>@_saveMessage</span>
+        </div>
     }
     @if (_saveError is not null)
     {
@@ -126,6 +130,7 @@ else if (_model is not null)
     private string? _saveError;
     private string? _saveMessage;
     private ProfileFormModel? _model;
+    private CancellationTokenSource? _saveMessageTimer;
 
     protected override async Task OnInitializedAsync()
     {
@@ -151,6 +156,7 @@ else if (_model is not null)
         if (_model is null) return;
 
         _isSaving = true;
+        StopSaveMessageTimer();
         _saveError = null;
         _saveMessage = null;
 
@@ -175,11 +181,43 @@ else if (_model is not null)
                 MapPreference.Invalidate();
                 ApplyProfile(saved);
                 _saveMessage = "Profile saved. Notification changes apply to future notifications.";
+                _saveMessageTimer = new CancellationTokenSource();
+                _ = HideSaveMessageAsync(_saveMessageTimer.Token);
             },
             message => _saveError = message);
 
         _isSaving = false;
     }
+
+    private async Task HideSaveMessageAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await InvokeAsync(() =>
+        {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                _saveMessage = null;
+                StateHasChanged();
+            }
+        });
+    }
+
+    private void StopSaveMessageTimer()
+    {
+        _saveMessageTimer?.Cancel();
+        _saveMessageTimer?.Dispose();
+        _saveMessageTimer = null;
+    }
+
+    public void Dispose() => StopSaveMessageTimer();
 
     private void ApplyProfile(UserProfileResponse profile)
     {
